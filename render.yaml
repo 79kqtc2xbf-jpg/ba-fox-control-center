@@ -1,0 +1,26 @@
+services:
+  - type: worker
+    name: ba-fox-control-center
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m bot.main
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_OWNER_CHAT_ID
+        sync: false
+      - key: GOOGLE_SHEET_ID
+        value: 1TJjQ0Uc_olOxL8kGW3tmd-e2wCfRoPkxbOEDOBs60F4
+      - key: TIMEZONE
+        value: Europe/Amsterdam
+      - key: REMINDER_MODE
+        value: combo
+      - key: MORNING_PROMPT_TIME
+        value: "09:30"
+      - key: MIDDAY_CHECK_TIME
+        value: "12:30"
+      - key: PUSH_CHECK_TIME
+        value: "15:30"
+      - key: EVENING_REPORT_TIME
+        value: "19:30"
