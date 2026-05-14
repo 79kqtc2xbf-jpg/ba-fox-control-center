@@ -1,14 +1,20 @@
+from datetime import date, datetime, timedelta
+
 from aiogram import Router, F
 from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
 from bot.config import settings
-from bot.keyboards import dashboard_keyboard, main_menu, task_actions, task_list_keyboard
+from bot.keyboards import add_task_preview_keyboard, dashboard_keyboard, main_menu, task_actions, task_list_keyboard
 from services.google_sheets import GoogleSheetsTaskStore, Task
 from services.report_builder import build_daily_report
 
 router = Router()
 store = GoogleSheetsTaskStore(settings.google_sheet_id)
+
+# MVP in-memory state. Good enough for local testing; later move to Redis/DB.
+awaiting_task_text: set[int] = set()
+pending_tasks: dict[int, Task] = {}
 
 
 def _task_name(task: Task) -> str:
@@ -92,6 +98,143 @@ def _filter_tasks(tasks: list[Task], category_key: str) -> list[Task]:
     if category_key == 'theodor':
         return [task for task in open_tasks if _is_theodor(task)]
     return open_tasks
+
+
+def _guess_category(raw: str) -> str:
+    text = raw.lower()
+    if any(word in text for word in ['документ', 'kyc', 'анкета', 'договор', 'выписк', 'пакет']):
+        return '📄 Документация'
+    if any(word in text for word in ['письмо', 'написать', 'ответить', 'пуш', 'follow', 'оффер', 'рассылк']):
+        return '💌 Письма'
+    if any(word in text for word in ['созвон', 'встреч', 'коммуникац', 'контакт', 'канал', 'напомнить']):
+        return '📞 Коммуникация'
+    if any(word in text for word in ['собесед', 'кандидат', 'hr', 'дубна']):
+        return '🤝 HR'
+    if any(word in text for word in ['оплат', 'пошлин', 'офис', 'поддержк']):
+        return '🌈 Дополнительные задачи'
+    if 'теодор' in text:
+        return '❤️ Напоминания для Теодора'
+    return '🌈 Дополнительные задачи'
+
+
+def _guess_organization(raw: str) -> str:
+    known = [
+        'Bitazza', 'BCEL', 'Super Rich Exchange', 'Super Rich', 'Niche', 'P3 Estates',
+        'GLN', 'JDB', 'APEC', 'Shobana', 'Flow official docs', 'Prominds Laos',
+        'Prominds', 'E com charge', 'E com', 'BOL', 'Kasikorn', 'Epay', 'Недвижимость',
+    ]
+    lower = raw.lower()
+    for item in known:
+        if item.lower() in lower:
+            return item
+    # Simple fallback: take text before dash if user wrote “Org — task”.
+    for sep in [' — ', ' - ', ':']:
+        if sep in raw:
+            candidate = raw.split(sep, 1)[0].strip()
+            if 2 <= len(candidate) <= 40:
+                return candidate
+    return ''
+
+
+def _guess_priority(raw: str) -> str:
+    text = raw.lower()
+    if any(word in text for word in ['срочно', 'важно', 'сегодня', 'до конца дня', 'обязательно']):
+        return 'Высокий'
+    if any(word in text for word in ['когда будет время', 'не срочно', 'потом', 'можно позже']):
+        return 'Низкий'
+    return 'Средний'
+
+
+def _guess_deadline(raw: str) -> str:
+    text = raw.lower()
+    if 'завтра' in text:
+        return 'Завтра'
+    if any(word in text for word in ['сегодня', 'срочно', 'до конца дня']):
+        return 'Сегодня'
+    return 'Сегодня'
+
+
+def _guess_status(raw: str) -> str:
+    text = raw.lower()
+    if 'пуш' in text or 'напомнить' in text or 'follow' in text:
+        return 'Пуш'
+    if 'жд' in text or 'ожида' in text:
+        return 'Ждём ответ'
+    return 'Не начато'
+
+
+def _build_steps(category: str, organization: str, title: str) -> str:
+    if 'Документац' in category:
+        return (
+            '1. Открыть папку/переписку по задаче.\n'
+            '2. Проверить, что уже есть.\n'
+            '3. Найти недостающее.\n'
+            '4. Дособрать или запросить документы.\n'
+            '5. Обновить статус в боте.'
+        )
+    if 'Письм' in category:
+        return (
+            '1. Найти последнюю переписку.\n'
+            '2. Проверить контекст и кому мы должны ответить.\n'
+            '3. Подготовить короткий текст.\n'
+            '4. Отправить письмо/пуш.\n'
+            '5. Обновить статус.'
+        )
+    if 'Коммуникац' in category or 'Напоминания' in category:
+        return (
+            '1. Найти нужный контакт/чат.\n'
+            '2. Сформулировать короткое сообщение.\n'
+            '3. Отправить или передать на согласование.\n'
+            '4. Зафиксировать ответ/следующий шаг.\n'
+            '5. Обновить статус.'
+        )
+    return (
+        '1. Уточнить контекст задачи.\n'
+        '2. Сделать первый практический шаг.\n'
+        '3. Зафиксировать результат.\n'
+        '4. Обновить статус в боте.'
+    )
+
+
+def parse_free_task(raw: str) -> Task:
+    today = date.today().isoformat()
+    stamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    category = _guess_category(raw)
+    organization = _guess_organization(raw)
+    title = raw.strip()
+    if organization and title.lower().startswith(organization.lower()):
+        title = title[len(organization):].lstrip(' —-:') or raw.strip()
+
+    return Task(
+        task_id=f'EA-MANUAL-{stamp}',
+        task_date=today,
+        category=category,
+        organization=organization,
+        title=title[:180],
+        steps=_build_steps(category, organization, title),
+        source='Telegram manual',
+        priority=_guess_priority(raw),
+        deadline=_guess_deadline(raw),
+        reminder_mode='Комбо',
+        status=_guess_status(raw),
+        next_reminder=(datetime.now() + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M'),
+        result='',
+        channel='Telegram',
+    )
+
+
+def build_add_task_preview(task: Task) -> str:
+    return (
+        '🦊 <b>Я поняла задачу так:</b>\n\n'
+        f'Категория: {task.category}\n'
+        f'Организация: {task.organization or "—"}\n'
+        f'Задача: <b>{task.title}</b>\n'
+        f'Приоритет: {task.priority}\n'
+        f'Дедлайн: {task.deadline}\n'
+        f'Статус: {task.status}\n\n'
+        f'<b>Шаги:</b>\n{task.steps}\n\n'
+        'Добавить в таблицу?'
+    )
 
 
 def build_dashboard_text(tasks: list[Task]) -> str:
@@ -195,6 +338,57 @@ async def my_id(message: Message) -> None:
         'Вставь его в файл .env в строку:\n'
         f'<code>TELEGRAM_OWNER_CHAT_ID={message.chat.id}</code>'
     )
+
+
+@router.message(F.text == '➕ Добавить задачу')
+async def add_task_start(message: Message) -> None:
+    awaiting_task_text.add(message.chat.id)
+    await message.answer(
+        'Напиши задачу как удобно — одним сообщением, без шаблона.\n\n'
+        'Примеры:\n'
+        '• BCEL завтра напомнить про PromptPay\n'
+        '• Теодору сказать про E com charge\n'
+        '• Bitazza документы сегодня добить\n\n'
+        'Я разложу её по категории, приоритету и шагам, а потом покажу предпросмотр.'
+    )
+
+
+@router.message(lambda message: message.chat.id in awaiting_task_text and message.text)
+async def add_task_receive_text(message: Message) -> None:
+    if not message.text:
+        return
+    awaiting_task_text.discard(message.chat.id)
+    task = parse_free_task(message.text)
+    pending_tasks[message.chat.id] = task
+    await message.answer(build_add_task_preview(task), reply_markup=add_task_preview_keyboard())
+
+
+@router.callback_query(F.data == 'addtask:confirm')
+async def add_task_confirm(callback: CallbackQuery) -> None:
+    task = pending_tasks.get(callback.message.chat.id)
+    if not task:
+        await callback.answer('Черновик задачи не найден. Нажми ➕ Добавить задачу ещё раз.', show_alert=True)
+        return
+    await store.append_task(task)
+    pending_tasks.pop(callback.message.chat.id, None)
+    await callback.answer('Задача добавлена')
+    await callback.message.answer(f'✅ Добавила в таблицу: <b>{_task_name(task)}</b>')
+
+
+@router.callback_query(F.data == 'addtask:rewrite')
+async def add_task_rewrite(callback: CallbackQuery) -> None:
+    pending_tasks.pop(callback.message.chat.id, None)
+    awaiting_task_text.add(callback.message.chat.id)
+    await callback.answer('Окей, напиши заново')
+    await callback.message.answer('Напиши задачу заново как удобно. Я снова разложу её в структуру.')
+
+
+@router.callback_query(F.data == 'addtask:cancel')
+async def add_task_cancel(callback: CallbackQuery) -> None:
+    pending_tasks.pop(callback.message.chat.id, None)
+    awaiting_task_text.discard(callback.message.chat.id)
+    await callback.answer('Отменила')
+    await callback.message.answer('Окей, задачу не добавляю.')
 
 
 @router.message(F.text == '🗓 Задачи на сегодня')
