@@ -24,6 +24,10 @@ def _is_high(task: Task) -> bool:
     return task.priority.strip().lower() == 'высокий'
 
 
+def _is_push(task: Task) -> bool:
+    return task.status == 'Пуш'
+
+
 def _is_wait(task: Task) -> bool:
     text = f'{task.category} {task.status} {task.deadline}'.lower()
     return 'wait' in text or 'ждём' in text or 'ждем' in text or task.status in {'Ждём ответ', 'Пуш'}
@@ -34,7 +38,7 @@ def _is_document(task: Task) -> bool:
 
 
 def _is_mail(task: Task) -> bool:
-    return 'письм' in task.category.lower() or task.status == 'Пуш'
+    return 'письм' in task.category.lower() or _is_push(task)
 
 
 def _is_communication(task: Task) -> bool:
@@ -96,11 +100,12 @@ def build_dashboard_text(tasks: list[Task]) -> str:
 
     open_tasks = [task for task in tasks if _is_open(task)]
     done_tasks = [task for task in tasks if task.status == 'Выполнено']
-    high_open = [task for task in open_tasks if _is_high(task)]
-    push_tasks = [task for task in open_tasks if task.status == 'Пуш']
+    push_tasks = [task for task in open_tasks if _is_push(task)]
+    focus_pool = [task for task in open_tasks if _is_high(task) and not _is_push(task)]
+    urgent_pool = [task for task in open_tasks if _is_high(task) and not _is_push(task)]
 
-    focus_tasks = high_open[:3] or open_tasks[:3]
-    urgent_tasks = [task for task in high_open if task not in focus_tasks][:2]
+    focus_tasks = focus_pool[:3] or [task for task in open_tasks if not _is_push(task)][:3]
+    urgent_tasks = [task for task in urgent_pool if task not in focus_tasks][:2]
 
     lines = [
         '🦊 <b>EA Fox Dashboard</b>',
@@ -120,9 +125,9 @@ def build_dashboard_text(tasks: list[Task]) -> str:
 
     if push_tasks:
         lines.append('📣 <b>Пуш</b>')
-        lines.extend(_short_items(push_tasks, 3))
-        if len(push_tasks) > 3:
-            lines.append(f'• ещё {len(push_tasks) - 3}')
+        lines.extend(_short_items(push_tasks, 4))
+        if len(push_tasks) > 4:
+            lines.append(f'• ещё {len(push_tasks) - 4}')
         lines.append('')
 
     lines.append('Ниже — разделы задач. Нажми кнопку, чтобы открыть список по блоку.')
@@ -152,7 +157,7 @@ def build_category_text(tasks: list[Task], category_key: str) -> str:
             'Пуш': '📣',
             'Перенести': '🔁',
         }.get(task.status, '▫️')
-        priority_icon = '🔥 ' if _is_high(task) else ''
+        priority_icon = '🔥 ' if _is_high(task) and not _is_push(task) else ''
         lines.append(f'{index}. {status_icon} {priority_icon}{_task_name(task)}')
     lines.append('')
     lines.append('Нажми номер задачи ниже, чтобы открыть шаги и кнопки статуса.')
