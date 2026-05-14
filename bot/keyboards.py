@@ -1,5 +1,7 @@
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, KeyboardButton
 
+from services.google_sheets import Task
+
 
 def main_menu() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
@@ -11,6 +13,26 @@ def main_menu() -> ReplyKeyboardMarkup:
         resize_keyboard=True,
         input_field_placeholder='Выбери действие 🦊',
     )
+
+
+def task_list_keyboard(tasks: list[Task]) -> InlineKeyboardMarkup:
+    rows: list[list[InlineKeyboardButton]] = []
+
+    # Compact task opener buttons: 1, 2, 3...
+    number_row: list[InlineKeyboardButton] = []
+    for index, task in enumerate(tasks, start=1):
+        number_row.append(
+            InlineKeyboardButton(text=str(index), callback_data=f'task:view:{task.task_id}')
+        )
+        if len(number_row) == 4:
+            rows.append(number_row)
+            number_row = []
+
+    if number_row:
+        rows.append(number_row)
+
+    rows.append([InlineKeyboardButton(text='🔄 Обновить список', callback_data='tasks:refresh')])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def task_actions(task_id: str) -> InlineKeyboardMarkup:
