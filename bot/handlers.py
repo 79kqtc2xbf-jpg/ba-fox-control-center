@@ -1,5 +1,5 @@
 from aiogram import Router, F
-from aiogram.filters import CommandStart
+from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
 from bot.config import settings
@@ -15,8 +15,19 @@ store = GoogleSheetsTaskStore(settings.google_sheet_id)
 async def start(message: Message) -> None:
     await message.answer(
         'Привет, Лиза 💛 Я Executive Fox 🦊\n'
-        'Буду помогать с задачами, напоминаниями и итогами BA.',
+        'Буду помогать с задачами, напоминаниями и итогами BA.\n\n'
+        f'Твой Telegram chat ID: <code>{message.chat.id}</code>\n'
+        'Он нужен для расписания напоминаний.',
         reply_markup=main_menu(),
+    )
+
+
+@router.message(Command('myid'))
+async def my_id(message: Message) -> None:
+    await message.answer(
+        f'Твой Telegram chat ID: <code>{message.chat.id}</code>\n\n'
+        'Вставь его в файл .env в строку:\n'
+        f'<code>TELEGRAM_OWNER_CHAT_ID={message.chat.id}</code>'
     )
 
 
@@ -84,7 +95,8 @@ async def settings_info(message: Message) -> None:
         '• База: Google Sheets\n'
         '• Режим напоминаний: Комбо\n'
         '• Основной вход: ChatGPT\n'
-        '• Интерфейс задач: Telegram'
+        '• Интерфейс задач: Telegram\n\n'
+        f'Твой Telegram chat ID: <code>{message.chat.id}</code>'
     )
 
 
