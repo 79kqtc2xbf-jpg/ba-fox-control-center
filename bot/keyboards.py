@@ -73,3 +73,15 @@ def task_actions(task_id: str) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text='💬 Комментарий', callback_data=f'task:comment:{task_id}')],
         ]
     )
+
+
+def add_task_preview_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text='✅ Добавить в таблицу', callback_data='addtask:confirm'),
+                InlineKeyboardButton(text='✏️ Написать заново', callback_data='addtask:rewrite'),
+            ],
+            [InlineKeyboardButton(text='❌ Отмена', callback_data='addtask:cancel')],
+        ]
+    )
