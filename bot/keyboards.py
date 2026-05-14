@@ -6,9 +6,10 @@ from services.google_sheets import Task
 def main_menu() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
-            [KeyboardButton(text='🗓 Задачи на сегодня'), KeyboardButton(text='📝 Собрать итоги')],
-            [KeyboardButton(text='✅ Выполненные'), KeyboardButton(text='⏰ Напоминания')],
-            [KeyboardButton(text='📥 Отчёты встреч'), KeyboardButton(text='⚙️ Настройки')],
+            [KeyboardButton(text='🗓 Задачи на сегодня'), KeyboardButton(text='➕ Добавить задачу')],
+            [KeyboardButton(text='📝 Собрать итоги'), KeyboardButton(text='✅ Выполненные')],
+            [KeyboardButton(text='⏰ Напоминания'), KeyboardButton(text='📥 Отчёты встреч')],
+            [KeyboardButton(text='⚙️ Настройки')],
         ],
         resize_keyboard=True,
         input_field_placeholder='Выбери действие 🦊',
