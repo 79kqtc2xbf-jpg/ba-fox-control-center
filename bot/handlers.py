@@ -3,12 +3,47 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
 from bot.config import settings
-from bot.keyboards import main_menu, task_actions
-from services.google_sheets import GoogleSheetsTaskStore
+from bot.keyboards import main_menu, task_actions, task_list_keyboard
+from services.google_sheets import GoogleSheetsTaskStore, Task
 from services.report_builder import build_daily_report
 
 router = Router()
 store = GoogleSheetsTaskStore(settings.google_sheet_id)
+
+
+def build_task_list_text(tasks: list[Task]) -> str:
+    if not tasks:
+        return 'На сегодня задач пока нет. Пришли план в ChatGPT, и я появлюсь с чек-листом 🦊'
+
+    lines = [f'🗓 <b>Задачи на сегодня</b> — {len(tasks)} шт.', '']
+    for index, task in enumerate(tasks, start=1):
+        org = f'{task.organization} — ' if task.organization else ''
+        status_icon = {
+            'Выполнено': '✅',
+            'В работе': '🟡',
+            'Ждём ответ': '⏳',
+            'Пуш': '📣',
+            'Перенести': '🔁',
+        }.get(task.status, '▫️')
+        lines.append(f'{index}. {status_icon} <b>{org}{task.title}</b>')
+        lines.append(f'   {task.category} · {task.priority} · {task.status}')
+
+    lines.append('')
+    lines.append('Нажми номер задачи ниже, чтобы открыть подробности и кнопки статуса.')
+    return '\n'.join(lines)
+
+
+def build_task_card_text(task: Task) -> str:
+    return (
+        f'📌 <b>{task.title}</b>\n'
+        f'ID: <code>{task.task_id}</code>\n'
+        f'Категория: {task.category}\n'
+        f'Организация: {task.organization}\n'
+        f'Приоритет: {task.priority}\n'
+        f'Дедлайн: {task.deadline}\n'
+        f'Статус: {task.status}\n\n'
+        f'<b>Шаги для Лизы:</b>\n{task.steps}'
+    )
 
 
 @router.message(CommandStart())
@@ -34,21 +69,18 @@ async def my_id(message: Message) -> None:
 @router.message(F.text == '🗓 Задачи на сегодня')
 async def today_tasks(message: Message) -> None:
     tasks = await store.get_today_tasks()
-    if not tasks:
-        await message.answer('На сегодня задач пока нет. Пришли план в ChatGPT, и я появлюсь с чек-листом 🦊')
-        return
+    text = build_task_list_text(tasks)
+    keyboard = task_list_keyboard(tasks) if tasks else None
+    await message.answer(text, reply_markup=keyboard)
 
-    for task in tasks:
-        text = (
-            f'📌 <b>{task.title}</b>\n'
-            f'Категория: {task.category}\n'
-            f'Организация: {task.organization}\n'
-            f'Приоритет: {task.priority}\n'
-            f'Дедлайн: {task.deadline}\n'
-            f'Статус: {task.status}\n\n'
-            f'<b>Шаги для Лизы:</b>\n{task.steps}'
-        )
-        await message.answer(text, reply_markup=task_actions(task.task_id))
+
+@router.callback_query(F.data == 'tasks:refresh')
+async def refresh_tasks(callback: CallbackQuery) -> None:
+    tasks = await store.get_today_tasks()
+    text = build_task_list_text(tasks)
+    keyboard = task_list_keyboard(tasks) if tasks else None
+    await callback.message.answer(text, reply_markup=keyboard)
+    await callback.answer('Список обновлён')
 
 
 @router.message(F.text == '📝 Собрать итоги')
@@ -98,6 +130,19 @@ async def settings_info(message: Message) -> None:
         '• Интерфейс задач: Telegram\n\n'
         f'Твой Telegram chat ID: <code>{message.chat.id}</code>'
     )
+
+
+@router.callback_query(F.data.startswith('task:view:'))
+async def view_task(callback: CallbackQuery) -> None:
+    _, _, task_id = callback.data.split(':', maxsplit=2)
+    tasks = await store.get_today_tasks()
+    task = next((item for item in tasks if item.task_id == task_id), None)
+    if not task:
+        await callback.answer('Задача не найдена', show_alert=True)
+        return
+
+    await callback.message.answer(build_task_card_text(task), reply_markup=task_actions(task.task_id))
+    await callback.answer('Открыла задачу')
 
 
 @router.callback_query(F.data.startswith('task:'))
