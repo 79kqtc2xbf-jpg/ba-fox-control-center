@@ -3,7 +3,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
 from bot.config import settings
-from bot.keyboards import main_menu, task_actions, task_list_keyboard
+from bot.keyboards import dashboard_keyboard, main_menu, task_actions, task_list_keyboard
 from services.google_sheets import GoogleSheetsTaskStore, Task
 from services.report_builder import build_daily_report
 
@@ -38,18 +38,115 @@ def _is_mail(task: Task) -> bool:
 
 
 def _is_communication(task: Task) -> bool:
-    return 'коммуникац' in task.category.lower() or 'напоминания' in task.category.lower()
+    return 'коммуникац' in task.category.lower()
 
 
-def _short_items(tasks: list[Task], limit: int = 4) -> list[str]:
+def _is_extra(task: Task) -> bool:
+    return 'доп' in task.category.lower()
+
+
+def _is_hr(task: Task) -> bool:
+    return 'hr' in task.category.lower()
+
+
+def _is_theodor(task: Task) -> bool:
+    return 'теодор' in task.category.lower() or 'теодор' in task.organization.lower()
+
+
+def _short_items(tasks: list[Task], limit: int = 3) -> list[str]:
     return [f'• {_task_name(task)}' for task in tasks[:limit]]
 
 
-def _compact_task_index(tasks: list[Task]) -> list[str]:
-    lines: list[str] = []
+def _counts(tasks: list[Task]) -> dict[str, int]:
+    open_tasks = [task for task in tasks if _is_open(task)]
+    return {
+        'all': len(open_tasks),
+        'docs': len([task for task in open_tasks if _is_document(task)]),
+        'mail': len([task for task in open_tasks if _is_mail(task)]),
+        'comm': len([task for task in open_tasks if _is_communication(task)]),
+        'wait': len([task for task in open_tasks if _is_wait(task)]),
+        'extra': len([task for task in open_tasks if _is_extra(task)]),
+        'hr': len([task for task in open_tasks if _is_hr(task)]),
+        'theodor': len([task for task in open_tasks if _is_theodor(task)]),
+    }
+
+
+def _filter_tasks(tasks: list[Task], category_key: str) -> list[Task]:
+    open_tasks = [task for task in tasks if _is_open(task)]
+    if category_key == 'docs':
+        return [task for task in open_tasks if _is_document(task)]
+    if category_key == 'mail':
+        return [task for task in open_tasks if _is_mail(task)]
+    if category_key == 'comm':
+        return [task for task in open_tasks if _is_communication(task)]
+    if category_key == 'wait':
+        return [task for task in open_tasks if _is_wait(task)]
+    if category_key == 'extra':
+        return [task for task in open_tasks if _is_extra(task)]
+    if category_key == 'hr':
+        return [task for task in open_tasks if _is_hr(task)]
+    if category_key == 'theodor':
+        return [task for task in open_tasks if _is_theodor(task)]
+    return open_tasks
+
+
+def build_dashboard_text(tasks: list[Task]) -> str:
+    if not tasks:
+        return 'На сегодня задач пока нет. Пришли план в ChatGPT, и я появлюсь с чек-листом 🦊'
+
+    open_tasks = [task for task in tasks if _is_open(task)]
+    done_tasks = [task for task in tasks if task.status == 'Выполнено']
+    high_open = [task for task in open_tasks if _is_high(task)]
+    push_tasks = [task for task in open_tasks if task.status == 'Пуш']
+
+    focus_tasks = high_open[:3] or open_tasks[:3]
+    urgent_tasks = [task for task in high_open if task not in focus_tasks][:2]
+
+    lines = [
+        '🦊 <b>EA Fox Dashboard</b>',
+        f'Открыто: <b>{len(open_tasks)}</b> · закрыто: <b>{len(done_tasks)}</b> · всего: <b>{len(tasks)}</b>',
+        '',
+    ]
+
+    if focus_tasks:
+        lines.append('🔥 <b>Фокус</b>')
+        lines.extend(_short_items(focus_tasks, 3))
+        lines.append('')
+
+    if urgent_tasks:
+        lines.append('⚠️ <b>Срочно сегодня</b>')
+        lines.extend(_short_items(urgent_tasks, 2))
+        lines.append('')
+
+    if push_tasks:
+        lines.append('📣 <b>Пуш</b>')
+        lines.extend(_short_items(push_tasks, 3))
+        if len(push_tasks) > 3:
+            lines.append(f'• ещё {len(push_tasks) - 3}')
+        lines.append('')
+
+    lines.append('Ниже — разделы задач. Нажми кнопку, чтобы открыть список по блоку.')
+    return '\n'.join(lines)
+
+
+def build_category_text(tasks: list[Task], category_key: str) -> str:
+    titles = {
+        'docs': '📄 Документы',
+        'mail': '💌 Почта / пуши',
+        'comm': '📞 Коммуникация',
+        'wait': '⏳ Ждём / контроль',
+        'extra': '🌈 Дополнительные задачи',
+        'hr': '🤝 HR',
+        'theodor': '❤️ Теодор',
+        'all': '🗂 Все открытые задачи',
+    }
+    title = titles.get(category_key, '🗂 Задачи')
+    if not tasks:
+        return f'{title}\n\nЗдесь пока нет открытых задач.'
+
+    lines = [f'<b>{title}</b> · {len(tasks)} шт.', '']
     for index, task in enumerate(tasks, start=1):
         status_icon = {
-            'Выполнено': '✅',
             'В работе': '🟡',
             'Ждём ответ': '⏳',
             'Пуш': '📣',
@@ -57,65 +154,6 @@ def _compact_task_index(tasks: list[Task]) -> list[str]:
         }.get(task.status, '▫️')
         priority_icon = '🔥 ' if _is_high(task) else ''
         lines.append(f'{index}. {status_icon} {priority_icon}{_task_name(task)}')
-    return lines
-
-
-def build_task_list_text(tasks: list[Task]) -> str:
-    if not tasks:
-        return 'На сегодня задач пока нет. Пришли план в ChatGPT, и я появлюсь с чек-листом 🦊'
-
-    open_tasks = [task for task in tasks if _is_open(task)]
-    done_tasks = [task for task in tasks if task.status == 'Выполнено']
-    high_open = [task for task in open_tasks if _is_high(task)]
-    wait_tasks = [task for task in open_tasks if _is_wait(task)]
-    mail_tasks = [task for task in open_tasks if _is_mail(task)]
-    doc_tasks = [task for task in open_tasks if _is_document(task)]
-    communication_tasks = [task for task in open_tasks if _is_communication(task)]
-
-    focus_tasks = high_open[:3] or open_tasks[:3]
-    urgent_tasks = [
-        task for task in high_open
-        if task not in focus_tasks and task.status not in {'Ждём ответ'}
-    ][:3]
-    later_tasks = [
-        task for task in open_tasks
-        if task.priority.strip().lower() in {'низкий', 'средний'} and task not in wait_tasks
-    ][:3]
-
-    lines = [
-        '🦊 <b>EA Fox Brief на день</b>',
-        f'Открыто: <b>{len(open_tasks)}</b> · закрыто: <b>{len(done_tasks)}</b> · всего: <b>{len(tasks)}</b>',
-        '',
-    ]
-
-    if focus_tasks:
-        lines.append('🔥 <b>Главный фокус</b>')
-        lines.extend(_short_items(focus_tasks, 3))
-        lines.append('')
-
-    if urgent_tasks:
-        lines.append('⚠️ <b>Срочно / сегодня</b>')
-        lines.extend(_short_items(urgent_tasks, 3))
-        lines.append('')
-
-    if wait_tasks:
-        lines.append('⏳ <b>Ждём / контроль / пуш</b>')
-        lines.extend(_short_items(wait_tasks, 4))
-        if len(wait_tasks) > 4:
-            lines.append(f'• ещё {len(wait_tasks) - 4} в контроле')
-        lines.append('')
-
-    lines.append('📌 <b>Разбивка</b>')
-    lines.append(f'📄 Документы: {len(doc_tasks)} · 💌 Письма/пуши: {len(mail_tasks)} · 📞 Коммуникация: {len(communication_tasks)}')
-    lines.append('')
-
-    if later_tasks:
-        lines.append('🌿 <b>Можно после главного</b>')
-        lines.extend(_short_items(later_tasks, 3))
-        lines.append('')
-
-    lines.append('🗂 <b>Индекс задач</b>')
-    lines.extend(_compact_task_index(tasks))
     lines.append('')
     lines.append('Нажми номер задачи ниже, чтобы открыть шаги и кнопки статуса.')
     return '\n'.join(lines)
@@ -138,7 +176,7 @@ def build_task_card_text(task: Task) -> str:
 async def start(message: Message) -> None:
     await message.answer(
         'Привет, Лиза 💛 Я Executive Fox 🦊\n'
-        'Буду помогать с задачами, напоминаниями и итогами BA.\n\n'
+        'Буду помогать с задачами, напоминаниями и итогами EA.\n\n'
         f'Твой Telegram chat ID: <code>{message.chat.id}</code>\n'
         'Он нужен для расписания напоминаний.',
         reply_markup=main_menu(),
@@ -157,18 +195,29 @@ async def my_id(message: Message) -> None:
 @router.message(F.text == '🗓 Задачи на сегодня')
 async def today_tasks(message: Message) -> None:
     tasks = await store.get_today_tasks()
-    text = build_task_list_text(tasks)
-    keyboard = task_list_keyboard(tasks) if tasks else None
+    text = build_dashboard_text(tasks)
+    keyboard = dashboard_keyboard(_counts(tasks)) if tasks else None
     await message.answer(text, reply_markup=keyboard)
 
 
 @router.callback_query(F.data == 'tasks:refresh')
 async def refresh_tasks(callback: CallbackQuery) -> None:
     tasks = await store.get_today_tasks()
-    text = build_task_list_text(tasks)
-    keyboard = task_list_keyboard(tasks) if tasks else None
+    text = build_dashboard_text(tasks)
+    keyboard = dashboard_keyboard(_counts(tasks)) if tasks else None
     await callback.message.answer(text, reply_markup=keyboard)
-    await callback.answer('Список обновлён')
+    await callback.answer('Дашборд обновлён')
+
+
+@router.callback_query(F.data.startswith('cat:'))
+async def category_tasks(callback: CallbackQuery) -> None:
+    _, category_key = callback.data.split(':', maxsplit=1)
+    all_tasks = await store.get_today_tasks()
+    tasks = _filter_tasks(all_tasks, category_key)
+    text = build_category_text(tasks, category_key)
+    keyboard = task_list_keyboard(tasks) if tasks else dashboard_keyboard(_counts(all_tasks))
+    await callback.message.answer(text, reply_markup=keyboard)
+    await callback.answer('Открыла раздел')
 
 
 @router.message(F.text == '📝 Собрать итоги')
