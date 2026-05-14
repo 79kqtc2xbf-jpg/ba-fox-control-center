@@ -45,6 +45,21 @@ def _short_items(tasks: list[Task], limit: int = 4) -> list[str]:
     return [f'• {_task_name(task)}' for task in tasks[:limit]]
 
 
+def _compact_task_index(tasks: list[Task]) -> list[str]:
+    lines: list[str] = []
+    for index, task in enumerate(tasks, start=1):
+        status_icon = {
+            'Выполнено': '✅',
+            'В работе': '🟡',
+            'Ждём ответ': '⏳',
+            'Пуш': '📣',
+            'Перенести': '🔁',
+        }.get(task.status, '▫️')
+        priority_icon = '🔥 ' if _is_high(task) else ''
+        lines.append(f'{index}. {status_icon} {priority_icon}{_task_name(task)}')
+    return lines
+
+
 def build_task_list_text(tasks: list[Task]) -> str:
     if not tasks:
         return 'На сегодня задач пока нет. Пришли план в ChatGPT, и я появлюсь с чек-листом 🦊'
@@ -61,15 +76,15 @@ def build_task_list_text(tasks: list[Task]) -> str:
     urgent_tasks = [
         task for task in high_open
         if task not in focus_tasks and task.status not in {'Ждём ответ'}
-    ][:4]
+    ][:3]
     later_tasks = [
         task for task in open_tasks
         if task.priority.strip().lower() in {'низкий', 'средний'} and task not in wait_tasks
-    ][:4]
+    ][:3]
 
     lines = [
-        f'🦊 <b>EA Fox Brief на день</b>',
-        f'Всего задач: <b>{len(tasks)}</b> · открыто: <b>{len(open_tasks)}</b> · закрыто: <b>{len(done_tasks)}</b>',
+        '🦊 <b>EA Fox Brief на день</b>',
+        f'Открыто: <b>{len(open_tasks)}</b> · закрыто: <b>{len(done_tasks)}</b> · всего: <b>{len(tasks)}</b>',
         '',
     ]
 
@@ -80,43 +95,29 @@ def build_task_list_text(tasks: list[Task]) -> str:
 
     if urgent_tasks:
         lines.append('⚠️ <b>Срочно / сегодня</b>')
-        lines.extend(_short_items(urgent_tasks, 4))
+        lines.extend(_short_items(urgent_tasks, 3))
         lines.append('')
 
     if wait_tasks:
         lines.append('⏳ <b>Ждём / контроль / пуш</b>')
-        lines.extend(_short_items(wait_tasks, 5))
-        if len(wait_tasks) > 5:
-            lines.append(f'• ещё {len(wait_tasks) - 5} в контроле')
+        lines.extend(_short_items(wait_tasks, 4))
+        if len(wait_tasks) > 4:
+            lines.append(f'• ещё {len(wait_tasks) - 4} в контроле')
         lines.append('')
 
-    lines.append('📌 <b>Разбивка по типу работы</b>')
-    lines.append(f'• 📄 Документы: {len(doc_tasks)}')
-    lines.append(f'• 💌 Письма / пуши: {len(mail_tasks)}')
-    lines.append(f'• 📞 Коммуникация / напоминания: {len(communication_tasks)}')
+    lines.append('📌 <b>Разбивка</b>')
+    lines.append(f'📄 Документы: {len(doc_tasks)} · 💌 Письма/пуши: {len(mail_tasks)} · 📞 Коммуникация: {len(communication_tasks)}')
     lines.append('')
 
     if later_tasks:
         lines.append('🌿 <b>Можно после главного</b>')
-        lines.extend(_short_items(later_tasks, 4))
+        lines.extend(_short_items(later_tasks, 3))
         lines.append('')
 
-    lines.append('🗂 <b>Все задачи</b>')
-    for index, task in enumerate(tasks, start=1):
-        org = f'{task.organization} — ' if task.organization else ''
-        status_icon = {
-            'Выполнено': '✅',
-            'В работе': '🟡',
-            'Ждём ответ': '⏳',
-            'Пуш': '📣',
-            'Перенести': '🔁',
-        }.get(task.status, '▫️')
-        priority_icon = '🔥' if _is_high(task) else '·'
-        lines.append(f'{index}. {status_icon} {priority_icon} <b>{org}{task.title}</b>')
-        lines.append(f'   {task.category} · {task.status}')
-
+    lines.append('🗂 <b>Индекс задач</b>')
+    lines.extend(_compact_task_index(tasks))
     lines.append('')
-    lines.append('Нажми номер задачи ниже, чтобы открыть подробности и кнопки статуса.')
+    lines.append('Нажми номер задачи ниже, чтобы открыть шаги и кнопки статуса.')
     return '\n'.join(lines)
 
 
