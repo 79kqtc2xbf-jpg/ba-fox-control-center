@@ -11,6 +11,7 @@ class Settings(BaseSettings):
 
     google_sheet_id: str
     google_service_account_json: Optional[str] = None
+    google_service_account_file: str = 'service-account.json'
 
     timezone: str = 'Asia/Singapore'
     reminder_mode: str = 'combo'
