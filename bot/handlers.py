@@ -11,11 +11,97 @@ router = Router()
 store = GoogleSheetsTaskStore(settings.google_sheet_id)
 
 
+def _task_name(task: Task) -> str:
+    org = f'{task.organization} — ' if task.organization else ''
+    return f'{org}{task.title}'
+
+
+def _is_open(task: Task) -> bool:
+    return task.status not in {'Выполнено'}
+
+
+def _is_high(task: Task) -> bool:
+    return task.priority.strip().lower() == 'высокий'
+
+
+def _is_wait(task: Task) -> bool:
+    text = f'{task.category} {task.status} {task.deadline}'.lower()
+    return 'wait' in text or 'ждём' in text or 'ждем' in text or task.status in {'Ждём ответ', 'Пуш'}
+
+
+def _is_document(task: Task) -> bool:
+    return 'документац' in task.category.lower()
+
+
+def _is_mail(task: Task) -> bool:
+    return 'письм' in task.category.lower() or task.status == 'Пуш'
+
+
+def _is_communication(task: Task) -> bool:
+    return 'коммуникац' in task.category.lower() or 'напоминания' in task.category.lower()
+
+
+def _short_items(tasks: list[Task], limit: int = 4) -> list[str]:
+    return [f'• {_task_name(task)}' for task in tasks[:limit]]
+
+
 def build_task_list_text(tasks: list[Task]) -> str:
     if not tasks:
         return 'На сегодня задач пока нет. Пришли план в ChatGPT, и я появлюсь с чек-листом 🦊'
 
-    lines = [f'🗓 <b>Задачи на сегодня</b> — {len(tasks)} шт.', '']
+    open_tasks = [task for task in tasks if _is_open(task)]
+    done_tasks = [task for task in tasks if task.status == 'Выполнено']
+    high_open = [task for task in open_tasks if _is_high(task)]
+    wait_tasks = [task for task in open_tasks if _is_wait(task)]
+    mail_tasks = [task for task in open_tasks if _is_mail(task)]
+    doc_tasks = [task for task in open_tasks if _is_document(task)]
+    communication_tasks = [task for task in open_tasks if _is_communication(task)]
+
+    focus_tasks = high_open[:3] or open_tasks[:3]
+    urgent_tasks = [
+        task for task in high_open
+        if task not in focus_tasks and task.status not in {'Ждём ответ'}
+    ][:4]
+    later_tasks = [
+        task for task in open_tasks
+        if task.priority.strip().lower() in {'низкий', 'средний'} and task not in wait_tasks
+    ][:4]
+
+    lines = [
+        f'🦊 <b>EA Fox Brief на день</b>',
+        f'Всего задач: <b>{len(tasks)}</b> · открыто: <b>{len(open_tasks)}</b> · закрыто: <b>{len(done_tasks)}</b>',
+        '',
+    ]
+
+    if focus_tasks:
+        lines.append('🔥 <b>Главный фокус</b>')
+        lines.extend(_short_items(focus_tasks, 3))
+        lines.append('')
+
+    if urgent_tasks:
+        lines.append('⚠️ <b>Срочно / сегодня</b>')
+        lines.extend(_short_items(urgent_tasks, 4))
+        lines.append('')
+
+    if wait_tasks:
+        lines.append('⏳ <b>Ждём / контроль / пуш</b>')
+        lines.extend(_short_items(wait_tasks, 5))
+        if len(wait_tasks) > 5:
+            lines.append(f'• ещё {len(wait_tasks) - 5} в контроле')
+        lines.append('')
+
+    lines.append('📌 <b>Разбивка по типу работы</b>')
+    lines.append(f'• 📄 Документы: {len(doc_tasks)}')
+    lines.append(f'• 💌 Письма / пуши: {len(mail_tasks)}')
+    lines.append(f'• 📞 Коммуникация / напоминания: {len(communication_tasks)}')
+    lines.append('')
+
+    if later_tasks:
+        lines.append('🌿 <b>Можно после главного</b>')
+        lines.extend(_short_items(later_tasks, 4))
+        lines.append('')
+
+    lines.append('🗂 <b>Все задачи</b>')
     for index, task in enumerate(tasks, start=1):
         org = f'{task.organization} — ' if task.organization else ''
         status_icon = {
@@ -25,8 +111,9 @@ def build_task_list_text(tasks: list[Task]) -> str:
             'Пуш': '📣',
             'Перенести': '🔁',
         }.get(task.status, '▫️')
-        lines.append(f'{index}. {status_icon} <b>{org}{task.title}</b>')
-        lines.append(f'   {task.category} · {task.priority} · {task.status}')
+        priority_icon = '🔥' if _is_high(task) else '·'
+        lines.append(f'{index}. {status_icon} {priority_icon} <b>{org}{task.title}</b>')
+        lines.append(f'   {task.category} · {task.status}')
 
     lines.append('')
     lines.append('Нажми номер задачи ниже, чтобы открыть подробности и кнопки статуса.')
