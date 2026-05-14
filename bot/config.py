@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -5,10 +7,10 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env', env_file_encoding='utf-8')
 
     telegram_bot_token: str
-    telegram_owner_chat_id: int | None = None
+    telegram_owner_chat_id: Optional[int] = None
 
     google_sheet_id: str
-    google_service_account_json: str | None = None
+    google_service_account_json: Optional[str] = None
 
     timezone: str = 'Asia/Singapore'
     reminder_mode: str = 'combo'
