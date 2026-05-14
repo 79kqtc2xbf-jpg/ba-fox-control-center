@@ -15,10 +15,33 @@ def main_menu() -> ReplyKeyboardMarkup:
     )
 
 
+def dashboard_keyboard(counts: dict[str, int]) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=f'📄 Документы · {counts.get("docs", 0)}', callback_data='cat:docs'),
+                InlineKeyboardButton(text=f'💌 Почта/пуш · {counts.get("mail", 0)}', callback_data='cat:mail'),
+            ],
+            [
+                InlineKeyboardButton(text=f'📞 Коммуникация · {counts.get("comm", 0)}', callback_data='cat:comm'),
+                InlineKeyboardButton(text=f'⏳ Ждём/контроль · {counts.get("wait", 0)}', callback_data='cat:wait'),
+            ],
+            [
+                InlineKeyboardButton(text=f'🌈 Доп · {counts.get("extra", 0)}', callback_data='cat:extra'),
+                InlineKeyboardButton(text=f'🤝 HR · {counts.get("hr", 0)}', callback_data='cat:hr'),
+            ],
+            [
+                InlineKeyboardButton(text=f'❤️ Теодор · {counts.get("theodor", 0)}', callback_data='cat:theodor'),
+                InlineKeyboardButton(text=f'🗂 Все · {counts.get("all", 0)}', callback_data='cat:all'),
+            ],
+            [InlineKeyboardButton(text='🔄 Обновить', callback_data='tasks:refresh')],
+        ]
+    )
+
+
 def task_list_keyboard(tasks: list[Task]) -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = []
 
-    # Compact task opener buttons: 1, 2, 3...
     number_row: list[InlineKeyboardButton] = []
     for index, task in enumerate(tasks, start=1):
         number_row.append(
@@ -31,7 +54,7 @@ def task_list_keyboard(tasks: list[Task]) -> InlineKeyboardMarkup:
     if number_row:
         rows.append(number_row)
 
-    rows.append([InlineKeyboardButton(text='🔄 Обновить список', callback_data='tasks:refresh')])
+    rows.append([InlineKeyboardButton(text='⬅️ К дашборду', callback_data='tasks:refresh')])
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
