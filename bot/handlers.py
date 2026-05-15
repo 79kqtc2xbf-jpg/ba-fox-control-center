@@ -5,7 +5,7 @@ from aiogram.filters import Command, CommandStart
 from aiogram.types import CallbackQuery, Message
 
 from bot.config import settings
-from bot.keyboards import add_task_preview_keyboard, dashboard_keyboard, main_menu, task_actions, task_list_keyboard
+from bot.keyboards import add_task_preview_keyboard, dashboard_keyboard, main_menu, reports_keyboard, task_actions, task_list_keyboard
 from services.google_sheets import GoogleSheetsTaskStore, Task
 from services.report_builder import build_daily_report
 
@@ -329,6 +329,14 @@ def build_task_card_text(task: Task) -> str:
     )
 
 
+async def send_daily_summary(message: Message) -> None:
+    tasks = await store.get_today_tasks()
+    report = build_daily_report(tasks)
+    await message.answer('Черновик итогов для проверки:')
+    await message.answer(f'<pre>{report}</pre>')
+    await message.answer('Проверь текст. После правок можно будет копировать или позже добавить отправку в рабочий чат после подтверждения.')
+
+
 @router.message(CommandStart())
 async def start(message: Message) -> None:
     await message.answer(
@@ -430,13 +438,26 @@ async def category_tasks(callback: CallbackQuery) -> None:
     await callback.answer('Открыла раздел')
 
 
+@router.message(F.text == '📥 Отчёты')
+async def reports_menu(message: Message) -> None:
+    await message.answer('Выбери, какой отчёт собрать:', reply_markup=reports_keyboard())
+
+
 @router.message(F.text == '📝 Собрать итоги')
 async def daily_summary(message: Message) -> None:
-    tasks = await store.get_today_tasks()
-    report = build_daily_report(tasks)
-    await message.answer('Черновик итогов для проверки:')
-    await message.answer(f'<pre>{report}</pre>')
-    await message.answer('Проверь текст. После правок можно будет копировать или позже добавить отправку в рабочий чат после подтверждения.')
+    await send_daily_summary(message)
+
+
+@router.callback_query(F.data == 'reports:daily')
+async def daily_summary_callback(callback: CallbackQuery) -> None:
+    await callback.answer('Собираю итоги')
+    await send_daily_summary(callback.message)
+
+
+@router.callback_query(F.data == 'reports:meetings')
+async def meetings_report_callback(callback: CallbackQuery) -> None:
+    await callback.answer('Раздел готовится')
+    await callback.message.answer('Раздел отчётов встреч готовится. Сюда будут попадать Read AI, Gemini и Zoom summaries.')
 
 
 @router.message(F.text == '✅ Выполненные')
