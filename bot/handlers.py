@@ -237,6 +237,15 @@ def build_add_task_preview(task: Task) -> str:
     )
 
 
+async def _delete_user_message_safely(message: Message) -> None:
+    try:
+        await message.delete()
+    except Exception:
+        # In private chats this should usually work. If Telegram refuses deletion,
+        # silently continue so task creation is not blocked.
+        return
+
+
 def build_dashboard_text(tasks: list[Task]) -> str:
     if not tasks:
         return 'На сегодня задач пока нет. Пришли план в ChatGPT, и я появлюсь с чек-листом 🦊'
@@ -358,8 +367,10 @@ async def add_task_receive_text(message: Message) -> None:
     if not message.text:
         return
     awaiting_task_text.discard(message.chat.id)
-    task = parse_free_task(message.text)
+    raw_text = message.text
+    task = parse_free_task(raw_text)
     pending_tasks[message.chat.id] = task
+    await _delete_user_message_safely(message)
     await message.answer(build_add_task_preview(task), reply_markup=add_task_preview_keyboard())
 
 
