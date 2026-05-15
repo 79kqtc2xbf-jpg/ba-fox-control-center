@@ -7,7 +7,18 @@ Lisa confirmed the reminder logic:
 ```text
 Рабочие — только будние.
 Личные — каждый день.
+Часовой пояс — Bangkok / Asia/Bangkok.
 ```
+
+## Timezone
+
+All BA Fox reminders should be scheduled in Lisa's current operational timezone:
+
+```text
+Asia/Bangkok
+```
+
+Do not use Europe/Amsterdam for BA Fox reminders unless Lisa explicitly asks to switch timezone again.
 
 ## Work reminders
 
@@ -20,7 +31,7 @@ Monday, Tuesday, Wednesday, Thursday, Friday
 Default work reminder time:
 
 ```text
-10:00 Europe/Amsterdam
+10:00 Asia/Bangkok
 ```
 
 Purpose:
@@ -37,7 +48,7 @@ Personal reminders should run every day.
 Default personal reminder time:
 
 ```text
-14:00 Europe/Amsterdam
+14:00 Asia/Bangkok
 ```
 
 Current personal task block:
@@ -54,5 +65,6 @@ When creating or updating reminders:
 
 - work reminders must use weekday-only recurrence;
 - personal reminders must use daily recurrence;
+- reminders must use `Asia/Bangkok` timezone by default;
 - do not mix work and personal tasks in the same reminder;
 - keep work and personal task lists visually separate in reports and bot logic.
