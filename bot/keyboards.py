@@ -7,12 +7,20 @@ def main_menu() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text='🗓 Задачи на сегодня'), KeyboardButton(text='➕ Добавить задачу')],
-            [KeyboardButton(text='📝 Собрать итоги'), KeyboardButton(text='✅ Выполненные')],
-            [KeyboardButton(text='⏰ Напоминания'), KeyboardButton(text='📥 Отчёты встреч')],
-            [KeyboardButton(text='⚙️ Настройки')],
+            [KeyboardButton(text='✅ Выполненные'), KeyboardButton(text='⏰ Напоминания')],
+            [KeyboardButton(text='📥 Отчёты'), KeyboardButton(text='⚙️ Настройки')],
         ],
         resize_keyboard=True,
         input_field_placeholder='Выбери действие 🦊',
+    )
+
+
+def reports_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text='📝 Собрать итоги', callback_data='reports:daily')],
+            [InlineKeyboardButton(text='📥 Отчёты встреч', callback_data='reports:meetings')],
+        ]
     )
 
 
