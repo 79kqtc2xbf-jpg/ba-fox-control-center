@@ -38,6 +38,8 @@ https://docs.google.com/spreadsheets/d/1TJjQ0Uc_olOxL8kGW3tmd-e2wCfRoPkxbOEDOBs6
 - Google Sheets storage
 - Daily report builder
 - Reminder scheduler skeleton
+- Free-text task creation with preview and confirmation
+- Reports submenu
 
 ### Not included yet
 
@@ -45,9 +47,186 @@ https://docs.google.com/spreadsheets/d/1TJjQ0Uc_olOxL8kGW3tmd-e2wCfRoPkxbOEDOBs6
 - Direct work-chat sending without Lisa confirmation
 - Full Read AI/Gemini/Zoom automation
 - ClickUp integration
+- Direct Gmail API reconciliation inside the bot
 
 ## Security
 
 Never commit real tokens, API keys, Google service account credentials, Telegram bot tokens, OpenAI keys, or personal data.
 
 Use `.env` locally or hosting environment variables.
+
+## Local setup
+
+### 1. Clone / open project
+
+```bash
+cd ba-fox-control-center
+```
+
+### 2. Create and activate virtual environment
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+```
+
+### 4. Create `.env`
+
+Copy `.env.example`:
+
+```bash
+cp .env.example .env
+```
+
+Fill real values:
+
+```text
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_OWNER_CHAT_ID=
+GOOGLE_SHEET_ID=
+GOOGLE_SERVICE_ACCOUNT_FILE=service-account.json
+TIMEZONE=Asia/Bangkok
+```
+
+For local mode, place `service-account.json` in the project root and do not commit it.
+
+### 5. Run bot locally
+
+```bash
+python -m bot.main
+```
+
+Terminal must stay open while the bot runs.
+
+## Telegram QA checklist
+
+After launch:
+
+1. Open `@ba_executive_fox_bot`.
+2. Send `/start`.
+3. Send `/myid`.
+4. Click `🗓 Задачи на сегодня`.
+5. Test `➕ Добавить задачу`.
+6. Test `📥 Отчёты`.
+7. Test `⚙️ Настройки`.
+
+## Main menu
+
+Current approved menu:
+
+```text
+🗓 Задачи на сегодня | ➕ Добавить задачу
+✅ Выполненные       | ⏰ Напоминания
+📥 Отчёты            | ⚙️ Настройки
+```
+
+Inside `📥 Отчёты`:
+
+```text
+📝 Собрать итоги
+📥 Отчёты встреч
+```
+
+## Deployment / hosting
+
+Local Terminal mode is only for testing.
+
+For always-on bot operation, deploy as a background worker.
+
+Recommended first MVP host:
+
+```text
+Railway
+```
+
+Alternative:
+
+```text
+Render background worker
+```
+
+Worker command:
+
+```bash
+python -m bot.main
+```
+
+This command is also stored in `Procfile`:
+
+```text
+worker: python -m bot.main
+```
+
+## Hosting environment variables
+
+Set these in hosting dashboard:
+
+```text
+TELEGRAM_BOT_TOKEN
+TELEGRAM_OWNER_CHAT_ID
+GOOGLE_SHEET_ID
+TIMEZONE=Asia/Bangkok
+REMINDER_MODE=combo
+GOOGLE_SERVICE_ACCOUNT_JSON
+```
+
+For hosting, recommended Google credentials mode is:
+
+```text
+GOOGLE_SERVICE_ACCOUNT_JSON
+```
+
+Paste the full Google service account JSON into the hosting secret/env variable as one-line JSON.
+
+Do not commit service account files to GitHub.
+
+## Important deployment rule
+
+Only one polling bot instance should run at a time.
+
+Before testing hosted deployment, stop the local bot:
+
+```text
+Ctrl+C
+```
+
+If local and hosted bot run together in polling mode, Telegram updates may conflict.
+
+## Deployment QA checklist
+
+1. Stop local bot.
+2. Start hosted worker.
+3. Open Telegram.
+4. Send `/start`.
+5. Send `/myid`.
+6. Click `🗓 Задачи на сегодня`.
+7. Add a test task.
+8. Confirm Google Sheet update works.
+9. Check hosting logs.
+10. Confirm bot still responds when Mac is sleeping / Terminal closed.
+
+## Current project docs
+
+Important docs live in `/docs`:
+
+```text
+PROJECT_MAP.md
+STAGE_1_SUMMARY.md
+REPORTING_STANDARD.md
+WEEKLY_REPORTING_STANDARD.md
+REPORTS_CHAT_RULES.md
+REPORTS_CHAT_PROMPT.md
+REMINDER_RULES.md
+SETUP_CHAT_RESPONSE_RULES.md
+STAGE_4_GMAIL_RECONCILIATION_ARCHITECTURE.md
+GMAIL_RECONCILIATION_SCENARIOS.md
+FOLLOW_UP_TEMPLATE_LIBRARY.md
+HOSTING_DEPLOYMENT_PLAN.md
+```
