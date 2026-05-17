@@ -159,7 +159,7 @@ h1 {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .panel-header h2 {
@@ -168,8 +168,21 @@ h1 {
   letter-spacing: -0.03em;
 }
 
+.focus-note {
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--card-strong);
+  color: var(--accent-dark);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .ghost-button,
-.action-button {
+.action-button,
+.done-toggle {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: #fff;
@@ -197,6 +210,17 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 18px;
   background: #fffdf8;
+  transition: transform 0.18s ease, opacity 0.18s ease, background 0.18s ease;
+}
+
+.task-card.done {
+  background: rgba(255, 250, 243, 0.58);
+  opacity: 0.68;
+}
+
+.task-card.done .task-title {
+  text-decoration: line-through;
+  color: var(--muted);
 }
 
 .status-dot {
@@ -208,7 +232,8 @@ h1 {
 }
 
 .task-card[data-status="Пуш"] .status-dot { background: var(--red); }
-.task-card[data-status="Выполнено"] .status-dot { background: var(--green); }
+.task-card[data-status="Выполнено"] .status-dot,
+.task-card.done .status-dot { background: var(--green); }
 .task-card[data-status="Wait list"] .status-dot { background: #9a8a78; }
 
 .task-title {
@@ -231,6 +256,21 @@ h1 {
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+.done-toggle {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.task-card.done .done-toggle {
+  border-color: transparent;
+  background: var(--green);
+  color: #fff;
 }
 
 .quick-actions {
@@ -276,6 +316,11 @@ h1 {
   .task-chip {
     grid-column: 2;
     width: fit-content;
+  }
+
+  .done-toggle {
+    grid-column: 1;
+    grid-row: 1 / span 2;
   }
 
   .quick-actions {
