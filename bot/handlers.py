@@ -445,7 +445,8 @@ async def add_task_start(message: Message) -> None:
     await _cleanup_add_task_prompt(message)
     prompt = await message.answer(
         'Напиши задачу как удобно — одной строкой или списком.\n'
-        'Я сразу добавлю в таблицу без подтверждения. Это сообщение удалю после добавления.'
+        'Я сразу добавлю в таблицу без подтверждения. Твоё сообщение оставлю в чате. '
+        'Удалю только своё служебное сообщение после добавления.'
     )
     add_task_prompt_message_ids[message.chat.id] = prompt.message_id
 
@@ -474,7 +475,8 @@ async def add_task_receive_text(message: Message) -> None:
         return
 
     await _cleanup_add_task_prompt(message)
-    await _delete_user_message_safely(message)
+    # Keep Lisa's original task message in Telegram for audit/context.
+    # Only bot-owned temporary messages are cleaned up.
 
     if len(created_tasks) == 1:
         task = created_tasks[0]
