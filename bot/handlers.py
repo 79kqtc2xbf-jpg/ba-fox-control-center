@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+from contextlib import suppress
 from datetime import date, datetime, timedelta
 
 from aiogram import Router, F
@@ -17,6 +19,7 @@ store = GoogleSheetsTaskStore(settings.google_sheet_id)
 # MVP in-memory state. Good enough for local testing; later move to Redis/DB.
 awaiting_task_text: set[int] = set()
 pending_tasks: dict[int, Task] = {}
+add_task_prompt_message_ids: dict[int, int] = {}
 
 
 def _task_name(task: Task) -> str:
@@ -297,12 +300,31 @@ def build_add_task_preview(task: Task) -> str:
 
 
 async def _delete_user_message_safely(message: Message) -> None:
-    try:
+    with suppress(Exception):
         await message.delete()
-    except Exception:
-        # In private chats this should usually work. If Telegram refuses deletion,
-        # silently continue so task creation is not blocked.
-        return
+
+
+async def _delete_bot_message_safely(message: Message, message_id: int) -> None:
+    with suppress(Exception):
+        await message.bot.delete_message(chat_id=message.chat.id, message_id=message_id)
+
+
+async def _delete_message_later(message: Message, delay_seconds: int = 15) -> None:
+    await asyncio.sleep(delay_seconds)
+    with suppress(Exception):
+        await message.delete()
+
+
+async def _send_temporary_message(message: Message, text: str, delay_seconds: int = 15) -> Message:
+    sent = await message.answer(text)
+    asyncio.create_task(_delete_message_later(sent, delay_seconds))
+    return sent
+
+
+async def _cleanup_add_task_prompt(message: Message) -> None:
+    prompt_message_id = add_task_prompt_message_ids.pop(message.chat.id, None)
+    if prompt_message_id:
+        await _delete_bot_message_safely(message, prompt_message_id)
 
 
 def build_dashboard_text(tasks: list[Task]) -> str:
@@ -420,15 +442,12 @@ async def my_id(message: Message) -> None:
 @router.message(F.text == '➕ Добавить задачу')
 async def add_task_start(message: Message) -> None:
     awaiting_task_text.add(message.chat.id)
-    await message.answer(
-        'Напиши задачу как удобно — одним сообщением, без шаблона.\n\n'
-        'Можно прислать одну задачу или список по строкам.\n'
-        'Я сразу добавлю задачи в таблицу без отдельного подтверждения.\n\n'
-        'Примеры:\n'
-        '• BCEL завтра напомнить про PromptPay\n'
-        '• Теодору сказать про EcomCharge\n'
-        '• Bitazza дослать документы сегодня'
+    await _cleanup_add_task_prompt(message)
+    prompt = await message.answer(
+        'Напиши задачу как удобно — одной строкой или списком.\n'
+        'Я сразу добавлю в таблицу без подтверждения. Это сообщение удалю после добавления.'
     )
+    add_task_prompt_message_ids[message.chat.id] = prompt.message_id
 
 
 @router.message(lambda message: message.chat.id in awaiting_task_text and message.text)
@@ -450,26 +469,29 @@ async def add_task_receive_text(message: Message) -> None:
         await message.answer(
             '⚠️ Не смогла добавить задачу в таблицу.\n'
             f'Ошибка: <code>{type(exc).__name__}</code>\n\n'
-            'Задачи не потеряны — пришли их сюда, и я помогу перенести вручную.'
+            'Это сообщение оставляю, чтобы не потерять проблему. Пришли задачи сюда, и я помогу перенести вручную.'
         )
         return
 
+    await _cleanup_add_task_prompt(message)
     await _delete_user_message_safely(message)
 
     if len(created_tasks) == 1:
         task = created_tasks[0]
-        await message.answer(
-            f'✅ Добавила в таблицу: <b>{_task_name(task)}</b>\n'
-            f'Статус: {task.status} · Категория: {task.category}'
+        await _send_temporary_message(
+            message,
+            f'✅ Добавила: <b>{_task_name(task)}</b>\n'
+            f'Статус: {task.status} · Категория: {task.category}',
+            delay_seconds=15,
         )
         return
 
-    lines = [f'✅ Добавила в таблицу задач: <b>{len(created_tasks)}</b>', '']
-    for task in created_tasks[:12]:
+    lines = [f'✅ Добавила задач: <b>{len(created_tasks)}</b>', '']
+    for task in created_tasks[:10]:
         lines.append(f'• {_task_name(task)} — {task.status}')
-    if len(created_tasks) > 12:
-        lines.append(f'• ещё {len(created_tasks) - 12}')
-    await message.answer('\n'.join(lines))
+    if len(created_tasks) > 10:
+        lines.append(f'• ещё {len(created_tasks) - 10}')
+    await _send_temporary_message(message, '\n'.join(lines), delay_seconds=20)
 
 
 @router.callback_query(F.data == 'addtask:confirm')
@@ -481,7 +503,7 @@ async def add_task_confirm(callback: CallbackQuery) -> None:
     await store.append_task(task)
     pending_tasks.pop(callback.message.chat.id, None)
     await callback.answer('Задача добавлена')
-    await callback.message.answer(f'✅ Добавила в таблицу: <b>{_task_name(task)}</b>')
+    await _send_temporary_message(callback.message, f'✅ Добавила в таблицу: <b>{_task_name(task)}</b>', delay_seconds=15)
 
 
 @router.callback_query(F.data == 'addtask:rewrite')
@@ -489,7 +511,9 @@ async def add_task_rewrite(callback: CallbackQuery) -> None:
     pending_tasks.pop(callback.message.chat.id, None)
     awaiting_task_text.add(callback.message.chat.id)
     await callback.answer('Окей, напиши заново')
-    await callback.message.answer('Напиши задачу заново как удобно. Я сразу добавлю её в таблицу без отдельного подтверждения.')
+    await _cleanup_add_task_prompt(callback.message)
+    prompt = await callback.message.answer('Напиши задачу заново. Я сразу добавлю её в таблицу без отдельного подтверждения.')
+    add_task_prompt_message_ids[callback.message.chat.id] = prompt.message_id
 
 
 @router.callback_query(F.data == 'addtask:cancel')
@@ -497,7 +521,8 @@ async def add_task_cancel(callback: CallbackQuery) -> None:
     pending_tasks.pop(callback.message.chat.id, None)
     awaiting_task_text.discard(callback.message.chat.id)
     await callback.answer('Отменила')
-    await callback.message.answer('Окей, задачу не добавляю.')
+    await _cleanup_add_task_prompt(callback.message)
+    await _send_temporary_message(callback.message, 'Окей, задачу не добавляю.', delay_seconds=10)
 
 
 @router.message(F.text == '🗓 Задачи на сегодня')
