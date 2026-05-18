@@ -102,15 +102,15 @@ def _filter_tasks(tasks: list[Task], category_key: str) -> list[Task]:
 
 def _guess_category(raw: str) -> str:
     text = raw.lower()
-    if any(word in text for word in ['документ', 'kyc', 'анкета', 'договор', 'выписк', 'пакет']):
+    if any(word in text for word in ['документ', 'kyc', 'kyb', 'анкета', 'договор', 'выписк', 'пакет']):
         return '📄 Документация'
-    if any(word in text for word in ['письмо', 'написать', 'ответить', 'пуш', 'follow', 'оффер', 'рассылк']):
+    if any(word in text for word in ['письмо', 'написать', 'ответить', 'пуш', 'follow', 'оффер', 'рассылк', 'remy bank']):
         return '💌 Письма'
-    if any(word in text for word in ['созвон', 'встреч', 'коммуникац', 'контакт', 'канал', 'напомнить']):
+    if any(word in text for word in ['созвон', 'звонок', 'встреч', 'коммуникац', 'контакт', 'канал', 'напомнить']):
         return '📞 Коммуникация'
     if any(word in text for word in ['собесед', 'кандидат', 'hr', 'дубна']):
         return '🤝 HR'
-    if any(word in text for word in ['оплат', 'пошлин', 'офис', 'поддержк']):
+    if any(word in text for word in ['оплат', 'пошлин', 'офис', 'поддержк', 'инвойс']):
         return '🌈 Дополнительные задачи'
     if 'теодор' in text:
         return '❤️ Напоминания для Теодора'
@@ -119,20 +119,29 @@ def _guess_category(raw: str) -> str:
 
 def _guess_organization(raw: str) -> str:
     known = [
-        'Bitazza', 'BCEL', 'Super Rich Exchange', 'Super Rich', 'Niche', 'P3 Estates',
-        'GLN', 'JDB', 'APEC', 'Shobana', 'Flow official docs', 'Prominds Laos',
-        'Prominds', 'E com charge', 'E com', 'BOL', 'Kasikorn', 'Epay', 'Недвижимость',
+        'Bitazza', 'Betaza', 'BCEL', 'Super Rich Exchange', 'Super Rich', 'Niche', 'P3 Estates',
+        'P3 Estate', 'GLN', 'BKL', 'JDB', 'APEC', 'Shobana', 'Flow official docs', 'Flow',
+        'Prominds Laos', 'Prominds', 'Remy Bank', 'RaidX', 'Raidx', 'EcomCharge',
+        'E com charge', 'E com', 'BOL', 'Kasikorn', 'Epay', 'Sansiri', 'SunSiri',
+        'Trisara', 'Sber', 'Недвижимость',
     ]
     lower = raw.lower()
+    aliases = {
+        'betaza': 'Bitazza',
+        'p3 estate': 'P3 Estates',
+        'sunsiri': 'Sansiri',
+        'raidx': 'RaidX',
+        'e com charge': 'EcomCharge',
+    }
     for item in known:
         if item.lower() in lower:
-            return item
+            return aliases.get(item.lower(), item)
     # Simple fallback: take text before dash if user wrote “Org — task”.
     for sep in [' — ', ' - ', ':']:
         if sep in raw:
             candidate = raw.split(sep, 1)[0].strip()
             if 2 <= len(candidate) <= 40:
-                return candidate
+                return aliases.get(candidate.lower(), candidate)
     return ''
 
 
@@ -156,11 +165,59 @@ def _guess_deadline(raw: str) -> str:
 
 def _guess_status(raw: str) -> str:
     text = raw.lower()
+    if any(word in text for word in ['блокер', 'blocked', 'не проходят', 'нет ответа от контакта', 'нет прозрачности']):
+        return 'Блокер'
     if 'пуш' in text or 'напомнить' in text or 'follow' in text:
         return 'Пуш'
     if 'жд' in text or 'ожида' in text:
         return 'Ждём ответ'
     return 'Не начато'
+
+
+def _status_from_section_header(raw: str) -> str | None:
+    text = raw.strip().lower()
+    if not text:
+        return None
+    if 'to do' in text or text == 'todo':
+        return 'Не начато'
+    if 'in progress' in text:
+        return 'В работе'
+    if 'done' in text or 'almost' in text:
+        return 'Выполнено'
+    if 'blocked' in text or 'blocker' in text:
+        return 'Блокер'
+    return None
+
+
+def _split_manual_task_input(raw: str) -> list[tuple[str, str | None]]:
+    """Split one Telegram message into separate task rows.
+
+    Supports Lisa's usual format with section headers:
+    TO DO / IN PROGRESS / DONE / BLOCKED.
+    """
+    result: list[tuple[str, str | None]] = []
+    current_status: str | None = None
+
+    for line in raw.splitlines():
+        cleaned = line.strip()
+        if not cleaned:
+            continue
+
+        header_status = _status_from_section_header(cleaned.strip('🟡🟢⚫✅🔄⚠️: '))
+        if header_status:
+            current_status = header_status
+            continue
+
+        cleaned = cleaned.lstrip('•-–—* ').strip()
+        if not cleaned:
+            continue
+
+        result.append((cleaned, current_status))
+
+    if not result and raw.strip():
+        result.append((raw.strip(), None))
+
+    return result
 
 
 def _build_steps(category: str, organization: str, title: str) -> str:
@@ -196,9 +253,9 @@ def _build_steps(category: str, organization: str, title: str) -> str:
     )
 
 
-def parse_free_task(raw: str) -> Task:
+def parse_free_task(raw: str, status_override: str | None = None) -> Task:
     today = date.today().isoformat()
-    stamp = datetime.now().strftime('%Y%m%d%H%M%S')
+    stamp = datetime.now().strftime('%Y%m%d%H%M%S%f')
     category = _guess_category(raw)
     organization = _guess_organization(raw)
     title = raw.strip()
@@ -212,11 +269,11 @@ def parse_free_task(raw: str) -> Task:
         organization=organization,
         title=title[:180],
         steps=_build_steps(category, organization, title),
-        source='Telegram manual',
+        source='Telegram manual fast-add',
         priority=_guess_priority(raw),
         deadline=_guess_deadline(raw),
         reminder_mode='Комбо',
-        status=_guess_status(raw),
+        status=status_override or _guess_status(raw),
         next_reminder=(datetime.now() + timedelta(hours=1)).strftime('%Y-%m-%d %H:%M'),
         result='',
         channel='Telegram',
@@ -308,6 +365,7 @@ def build_category_text(tasks: list[Task], category_key: str) -> str:
             'Ждём ответ': '⏳',
             'Пуш': '📣',
             'Перенести': '🔁',
+            'Блокер': '⚫',
         }.get(task.status, '▫️')
         priority_icon = '🔥 ' if _is_high(task) and not _is_push(task) else ''
         lines.append(f'{index}. {status_icon} {priority_icon}{_task_name(task)}')
@@ -362,11 +420,12 @@ async def add_task_start(message: Message) -> None:
     awaiting_task_text.add(message.chat.id)
     await message.answer(
         'Напиши задачу как удобно — одним сообщением, без шаблона.\n\n'
+        'Можно прислать одну задачу или список по строкам.\n'
+        'Я сразу добавлю задачи в таблицу без отдельного подтверждения.\n\n'
         'Примеры:\n'
         '• BCEL завтра напомнить про PromptPay\n'
-        '• Теодору сказать про E com charge\n'
-        '• Bitazza документы сегодня добить\n\n'
-        'Я разложу её по категории, приоритету и шагам, а потом покажу предпросмотр.'
+        '• Теодору сказать про EcomCharge\n'
+        '• Bitazza дослать документы сегодня'
     )
 
 
@@ -374,12 +433,41 @@ async def add_task_start(message: Message) -> None:
 async def add_task_receive_text(message: Message) -> None:
     if not message.text:
         return
+
     awaiting_task_text.discard(message.chat.id)
     raw_text = message.text
-    task = parse_free_task(raw_text)
-    pending_tasks[message.chat.id] = task
+    task_inputs = _split_manual_task_input(raw_text)
+    created_tasks: list[Task] = []
+
+    try:
+        for task_text, status_override in task_inputs:
+            task = parse_free_task(task_text, status_override=status_override)
+            await store.append_task(task)
+            created_tasks.append(task)
+    except Exception as exc:
+        await message.answer(
+            '⚠️ Не смогла добавить задачу в таблицу.\n'
+            f'Ошибка: <code>{type(exc).__name__}</code>\n\n'
+            'Задачи не потеряны — пришли их сюда, и я помогу перенести вручную.'
+        )
+        return
+
     await _delete_user_message_safely(message)
-    await message.answer(build_add_task_preview(task), reply_markup=add_task_preview_keyboard())
+
+    if len(created_tasks) == 1:
+        task = created_tasks[0]
+        await message.answer(
+            f'✅ Добавила в таблицу: <b>{_task_name(task)}</b>\n'
+            f'Статус: {task.status} · Категория: {task.category}'
+        )
+        return
+
+    lines = [f'✅ Добавила в таблицу задач: <b>{len(created_tasks)}</b>', '']
+    for task in created_tasks[:12]:
+        lines.append(f'• {_task_name(task)} — {task.status}')
+    if len(created_tasks) > 12:
+        lines.append(f'• ещё {len(created_tasks) - 12}')
+    await message.answer('\n'.join(lines))
 
 
 @router.callback_query(F.data == 'addtask:confirm')
@@ -399,7 +487,7 @@ async def add_task_rewrite(callback: CallbackQuery) -> None:
     pending_tasks.pop(callback.message.chat.id, None)
     awaiting_task_text.add(callback.message.chat.id)
     await callback.answer('Окей, напиши заново')
-    await callback.message.answer('Напиши задачу заново как удобно. Я снова разложу её в структуру.')
+    await callback.message.answer('Напиши задачу заново как удобно. Я сразу добавлю её в таблицу без отдельного подтверждения.')
 
 
 @router.callback_query(F.data == 'addtask:cancel')
