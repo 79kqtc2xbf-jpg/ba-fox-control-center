@@ -55,7 +55,7 @@ def task_actions(task_id: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text='\u2705 Выполнено', callback_data=f'task:done:{task_id}'), InlineKeyboardButton(text='\U0001f7e1 В работе', callback_data=f'task:progress:{task_id}')],
-            [InlineKeyboardButton(text='\u23f0 Напомнить позже', callback_data=f'task:later:{task_id}'), InlineKeyboardButton(text='\U0001f501 Перенести', callback_data=f'task:postpone:{task_id}')],
+            [InlineKeyboardButton(text='\u23f0 Оставить открытой', callback_data=f'task:later:{task_id}'), InlineKeyboardButton(text='\U0001f501 Перенести', callback_data=f'task:postpone:{task_id}')],
             [InlineKeyboardButton(text='\U0001f4ac Комментарий', callback_data=f'task:comment:{task_id}')],
         ]
     )

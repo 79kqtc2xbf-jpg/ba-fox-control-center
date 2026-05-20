@@ -27,7 +27,7 @@ Fill `.env`:
 TELEGRAM_BOT_TOKEN=your_token_here
 TELEGRAM_OWNER_CHAT_ID=your_chat_id_here
 GOOGLE_SHEET_ID=1TJjQ0Uc_olOxL8kGW3tmd-e2wCfRoPkxbOEDOBs60F4
-TIMEZONE=Europe/Amsterdam
+TIMEZONE=Asia/Bangkok
 ```
 
 ## 3. Run bot locally
@@ -40,9 +40,9 @@ Open Telegram and send `/start` to the bot.
 
 ## 4. MVP limitation
 
-Current implementation uses a demo in-memory Google Sheets adapter.
+Current implementation uses Google Sheets as the live task store.
 
-Next step is to connect the real Google Sheets API so the bot reads and updates the live `BA Fox Control Center` spreadsheet.
+Reminder timezone should stay aligned with the product rule: `Asia/Bangkok`.
 
 ## 5. Safety
 

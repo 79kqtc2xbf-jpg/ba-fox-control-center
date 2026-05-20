@@ -13,7 +13,7 @@ services:
       - key: GOOGLE_SHEET_ID
         value: 1TJjQ0Uc_olOxL8kGW3tmd-e2wCfRoPkxbOEDOBs60F4
       - key: TIMEZONE
-        value: Europe/Amsterdam
+        value: Asia/Bangkok
       - key: REMINDER_MODE
         value: combo
       - key: MORNING_PROMPT_TIME
