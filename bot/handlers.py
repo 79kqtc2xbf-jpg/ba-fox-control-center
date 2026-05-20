@@ -577,6 +577,16 @@ async def meetings_report_callback(callback: CallbackQuery) -> None:
     await callback.message.answer('Раздел отчётов встреч готовится. Сюда будут попадать Read AI, Gemini и Zoom summaries.')
 
 
+@router.callback_query(F.data == 'reports:gmail')
+async def gmail_report_callback(callback: CallbackQuery) -> None:
+    await callback.answer('Gmail-сверка пока вручную')
+    await callback.message.answer(
+        '📬 Сверка почты пока не подключена к Gmail API.\n\n'
+        'Безопасный MVP-режим: пришли сюда результат ручной сверки или список писем, '
+        'а я помогу превратить это в задачи/пуши для Google Sheets.'
+    )
+
+
 @router.message(F.text == '✅ Выполненные')
 async def completed_tasks(message: Message) -> None:
     tasks = await store.get_today_tasks()
@@ -652,4 +662,8 @@ async def task_callback(callback: CallbackQuery) -> None:
 
     await store.update_task_status(task_id=task_id, status=status)  # type: ignore[arg-type]
     await callback.answer(f'Статус обновлён: {status}')
+    if action == 'later':
+        await callback.message.answer(f'🦊 Оставила задачу {task_id} открытой. Таймер напоминания подключим отдельным шагом.')
+        return
+
     await callback.message.answer(f'🦊 Принято: задача {task_id} → {status}')

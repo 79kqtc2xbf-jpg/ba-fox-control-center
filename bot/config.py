@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     google_service_account_json: Optional[str] = None
     google_service_account_file: str = 'service-account.json'
 
-    timezone: str = 'Asia/Singapore'
+    timezone: str = 'Asia/Bangkok'
     reminder_mode: str = 'combo'
 
     morning_prompt_time: str = '09:30'

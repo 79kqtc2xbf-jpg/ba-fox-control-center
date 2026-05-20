@@ -380,31 +380,31 @@ Checklist:
 6. If tasks appear correctly: close Stage 3.
 7. If tasks do not appear: debug date filtering before Stage 4.1.
 
-## Safe work before Monday
+## Current Railway deployment status
 
-Allowed before Monday:
+Stage 5 is now the active deployment stabilization track.
 
 ```text
-Stage 3.4 — docs cleanup
-Stage 4.0.1 — Gmail reconciliation scenarios
-Stage 4.0.2 — follow-up template library
-Stage 5.0 — hosting/deploy plan
-Stage 6.0 — personal tasks architecture
+Stage 5.1 — repo prepared for Railway deploy: done.
+Stage 5.2 — Railway duplicate worker cleanup: pending manual Railway dashboard.
+Stage 5.3 — hosted Telegram smoke test: pending after Railway cleanup.
+Stage 5.4 — scheduler/reminders: later, not verified.
 ```
 
-Blocked before Monday:
+Current operational rule:
 
 ```text
-Stage 4.1 — implement 📬 Сверить почту button inside Telegram.
+Only one Railway worker should remain active for the Telegram polling bot.
 ```
 
 ## Current next action
 
-Continue safe preparation work before Monday:
+Continue Railway stabilization:
 
-1. Create Gmail reconciliation scenarios.
-2. Create follow-up template library.
-3. Create hosting/deploy plan.
-4. Create personal tasks architecture.
+1. Keep only the Railway worker that passes Telegram and Google Sheets checks.
+2. Verify env/secrets on the active worker.
+3. Stop local bot before hosted smoke test.
+4. Run Telegram smoke test from the hosted worker.
+5. Connect scheduler/reminders only after the hosted worker is stable.
 
-Do not change the live Telegram workflow further until Monday QA unless Lisa explicitly requests a small safe fix.
+Do not count reminders as verified until scheduler/reminders are connected and tested separately.

@@ -164,6 +164,12 @@ This command is also stored in `Procfile`:
 worker: python -m bot.main
 ```
 
+Railway start command is also fixed in `railway.json`:
+
+```text
+python -m bot.main
+```
+
 ## Hosting environment variables
 
 Set these in hosting dashboard:
@@ -198,6 +204,8 @@ Ctrl+C
 ```
 
 If local and hosted bot run together in polling mode, Telegram updates may conflict.
+
+If Railway shows multiple worker services for this bot, keep only the worker that passes Telegram and Google Sheets smoke tests. Stop/delete/disconnect duplicate workers so they do not consume Telegram polling updates or report false failed GitHub statuses.
 
 ## Deployment QA checklist
 

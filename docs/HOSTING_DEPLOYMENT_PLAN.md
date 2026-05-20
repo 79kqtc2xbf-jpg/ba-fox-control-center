@@ -63,7 +63,7 @@ Expected variables:
 TELEGRAM_BOT_TOKEN
 TELEGRAM_OWNER_CHAT_ID
 GOOGLE_SHEET_ID
-GOOGLE_APPLICATION_CREDENTIALS or equivalent Google credentials path/content
+GOOGLE_SERVICE_ACCOUNT_JSON
 ```
 
 Important:
@@ -210,12 +210,13 @@ requirements.txt
 bot/main.py
 bot/config.py
 services/google_sheets.py
+railway.json
 ```
 
 Add if missing:
 
 ```text
-Procfile or railway.json / render.yaml
+Procfile / railway.json / render.yaml
 README deployment section
 .env.example
 ```
@@ -256,6 +257,7 @@ Add secrets in hosting dashboard, not in repo:
 TELEGRAM_BOT_TOKEN
 TELEGRAM_OWNER_CHAT_ID
 GOOGLE_SHEET_ID
+GOOGLE_SERVICE_ACCOUNT_JSON
 ```
 
 Google credentials approach options:
@@ -312,6 +314,34 @@ Do not expose public HTTP endpoint yet.
 
 Webhook mode is optional later but not required for MVP.
 
+Railway should use the explicit command from `railway.json`:
+
+```json
+{
+  "deploy": {
+    "startCommand": "python -m bot.main"
+  }
+}
+```
+
+## Stage 5.4a — Duplicate Railway worker check
+
+Current GitHub status shows two Railway workers for the same commit:
+
+```text
+rare-embrace - worker — success
+lovely-charm - worker — failure
+```
+
+Only one Railway worker should remain active for the Telegram polling bot.
+
+Recommended action:
+
+1. Confirm which worker responds in Telegram and reads Google Sheets.
+2. If `rare-embrace - worker` passes the Telegram smoke test, keep it.
+3. Stop, delete, or disconnect the failing `lovely-charm - worker`.
+4. Confirm GitHub no longer receives a false failed Railway status from the inactive worker.
+
 ## Stage 5.5 — Deployment QA checklist
 
 After deployment:
@@ -342,6 +372,16 @@ After deployment:
 8. Confirm Google Sheet update works.
 9. Confirm logs show no errors.
 10. Confirm bot still responds after Mac sleeps / Terminal closes.
+
+Record result:
+
+```text
+Active Railway worker:
+Duplicate worker removed/stopped:
+Env verified:
+Telegram smoke test:
+Google Sheet write test:
+```
 
 ## Stage 5.6 — Monitoring and recovery
 
@@ -404,14 +444,15 @@ Mitigation:
 
 ## Recommended immediate next steps
 
-Before Monday, safe preparation:
+Current safe preparation:
 
-1. Add `.env.example`.
-2. Add deployment instructions to docs.
-3. Check whether `services/google_sheets.py` can support env-based Google credentials.
-4. Prepare Railway/Render worker config.
+1. Keep exactly one Railway worker active.
+2. Verify active worker env/secrets.
+3. Run Telegram smoke test.
+4. Confirm Google Sheet read/write from hosted worker.
+5. Connect scheduler/reminders after Railway is stable.
 
-Do not deploy before Monday QA unless Lisa explicitly confirms, because Stage 3 still has one pending rollover check.
+Do not connect scheduler/reminders until the duplicate Railway worker risk is resolved.
 
 ## Deployment decision
 
@@ -425,6 +466,8 @@ Use Railway as first production-like host for BA Fox Telegram bot.
 
 ```text
 Stage 5.0 — hosting/deployment plan created.
-Stage 5.1 — prepare repo for deployment: pending.
-Deployment itself: not started.
+Stage 5.1 — repo prepared for Railway deploy: done.
+Stage 5.2 — Railway duplicate worker cleanup: pending manual Railway dashboard.
+Stage 5.3 — hosted Telegram smoke test: pending after Railway cleanup.
+Stage 5.4 — scheduler/reminders: later, not verified.
 ```
