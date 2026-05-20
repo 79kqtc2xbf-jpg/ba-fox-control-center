@@ -11,21 +11,25 @@ It shows:
 - what is pending;
 - what rules are approved;
 - what stages are next;
-- what is blocked until Monday QA.
+- what is paused or legacy.
 
 ## Current project role
 
 BA Fox / Executive Fox is Lisa's EA operating system.
 
-It connects:
+V2 target connects:
 
 ```text
 ChatGPT → thinking / analysis / reporting / Gmail reconciliation
-Telegram bot → task UI / dashboard / quick status control
-Google Sheet → source of truth / task database
+Google Sheets → source of truth / task database
+Apps Script → backend / automation / reminders
+Web/PWA → main mobile dashboard
+Google Chat → notification / quick-command layer
 Gmail → inbox context / partner follow-up / reconciliation source
 GitHub → project memory / technical documentation / stage tracking
 ```
+
+Telegram/Railway is now a legacy/paused path. Keep the code for reference and fallback, but do not treat it as the primary V2 direction.
 
 ## Source of truth
 
@@ -48,6 +52,7 @@ docs/REPORTS_CHAT_PROMPT.md
 docs/REMINDER_RULES.md
 docs/SETUP_CHAT_RESPONSE_RULES.md
 docs/STAGE_4_GMAIL_RECONCILIATION_ARCHITECTURE.md
+docs/BA_FOX_V2_APPS_SCRIPT_WEB_CHAT_PLAN.md
 docs/PROJECT_MAP.md
 ```
 
@@ -169,6 +174,42 @@ Daily, 14:00 Asia/Bangkok
 Work and personal tasks must stay visually and logically separate.
 
 ## Stage status
+
+## V2 — Apps Script / Web / Google Chat
+
+Status:
+
+```text
+Active architecture direction / documentation in progress
+```
+
+Decision:
+
+```text
+BA Fox V2 = Google Sheets + Apps Script + Web/PWA + Google Chat.
+```
+
+Primary plan:
+
+```text
+docs/BA_FOX_V2_APPS_SCRIPT_WEB_CHAT_PLAN.md
+```
+
+V2 responsibilities:
+
+- Google Sheets remains the source of truth.
+- Apps Script becomes backend, automation, and reminder layer.
+- Web/PWA becomes the main mobile dashboard.
+- Google Chat starts as notification-only MVP.
+- ChatGPT remains planning, reporting, and reconciliation layer.
+
+Guardrails:
+
+- Telegram/Railway remains legacy/paused.
+- Do not delete Telegram bot code yet.
+- Do not pay Railway for V2 unless explicitly re-approved.
+- Do not expose secrets.
+- Do not connect live Gmail automation yet.
 
 ## Stage 1 — Foundation / Telegram MVP
 
@@ -302,12 +343,18 @@ MVP behavior:
 Status:
 
 ```text
-Not started / safe to prepare before Monday
+Legacy/paused for V2
 ```
 
 Goal:
 
-Make the bot run without Lisa keeping Terminal open.
+Original goal was to make the Telegram bot run without Lisa keeping Terminal open.
+
+Current V2 decision:
+
+```text
+Do not continue Railway as the primary path for BA Fox V2.
+```
 
 Possible options:
 
@@ -317,7 +364,7 @@ Possible options:
 - VPS;
 - lightweight cloud instance.
 
-This needs a separate decision because it involves credentials, environment variables and reliability.
+Railway duplicate worker cleanup may still be needed to avoid false GitHub statuses or billing, but Railway is not the V2 runtime target.
 
 ## Stage 6 — Personal tasks architecture
 
@@ -380,31 +427,32 @@ Checklist:
 6. If tasks appear correctly: close Stage 3.
 7. If tasks do not appear: debug date filtering before Stage 4.1.
 
-## Current Railway deployment status
+## Current V2 deployment status
 
-Stage 5 is now the active deployment stabilization track.
+V2 replaces Railway deployment as the primary architecture path.
 
 ```text
-Stage 5.1 — repo prepared for Railway deploy: done.
-Stage 5.2 — Railway duplicate worker cleanup: pending manual Railway dashboard.
-Stage 5.3 — hosted Telegram smoke test: pending after Railway cleanup.
-Stage 5.4 — scheduler/reminders: later, not verified.
+V2.1 — Apps Script / Web / Google Chat plan: in progress.
+V2.2 — Apps Script backend MVP: pending.
+V2.3 — Web/PWA MVP connection: pending.
+V2.4 — Google Chat notification MVP: pending.
+Telegram/Railway — legacy/paused.
 ```
 
 Current operational rule:
 
 ```text
-Only one Railway worker should remain active for the Telegram polling bot.
+Do not delete Telegram code, but do not build V2 around Railway.
 ```
 
 ## Current next action
 
-Continue Railway stabilization:
+Continue V2 planning and Google-native implementation prep:
 
-1. Keep only the Railway worker that passes Telegram and Google Sheets checks.
-2. Verify env/secrets on the active worker.
-3. Stop local bot before hosted smoke test.
-4. Run Telegram smoke test from the hosted worker.
-5. Connect scheduler/reminders only after the hosted worker is stable.
+1. Approve V2 Apps Script / Web / Google Chat plan.
+2. Prepare Google Sheets V2 schema update.
+3. Create Apps Script backend scaffold.
+4. Connect Web/PWA to Apps Script API.
+5. Add Google Chat notification-only MVP.
 
-Do not count reminders as verified until scheduler/reminders are connected and tested separately.
+Do not connect live Gmail automation until separately approved.
