@@ -1,6 +1,7 @@
 var BA_FOX_CONFIG = {
-  VERSION: 'v2.2-scaffold',
+  VERSION: 'v2.4-read-only',
   DRY_RUN: true,
+  READ_LIVE_SHEETS: true,
   TIMEZONE: 'Asia/Bangkok',
   SHEETS: {
     TASKS: 'Tasks',
@@ -37,8 +38,30 @@ var BA_FOX_CONFIG = {
     EXTERNAL_REF: 24,
     ARCHIVED: 25
   },
-  FINAL_STATUSES: ['Done', 'Cancelled', 'Archived'],
-  OPEN_STATUSES: ['Not started', 'In progress', 'Waiting', 'Push', 'Blocked', 'Postpone'],
+  FINAL_STATUSES: ['Done', 'Cancelled', 'Archived', 'Выполнено'],
+  OPEN_STATUSES: [
+    'Not started',
+    'In progress',
+    'Waiting',
+    'Push',
+    'Blocked',
+    'Postpone',
+    'Не начато',
+    'В работе',
+    'Ждём ответ',
+    'Перенести',
+    'Пуш'
+  ],
+  CONTROL_SIGNALS: [
+    'push',
+    'waiting',
+    'control',
+    'follow-up',
+    'пуш',
+    'ждём ответ',
+    'ждем ответ',
+    'контроль'
+  ],
   TASK_TYPES: ['work', 'personal'],
   APP_SOURCES: ['web', 'chatgpt', 'apps_script', 'telegram_legacy', 'manual_sheet'],
   COMMENT_MODES: ['replace', 'append'],
