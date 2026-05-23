@@ -82,3 +82,50 @@ triggersEnabled: false
 5. Confirm no new rows appeared in `Tasks`, `AuditLog`, `Reports`, or `NotificationQueue`.
 
 Do not enable triggers, notifications, Gmail automation, or webhook configuration during this test.
+
+## Stage V2.5 Read-only Web Endpoint
+
+`doGet(e)` exposes JSON-only read routes for a future Web/PWA dashboard:
+
+```text
+?route=scaffoldInfo
+?route=today
+?route=open
+?route=pushes
+?route=dashboard
+```
+
+Optional read-only filters:
+
+```text
+?route=today&date=2026-05-23
+?route=open&taskType=work
+?route=pushes&dateRange=today
+```
+
+The `dashboard` route combines scaffold information, today tasks, open tasks, and push tasks. Unknown routes return a safe JSON error. `doPost` remains disabled and returns `NOT_IMPLEMENTED`.
+
+### Manual V2.5 Smoke Test
+
+After copying the updated `WebApp.gs` into the bound Apps Script project:
+
+1. Save the Apps Script project.
+2. Run `baFoxScaffoldInfo()` and `baFoxManualSmokeTest()` in the editor first.
+3. Confirm `dryRun: true`, `readLiveSheets: true`, `liveAutomationEnabled: false`, and `triggersEnabled: false`.
+4. Deploy as a Web app only after Lisa explicitly confirms that manual action.
+5. Keep the generated endpoint URL outside this repository.
+6. Test these read-only browser routes:
+
+```text
+<WEB_APP_URL>?route=scaffoldInfo
+<WEB_APP_URL>?route=today
+<WEB_APP_URL>?route=open
+<WEB_APP_URL>?route=pushes
+<WEB_APP_URL>?route=dashboard
+```
+
+7. Confirm valid routes return JSON with `ok: true`.
+8. Confirm read route data shows `readLive: true` where tasks are returned.
+9. Confirm `Tasks`, `AuditLog`, `Reports`, and `NotificationQueue` have no unexpected added or updated rows.
+
+The first Web/PWA integration must be read-only. Do not store endpoint credentials or secrets in frontend code, and do not enable triggers, notifications, webhooks, or Gmail automation.
