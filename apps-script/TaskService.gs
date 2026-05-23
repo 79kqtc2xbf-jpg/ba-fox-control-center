@@ -1,18 +1,58 @@
 function baFoxNormalizeTaskRow(row) {
   return {
     id: row[BA_FOX_CONFIG.TASK_COLUMNS.ID - 1] || '',
-    date: row[BA_FOX_CONFIG.TASK_COLUMNS.DATE - 1] || '',
+    date: baFoxTaskDateValue(row[BA_FOX_CONFIG.TASK_COLUMNS.DATE - 1]),
     category: row[BA_FOX_CONFIG.TASK_COLUMNS.CATEGORY - 1] || '',
     organization: row[BA_FOX_CONFIG.TASK_COLUMNS.ORGANIZATION - 1] || '',
     title: row[BA_FOX_CONFIG.TASK_COLUMNS.TITLE - 1] || '',
+    steps: row[BA_FOX_CONFIG.TASK_COLUMNS.STEPS - 1] || '',
+    source: row[BA_FOX_CONFIG.TASK_COLUMNS.SOURCE - 1] || '',
     priority: row[BA_FOX_CONFIG.TASK_COLUMNS.PRIORITY - 1] || '',
-    deadline: row[BA_FOX_CONFIG.TASK_COLUMNS.DEADLINE - 1] || '',
+    deadline: baFoxTaskDateValue(row[BA_FOX_CONFIG.TASK_COLUMNS.DEADLINE - 1]),
+    reminderMode: row[BA_FOX_CONFIG.TASK_COLUMNS.REMINDER_MODE - 1] || '',
     status: row[BA_FOX_CONFIG.TASK_COLUMNS.STATUS - 1] || '',
+    nextReminder: row[BA_FOX_CONFIG.TASK_COLUMNS.NEXT_REMINDER - 1] || '',
     comment: row[BA_FOX_CONFIG.TASK_COLUMNS.COMMENT - 1] || '',
     channel: row[BA_FOX_CONFIG.TASK_COLUMNS.CHANNEL - 1] || '',
     taskType: row[BA_FOX_CONFIG.TASK_COLUMNS.TASK_TYPE - 1] || 'work',
-    archived: row[BA_FOX_CONFIG.TASK_COLUMNS.ARCHIVED - 1] === true
+    owner: row[BA_FOX_CONFIG.TASK_COLUMNS.OWNER - 1] || 'Lisa',
+    createdAt: row[BA_FOX_CONFIG.TASK_COLUMNS.CREATED_AT - 1] || '',
+    updatedAt: row[BA_FOX_CONFIG.TASK_COLUMNS.UPDATED_AT - 1] || '',
+    completedAt: row[BA_FOX_CONFIG.TASK_COLUMNS.COMPLETED_AT - 1] || '',
+    reminderRecurrence: row[BA_FOX_CONFIG.TASK_COLUMNS.REMINDER_RECURRENCE - 1] || '',
+    notificationChannels: row[BA_FOX_CONFIG.TASK_COLUMNS.NOTIFICATION_CHANNELS - 1] || '',
+    notificationStatus: row[BA_FOX_CONFIG.TASK_COLUMNS.NOTIFICATION_STATUS - 1] || '',
+    appSource: row[BA_FOX_CONFIG.TASK_COLUMNS.APP_SOURCE - 1] || '',
+    externalRef: row[BA_FOX_CONFIG.TASK_COLUMNS.EXTERNAL_REF - 1] || '',
+    archived: baFoxIsTrueValue_(row[BA_FOX_CONFIG.TASK_COLUMNS.ARCHIVED - 1])
   };
+}
+
+function baFoxIsTrueValue_(value) {
+  return value === true || baFoxSafeString(value).toUpperCase() === 'TRUE';
+}
+
+function baFoxNormalizeMatchValue_(value) {
+  return baFoxSafeString(value).toLowerCase();
+}
+
+function baFoxStatusMatches_(status, values) {
+  var normalizedStatus = baFoxNormalizeMatchValue_(status);
+  return values.some(function(value) {
+    return normalizedStatus === baFoxNormalizeMatchValue_(value);
+  });
+}
+
+function baFoxTaskNeedsControl_(task) {
+  var signalText = [
+    task.status,
+    task.category,
+    task.reminderMode
+  ].map(baFoxNormalizeMatchValue_).join(' ');
+
+  return BA_FOX_CONFIG.CONTROL_SIGNALS.some(function(signal) {
+    return signalText.indexOf(baFoxNormalizeMatchValue_(signal)) !== -1;
+  });
 }
 
 function baFoxListTodayTasks(request) {
@@ -23,8 +63,11 @@ function baFoxListTodayTasks(request) {
   return {
     date: date,
     dryRun: storeResult.dryRun,
+    readLive: storeResult.readLive,
+    warning: storeResult.warning,
     tasks: storeResult.rows.map(baFoxNormalizeTaskRow).filter(function(task) {
-      return !task.archived && (task.date === date || task.date === 'Сегодня');
+      var taskDate = baFoxNormalizeMatchValue_(task.date);
+      return !task.archived && (task.date === date || taskDate === 'сегодня');
     })
   };
 }
@@ -37,8 +80,10 @@ function baFoxListOpenTasks(request) {
   return {
     taskType: taskType,
     dryRun: storeResult.dryRun,
+    readLive: storeResult.readLive,
+    warning: storeResult.warning,
     tasks: storeResult.rows.map(baFoxNormalizeTaskRow).filter(function(task) {
-      var finalStatus = BA_FOX_CONFIG.FINAL_STATUSES.indexOf(task.status) !== -1;
+      var finalStatus = baFoxStatusMatches_(task.status, BA_FOX_CONFIG.FINAL_STATUSES);
       var typeMatches = taskType === 'all' || task.taskType === taskType;
       return !task.archived && !finalStatus && typeMatches;
     })
@@ -53,8 +98,11 @@ function baFoxListPushTasks(request) {
   return {
     dateRange: dateRange,
     dryRun: storeResult.dryRun,
+    readLive: storeResult.readLive,
+    warning: storeResult.warning,
     tasks: storeResult.rows.map(baFoxNormalizeTaskRow).filter(function(task) {
-      return !task.archived && task.status === 'Push';
+      var finalStatus = baFoxStatusMatches_(task.status, BA_FOX_CONFIG.FINAL_STATUSES);
+      return !task.archived && !finalStatus && baFoxTaskNeedsControl_(task);
     })
   };
 }
