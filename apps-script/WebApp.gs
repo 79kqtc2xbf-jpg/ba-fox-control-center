@@ -1,24 +1,59 @@
-function doGet() {
-  var output = {
-    ok: true,
-    app: 'BA Fox V2 Apps Script scaffold',
-    version: BA_FOX_CONFIG.VERSION,
-    dryRun: BA_FOX_CONFIG.DRY_RUN,
-    message: 'Stage V2.2 scaffold only. Web/PWA hosting is not enabled here.'
-  };
-
+function baFoxJsonOutput_(payload) {
   return ContentService
-    .createTextOutput(JSON.stringify(output))
+    .createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function baFoxRequestParameters_(event) {
+  return event && event.parameter ? event.parameter : {};
+}
+
+function baFoxGetDashboard_(parameters) {
+  return baFoxOk({
+    scaffoldInfo: baFoxScaffoldInfo().data,
+    today: getTodayTasks({ date: parameters.date }).data,
+    open: getOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }).data,
+    pushes: getPushTasks({ dateRange: parameters.dateRange || 'today' }).data
+  });
+}
+
+function doGet(event) {
+  var parameters = baFoxRequestParameters_(event);
+  var route = parameters.route || 'scaffoldInfo';
+  var response;
+
+  switch (route) {
+    case 'scaffoldInfo':
+      response = baFoxScaffoldInfo();
+      break;
+    case 'today':
+      response = getTodayTasks({ date: parameters.date });
+      break;
+    case 'open':
+      response = getOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' });
+      break;
+    case 'pushes':
+      response = getPushTasks({ dateRange: parameters.dateRange || 'today' });
+      break;
+    case 'dashboard':
+      response = baFoxGetDashboard_(parameters);
+      break;
+    default:
+      response = baFoxError(
+        'ROUTE_NOT_FOUND',
+        'Unknown read-only route.',
+        { route: route }
+      );
+  }
+
+  return baFoxJsonOutput_(response);
 }
 
 function doPost(event) {
   var body = event && event.postData && event.postData.contents;
-  return ContentService
-    .createTextOutput(JSON.stringify(baFoxError(
+  return baFoxJsonOutput_(baFoxError(
       'NOT_IMPLEMENTED',
-      'Stage V2.2 does not expose live write endpoints.',
+      'Stage V2.5 does not expose write endpoints.',
       { receivedBody: Boolean(body) }
-    )))
-    .setMimeType(ContentService.MimeType.JSON);
+    ));
 }
