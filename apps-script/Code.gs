@@ -2,6 +2,7 @@ function baFoxScaffoldInfo() {
   return baFoxOk({
     version: BA_FOX_CONFIG.VERSION,
     dryRun: BA_FOX_CONFIG.DRY_RUN,
+    readLiveSheets: BA_FOX_CONFIG.READ_LIVE_SHEETS,
     timezone: BA_FOX_CONFIG.TIMEZONE,
     sheets: BA_FOX_CONFIG.SHEETS,
     liveAutomationEnabled: false,
