@@ -14,25 +14,31 @@ function baFoxGetSheetByName_(sheetName) {
 }
 
 function baFoxReadTasksRows() {
-  if (BA_FOX_CONFIG.DRY_RUN) {
+  if (!BA_FOX_CONFIG.READ_LIVE_SHEETS) {
     return {
-      dryRun: true,
-      rows: []
+      dryRun: BA_FOX_CONFIG.DRY_RUN,
+      readLive: false,
+      rows: [],
+      warning: 'Live Sheets reads are disabled.'
     };
   }
 
   var sheet = baFoxGetSheetByName_(BA_FOX_CONFIG.SHEETS.TASKS);
   if (!sheet) {
     return {
-      dryRun: false,
-      rows: []
+      dryRun: BA_FOX_CONFIG.DRY_RUN,
+      readLive: false,
+      rows: [],
+      warning: 'Bound spreadsheet or Tasks sheet is not available.'
     };
   }
 
   var values = sheet.getDataRange().getValues();
   return {
-    dryRun: false,
-    rows: values.slice(1)
+    dryRun: BA_FOX_CONFIG.DRY_RUN,
+    readLive: true,
+    rows: values.slice(1),
+    warning: null
   };
 }
 
@@ -40,7 +46,7 @@ function baFoxAppendTaskRow(rowValues) {
   return {
     dryRun: true,
     rowValues: rowValues,
-    message: 'Stage V2.2 scaffold does not write to Google Sheets.'
+    message: 'Stage V2.4 read-only mode does not write to Google Sheets.'
   };
 }
 
@@ -49,7 +55,7 @@ function baFoxUpdateTaskRow(taskId, patch) {
     dryRun: true,
     taskId: taskId,
     patch: patch,
-    message: 'Stage V2.2 scaffold does not update Google Sheets.'
+    message: 'Stage V2.4 read-only mode does not update Google Sheets.'
   };
 }
 
@@ -57,6 +63,6 @@ function baFoxAppendReportRow(rowValues) {
   return {
     dryRun: true,
     rowValues: rowValues,
-    message: 'Stage V2.2 scaffold does not write reports.'
+    message: 'Stage V2.4 read-only mode does not write reports.'
   };
 }
