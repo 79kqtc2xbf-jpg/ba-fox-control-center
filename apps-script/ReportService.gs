@@ -15,16 +15,16 @@ function baFoxBuildDailyReportDraft(request) {
     'Date: ' + date,
     '',
     'Completed:',
-    '- Dry-run scaffold: no live task rows read yet.',
+    '- Report write remains dry-run; source task rows may be read live.',
     '',
     'In progress / control:',
-    '- Connect to SheetsStore after schema migration is approved.',
+    '- Review the read-only task results before enabling future writes.',
     '',
     'Blockers:',
     '- None captured by scaffold.',
     '',
     'Next actions:',
-    '- Implement read/write logic after Stage V2.2 review.'
+    '- Keep report persistence disabled until a separately approved stage.'
   ].join('\n');
 
   var reportRow = [
@@ -37,7 +37,7 @@ function baFoxBuildDailyReportDraft(request) {
     baFoxIsoNow(),
     baFoxIsoNow(),
     '',
-    'Dry-run scaffold report.'
+    'Read-only Stage V2.4 draft; no report row written.'
   ];
 
   return baFoxOk({
