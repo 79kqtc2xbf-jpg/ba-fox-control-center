@@ -66,8 +66,14 @@ function summaryCount(sectionName) {
 }
 
 function renderModeBanner() {
+  const loading = dashboardState.status === 'loading' || scaffoldState.status === 'loading';
   const isMock = dashboardState.isMock || scaffoldState.isMock;
   const failed = dashboardState.status === 'error' || scaffoldState.status === 'error';
+  if (loading) {
+    elements.modeBanner.className = 'mode-banner';
+    elements.modeBanner.innerHTML = '<strong>Read-only dashboard</strong><span>Проверяю безопасную конфигурацию источника данных...</span>';
+    return;
+  }
   elements.modeBanner.className = 'mode-banner ' + (failed ? 'warning' : isMock ? 'mock' : 'live');
   elements.modeBanner.innerHTML = failed
     ? '<strong>Demo mode / mock data</strong><span>Read-only источник недоступен. Показаны безопасные демо-данные.</span>'
@@ -207,12 +213,28 @@ async function loadDashboard() {
   render();
 }
 
+function loadOptionalLocalConfig() {
+  return new Promise(function (resolve) {
+    const localConfigScript = document.createElement('script');
+    localConfigScript.src = 'config.local.js';
+    localConfigScript.onload = resolve;
+    localConfigScript.onerror = resolve;
+    document.head.appendChild(localConfigScript);
+  });
+}
+
 elements.tabs.forEach(function (tab) {
   tab.addEventListener('click', function () {
     setTab(tab.dataset.tab);
   });
 });
 
-formatBangkokTime();
-setInterval(formatBangkokTime, 30000);
-loadDashboard();
+async function initializeDashboard() {
+  formatBangkokTime();
+  setInterval(formatBangkokTime, 30000);
+  render();
+  await loadOptionalLocalConfig();
+  await loadDashboard();
+}
+
+initializeDashboard();
