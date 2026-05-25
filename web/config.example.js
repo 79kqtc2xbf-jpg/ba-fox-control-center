@@ -1,0 +1,4 @@
+window.BA_FOX_CONFIG = {
+  APPS_SCRIPT_ENDPOINT: '',
+  USE_MOCK_DATA: true,
+};
