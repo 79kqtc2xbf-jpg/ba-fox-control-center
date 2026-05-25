@@ -3,48 +3,55 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>BA Fox — Control Center</title>
+  <title>BA Fox - Control Center</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <main class="app-shell">
-    <section class="hero-card">
+    <header class="hero-card">
       <div>
         <p class="eyebrow">BA Fox / Executive Fox</p>
-        <h1>Сегодня держим фокус спокойно 🦊</h1>
-        <p class="hero-copy">Работа, личное, пуши и wait list — в одном мягком control center.</p>
+        <h1>BA Fox Control Center</h1>
+        <p class="hero-copy">Тихий обзор текущих задач и ожидаемых ответов.</p>
       </div>
-      <div class="date-pill" id="todayLabel">Время Бангкока</div>
-    </section>
+      <div class="hero-status">
+        <span class="read-only-pill">Только просмотр</span>
+        <div class="date-pill" id="todayLabel">Время Бангкока</div>
+      </div>
+    </header>
+
+    <div class="mode-banner mock" id="modeBanner" role="status">
+      <strong>Demo mode / mock data</strong>
+      <span>Без подключения к рабочей таблице и без изменений задач.</span>
+    </div>
 
     <nav class="tabs" aria-label="Разделы BA Fox">
       <button class="tab active" data-tab="today">Сегодня</button>
-      <button class="tab" data-tab="work">Работа</button>
-      <button class="tab" data-tab="personal">Личное</button>
-      <button class="tab" data-tab="push">Пуши</button>
-      <button class="tab" data-tab="week">Неделя</button>
+      <button class="tab" data-tab="open">Открытые</button>
+      <button class="tab" data-tab="pushes">Пуши</button>
+      <button class="tab" data-tab="system">Система</button>
     </nav>
 
-    <section class="dashboard-grid" id="summaryCards"></section>
+    <section class="dashboard-grid" id="summaryCards" aria-label="Краткая сводка"></section>
 
     <section class="content-panel">
       <div class="panel-header">
         <div>
           <p class="eyebrow" id="panelEyebrow">Сегодня</p>
-          <h2 id="panelTitle">Фокус дня</h2>
+          <h2 id="panelTitle">Задачи на сегодня</h2>
         </div>
-        <button class="ghost-button" id="resetDemo">Сбросить отметки</button>
+        <span class="panel-badge" id="panelBadge">Read-only</span>
       </div>
-      <div class="focus-note" id="focusNote"></div>
-      <div class="task-list" id="taskList"></div>
-    </section>
-
-    <section class="quick-actions">
-      <button class="action-button primary" id="copyDaily">Скопировать итог дня</button>
-      <button class="action-button" id="copyMonday">Скопировать чек-лист на понедельник</button>
+      <div class="focus-note" id="statusMessage" role="status"></div>
+      <div class="task-list" id="taskList" aria-live="polite"></div>
     </section>
   </main>
 
+  <script src="config.example.js"></script>
+  <script src="api/baFoxConfig.js"></script>
+  <script src="api/baFoxMockData.js"></script>
+  <script src="api/baFoxUiState.js"></script>
+  <script src="api/baFoxClient.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
