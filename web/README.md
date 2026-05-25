@@ -2,17 +2,18 @@
 
 ## Purpose
 
-This is a safe standalone web MVP for BA Fox.
+The BA Fox Web/PWA dashboard is now wired to the V2 read-only client in safe demo mode.
 
-It does not touch the Telegram bot.
-It does not read Google Sheet yet.
-It contains a read-only API client skeleton, but no live endpoint is committed or connected to the visible MVP yet.
-
-Current goal:
+The visible screen renders:
 
 ```text
-Preview the future BA Fox web app / PWA direction in a Cozy-style interface.
+Today
+Open tasks
+Pushes
+System status
 ```
+
+No live endpoint URL is committed. The default configuration uses mock data only.
 
 ## Files
 
@@ -30,14 +31,18 @@ web/api/baFoxUiState.js
 ## Current mode
 
 ```text
-Static demo / mock data by default
+Demo mode / mock data
+Read-only dashboard
 ```
 
-Stage V2.6A adds a read-only mock client skeleton. Existing screens remain unchanged until a separately reviewed UI integration step.
+`web/app.js` reads the view model only through:
 
-## Read-only client skeleton
+```js
+BAFoxClient.getDashboard()
+BAFoxClient.getScaffoldInfo()
+```
 
-The client is prepared for GET-only routes:
+The client remains limited to GET-only routes:
 
 ```text
 scaffoldInfo
@@ -47,21 +52,11 @@ pushes
 dashboard
 ```
 
-It exposes:
-
-```js
-BAFoxClient.getScaffoldInfo()
-BAFoxClient.getTodayTasks({ date: '2026-05-25' })
-BAFoxClient.getOpenTasks({ taskType: 'work' })
-BAFoxClient.getPushTasks({ dateRange: 'today' })
-BAFoxClient.getDashboard()
-```
-
-There are no task creation, status update, comment update, POST, notification, or cleanup methods in this client.
+The dashboard has loading, success, empty, and error handling. An error uses safe mock fallback data instead of exposing or changing live tasks.
 
 ## Configuration
 
-The committed safe example is:
+The committed safe configuration remains:
 
 ```js
 window.BA_FOX_CONFIG = {
@@ -70,29 +65,25 @@ window.BA_FOX_CONFIG = {
 };
 ```
 
-If no endpoint is configured, mock mode is always used.
+Do not commit a live endpoint URL, secrets, tokens, webhooks, or Sheet IDs. `web/config.local.js` is reserved for a separately approved future local read-only test and is ignored by Git.
 
-For a future local read-only check, create `web/config.local.js` manually and keep it only on your machine. That filename is ignored by Git. Do not put a live endpoint URL, secrets, tokens, webhooks, or Sheet IDs in committed files.
+## Manual smoke test
 
-## Client smoke test
+1. Open `web/index.html` in a browser.
+2. Confirm the banner says `Demo mode / mock data` and `Только просмотр`.
+3. Confirm the summary shows counts for `Сегодня`, `Открытые`, and `Пуши`.
+4. Switch among `Сегодня`, `Открытые`, `Пуши`, and `Система`.
+5. Confirm the system screen shows writes, automation, and triggers as disabled.
+6. Confirm there are no buttons to add, close, edit, or change a task.
 
-The visible MVP is not wired to this layer in Stage V2.6A. To smoke-test the skeleton in browser DevTools, load the scripts in this order from a temporary local test page or a later UI integration:
-
-```html
-<script src="config.example.js"></script>
-<script src="api/baFoxConfig.js"></script>
-<script src="api/baFoxMockData.js"></script>
-<script src="api/baFoxUiState.js"></script>
-<script src="api/baFoxClient.js"></script>
-```
-
-Then run:
+Optional browser console check:
 
 ```js
 await BAFoxClient.getDashboard()
+await BAFoxClient.getScaffoldInfo()
 ```
 
-Expected default behavior:
+Expected default response state:
 
 ```text
 status: success
@@ -100,56 +91,6 @@ isMock: true
 message: Demo mode / mock data
 ```
 
-Prepared UI-state helpers cover `loading`, `success`, `empty`, `error`, and `mock` states. A locally configured endpoint is accepted only for GET reads, and live data is treated as connected only when read-only safety flags are present.
+## Safety boundary
 
-## Sections
-
-```text
-Сегодня
-Работа
-Личное
-Пуши
-Неделя
-```
-
-## How to open locally
-
-From repository root:
-
-```bash
-open web/index.html
-```
-
-Or open the file manually in browser.
-
-## Design direction
-
-The app should feel like:
-
-```text
-less CRM, more personal executive command center
-```
-
-Inspired by Cozy-style simplicity:
-
-- warm;
-- mobile-first;
-- calm;
-- not overloaded;
-- work and personal separated;
-- clear focus for the day.
-
-## Future steps
-
-Future V2 work:
-
-```text
-1. Wire the visible dashboard to the read-only mock client.
-2. Test local-only read endpoint configuration outside Git.
-3. Add installable PWA behavior.
-4. Design writes only as a separately approved later stage.
-```
-
-## Safety rule
-
-Do not commit a live endpoint URL. Do not add writes, notifications, triggers, Gmail automation, Google Chat, or Telegram/Railway changes in this frontend stage.
+This stage does not add write calls, notifications, triggers, Gmail automation, Google Chat, or live task cleanup. It does not change `bot/`, Telegram, or Railway behavior.
