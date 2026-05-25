@@ -65,7 +65,20 @@ window.BA_FOX_CONFIG = {
 };
 ```
 
-Do not commit a live endpoint URL, secrets, tokens, webhooks, or Sheet IDs. `web/config.local.js` is reserved for a separately approved future local read-only test and is ignored by Git.
+Do not commit a live endpoint URL, secrets, tokens, webhooks, or Sheet IDs. `web/config.local.js` is ignored by Git and is the only supported place for a local read-only endpoint check.
+
+## Local-only live read test
+
+The page attempts to load `web/config.local.js` at startup. If the file is absent, the dashboard stays in safe mock mode. The missing local file never prevents the page from loading.
+
+For a local read-only verification only:
+
+1. Copy `web/config.example.js` to `web/config.local.js` on your machine.
+2. Paste the Apps Script endpoint URL into `APPS_SCRIPT_ENDPOINT` in that local file only.
+3. Change `USE_MOCK_DATA` to `false` in that local file only.
+4. Open the dashboard through a local static server and check the `Read-only data` banner.
+
+The real URL must never appear in a committed file, documentation, screenshot, or pull request text. See `docs/BA_FOX_V2_STAGE_6C_LOCAL_READ_ONLY_WEB_CONNECTION_GUIDE.md` for the Lisa checklist and the after-test safety check.
 
 ## Manual smoke test
 
