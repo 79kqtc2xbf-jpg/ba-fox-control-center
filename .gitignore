@@ -27,3 +27,6 @@ logs/
 # Runtime data
 *.sqlite3
 *.db
+
+# Local Web/PWA endpoint configuration
+web/config.local.js
