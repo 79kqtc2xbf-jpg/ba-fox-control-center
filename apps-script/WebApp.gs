@@ -7,7 +7,7 @@ function baFoxJsonOutput_(payload) {
 function baFoxJsonpCallbackIsValid_(callback) {
   return typeof callback === 'string'
     && callback.length <= 128
-    && /^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$/.test(callback);
+    && /^BAFoxJsonpCallback_[A-Za-z0-9_$]+$/.test(callback);
 }
 
 function baFoxReadOutput_(payload, callback) {
