@@ -4,6 +4,22 @@ function baFoxJsonOutput_(payload) {
     .setMimeType(ContentService.MimeType.JSON);
 }
 
+function baFoxJsonpCallbackIsValid_(callback) {
+  return typeof callback === 'string'
+    && callback.length <= 128
+    && /^[A-Za-z_$][A-Za-z0-9_$]*(\.[A-Za-z_$][A-Za-z0-9_$]*)*$/.test(callback);
+}
+
+function baFoxReadOutput_(payload, callback) {
+  if (!callback) {
+    return baFoxJsonOutput_(payload);
+  }
+
+  return ContentService
+    .createTextOutput(callback + '(' + JSON.stringify(payload) + ');')
+    .setMimeType(ContentService.MimeType.JAVASCRIPT);
+}
+
 function baFoxRequestParameters_(event) {
   return event && event.parameter ? event.parameter : {};
 }
@@ -20,7 +36,16 @@ function baFoxGetDashboard_(parameters) {
 function doGet(event) {
   var parameters = baFoxRequestParameters_(event);
   var route = parameters.route || 'scaffoldInfo';
+  var callback = parameters.callback || '';
   var response;
+
+  if (callback && !baFoxJsonpCallbackIsValid_(callback)) {
+    return baFoxJsonOutput_(baFoxError(
+      'INVALID_CALLBACK',
+      'Callback name is not allowed.',
+      {}
+    ));
+  }
 
   switch (route) {
     case 'scaffoldInfo':
@@ -46,7 +71,7 @@ function doGet(event) {
       );
   }
 
-  return baFoxJsonOutput_(response);
+  return baFoxReadOutput_(response, callback);
 }
 
 function doPost(event) {
