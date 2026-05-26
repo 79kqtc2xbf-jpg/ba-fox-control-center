@@ -140,7 +140,7 @@ Local Web/PWA pages can be blocked by browser CORS rules when reading the Apps S
 
 - Without `callback`, existing responses remain normal JSON.
 - With a valid `callback`, the response is JavaScript containing that callback and the existing payload.
-- Callback names accept only conservative JavaScript identifier paths; invalid callbacks return a safe JSON error.
+- Callback names accept only the generated `BAFoxJsonpCallback_...` prefix; invalid callbacks return a safe JSON error.
 - `doPost` remains disabled, and no trigger, notification, or write behavior is enabled.
 
 ### Manual V2.6D Smoke Test
