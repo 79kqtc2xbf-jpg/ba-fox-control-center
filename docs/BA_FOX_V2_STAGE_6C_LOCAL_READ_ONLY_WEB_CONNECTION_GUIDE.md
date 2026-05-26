@@ -35,6 +35,7 @@ triggersEnabled = false
 
 - Если endpoint недоступен или признаки небезопасны, dashboard показывает безопасные mock/error data.
 - Для локального dashboard live read выполняется через безопасный JSONP GET, чтобы чтение не блокировалось браузерным CORS.
+- Endpoint принимает только callback-имена, сгенерированные BA Fox client с префиксом `BAFoxJsonpCallback_`; произвольные функции отклоняются.
 - Обычные browser-проверки Apps Script URL без `callback` по-прежнему получают JSON.
 
 ## Настройка на компьютере Лизы
