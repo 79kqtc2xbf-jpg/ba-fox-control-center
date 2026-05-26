@@ -129,3 +129,27 @@ After copying the updated `WebApp.gs` into the bound Apps Script project:
 9. Confirm `Tasks`, `AuditLog`, `Reports`, and `NotificationQueue` have no unexpected added or updated rows.
 
 The first Web/PWA integration must be read-only. Do not store endpoint credentials or secrets in frontend code, and do not enable triggers, notifications, webhooks, or Gmail automation.
+
+## Stage V2.6D Local Read-only JSONP
+
+Local Web/PWA pages can be blocked by browser CORS rules when reading the Apps Script Web App JSON endpoint. `doGet(e)` now supports an optional JSONP callback for the same read-only routes:
+
+```text
+<WEB_APP_URL>?route=dashboard&callback=BAFoxJsonpCallback_1
+```
+
+- Without `callback`, existing responses remain normal JSON.
+- With a valid `callback`, the response is JavaScript containing that callback and the existing payload.
+- Callback names accept only conservative JavaScript identifier paths; invalid callbacks return a safe JSON error.
+- `doPost` remains disabled, and no trigger, notification, or write behavior is enabled.
+
+### Manual V2.6D Smoke Test
+
+1. Copy the updated `WebApp.gs` into the bound Apps Script project and save it.
+2. Run `baFoxScaffoldInfo()` and `baFoxManualSmokeTest()` before redeploying.
+3. Confirm `dryRun: true`, `readLiveSheets: true`, `liveAutomationEnabled: false`, and `triggersEnabled: false`.
+4. Deploy a new Web App version only as the manual deployment step.
+5. Keep the Web App URL only in local `web/config.local.js`.
+6. Open the local dashboard and confirm it switches to `Read-only data`.
+7. Confirm the browser loads JSONP scripts for read routes and makes no POST requests.
+8. Confirm `AuditLog`, `Reports`, and `NotificationQueue` still contain headers only.
