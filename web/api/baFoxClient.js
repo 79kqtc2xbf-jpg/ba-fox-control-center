@@ -6,6 +6,8 @@
     'pushes',
     'dashboard',
   ]);
+  const JSONP_TIMEOUT_MS = 10000;
+  let jsonpRequestSequence = 0;
 
   function assertRoute(route) {
     if (!READ_ONLY_ROUTES.includes(route)) {
@@ -47,7 +49,7 @@
   function validateScaffoldSafety(data) {
     const isSafe = data
       && data.dryRun === true
-      && data.readLiveSheets === true
+      && (data.readLiveSheets === true || data.readLive === true)
       && data.liveAutomationEnabled === false
       && data.triggersEnabled === false;
 
@@ -69,25 +71,54 @@
     return data && Array.isArray(data.tasks) && data.tasks.length === 0;
   }
 
-  async function getJson(route, params) {
-    const response = await fetch(buildRouteUrl(route, params), {
-      method: 'GET',
+  function getJsonp(route, params) {
+    return new Promise(function (resolve, reject) {
+      jsonpRequestSequence += 1;
+      const callbackName = 'BAFoxJsonpCallback_' + Date.now() + '_' + jsonpRequestSequence;
+      const query = Object.assign({}, params || {}, { callback: callbackName });
+      const script = global.document.createElement('script');
+      let timeoutId;
+
+      function cleanup() {
+        global.clearTimeout(timeoutId);
+        delete global[callbackName];
+        if (script.parentNode) {
+          script.parentNode.removeChild(script);
+        }
+      }
+
+      global[callbackName] = function (response) {
+        cleanup();
+        try {
+          resolve(validateResponseShape(response));
+        } catch (responseError) {
+          reject(responseError);
+        }
+      };
+
+      script.async = true;
+      script.src = buildRouteUrl(route, query);
+      script.onerror = function () {
+        cleanup();
+        reject(new Error('Read-only JSONP endpoint request failed.'));
+      };
+      timeoutId = global.setTimeout(function () {
+        cleanup();
+        reject(new Error('Read-only JSONP endpoint timed out.'));
+      }, JSONP_TIMEOUT_MS);
+      global.document.head.appendChild(script);
     });
-    if (!response.ok) {
-      throw new Error('Read-only endpoint request failed.');
-    }
-    return validateResponseShape(await response.json());
   }
 
   async function readLive(route, params) {
     if (route === 'scaffoldInfo') {
-      const scaffoldInfo = await getJson(route, params);
+      const scaffoldInfo = await getJsonp(route, params);
       validateScaffoldSafety(scaffoldInfo);
       return scaffoldInfo;
     }
 
     if (route === 'dashboard') {
-      const dashboard = await getJson(route, params);
+      const dashboard = await getJsonp(route, params);
       validateScaffoldSafety(dashboard.scaffoldInfo);
       validateReadSafety(dashboard.today);
       validateReadSafety(dashboard.open);
@@ -95,9 +126,9 @@
       return dashboard;
     }
 
-    const scaffoldInfo = await getJson('scaffoldInfo', {});
+    const scaffoldInfo = await getJsonp('scaffoldInfo', {});
     validateScaffoldSafety(scaffoldInfo);
-    const data = await getJson(route, params);
+    const data = await getJsonp(route, params);
     validateReadSafety(data);
     return data;
   }
