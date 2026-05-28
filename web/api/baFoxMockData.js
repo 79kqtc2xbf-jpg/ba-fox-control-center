@@ -83,6 +83,66 @@
     },
   ];
 
+  const cleanupAudit = {
+    summary: {
+      rowsChecked: 24,
+      duplicateGroups: 1,
+      nearDuplicateGroups: 2,
+      nonCanonicalStatuses: 3,
+      nonCanonicalPriorities: 2,
+      missingV2Fields: 4,
+      vagueDates: 3,
+      activeLegacyRows: 2,
+      archiveCandidates: 1,
+    },
+    items: [
+      {
+        rowNumber: 7,
+        taskId: 'MOCK-002',
+        issueType: 'STATUS_NORMALIZATION',
+        currentValue: 'Waiting',
+        proposedValue: 'Ждём ответ',
+        confidence: 0.85,
+        suggestedAction: 'NORMALIZE',
+        needsLisaApproval: true,
+        notes: 'Demo-only suggestion. No cleanup action is available in the UI.',
+      },
+      {
+        rowNumber: 12,
+        taskId: 'MOCK-009',
+        issueType: 'NEAR_DUPLICATE',
+        currentValue: 'Demo Bank / Уточнить обратную связь',
+        proposedValue: '',
+        confidence: 0.75,
+        suggestedAction: 'REVIEW_REQUIRED',
+        needsLisaApproval: true,
+        notes: 'Same organization and normalized title appear elsewhere. Review only.',
+      },
+      {
+        rowNumber: 18,
+        taskId: 'MOCK-014',
+        issueType: 'CORRUPTED_FIELD',
+        currentValue: 'Deadline: Сегодня',
+        proposedValue: '',
+        confidence: 0.65,
+        suggestedAction: 'REVIEW_REQUIRED',
+        needsLisaApproval: true,
+        notes: 'Human-readable date should be reviewed before a machine control date is added.',
+      },
+      {
+        rowNumber: 22,
+        taskId: 'MOCK-006',
+        issueType: 'ARCHIVE_CANDIDATE',
+        currentValue: 'Выполнено',
+        proposedValue: 'Архив',
+        confidence: 0.65,
+        suggestedAction: 'ARCHIVE_AFTER_APPROVAL',
+        needsLisaApproval: true,
+        notes: 'Suggestion only. The dashboard does not archive or modify rows.',
+      },
+    ],
+  };
+
   function clone(data) {
     return JSON.parse(JSON.stringify(data));
   }
@@ -147,6 +207,8 @@
           open: clone(getOpenData(input.taskType)),
           pushes: clone(getPushData(input.dateRange)),
         });
+      case 'cleanupAudit':
+        return success(clone(cleanupAudit));
       default:
         return {
           ok: false,
