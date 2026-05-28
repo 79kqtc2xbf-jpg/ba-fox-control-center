@@ -36,6 +36,7 @@ ReportService.gs
 ReminderService.gs
 NotificationService.gs
 ChatService.gs
+CleanupAudit.gs
 WebApi.gs
 WebApp.gs
 Validation.gs
@@ -153,3 +154,19 @@ Local Web/PWA pages can be blocked by browser CORS rules when reading the Apps S
 6. Open the local dashboard and confirm it switches to `Read-only data`.
 7. Confirm the browser loads JSONP scripts for read routes and makes no POST requests.
 8. Confirm `AuditLog`, `Reports`, and `NotificationQueue` still contain headers only.
+
+## Stage V2.6F Audit-only Cleanup Report
+
+`baFoxBuildCleanupAuditDryRun()` reads `Tasks` rows and returns cleanup review suggestions without writing anything.
+
+It detects duplicate task IDs, near-duplicates, non-canonical statuses and priorities, missing V2 fields in active rows, vague dates, active legacy rows, possible corrupted fields, and archive candidates.
+
+### Manual V2.6F Smoke Test
+
+1. Copy `CleanupAudit.gs` into the bound Apps Script project and save it.
+2. Run `baFoxBuildCleanupAuditDryRun()`.
+3. Confirm the response has `ok: true`, `data.summary.rowsChecked`, and `data.items`.
+4. Confirm `Tasks` was not edited.
+5. Confirm `CleanupReview` was not created or populated.
+6. Confirm `AuditLog`, `Reports`, and `NotificationQueue` were not edited.
+7. Confirm no `doPost` write path, Web/PWA write behavior, trigger, Google Chat, Gmail, Telegram, Railway, endpoint URL, secret, Sheet ID, or webhook was added.
