@@ -5,6 +5,7 @@
     'open',
     'pushes',
     'dashboard',
+    'cleanupAudit',
   ]);
   const JSONP_TIMEOUT_MS = 10000;
   let jsonpRequestSequence = 0;
@@ -64,7 +65,21 @@
     }
   }
 
+  function validateCleanupAudit(data) {
+    const isValid = data
+      && data.summary
+      && Array.isArray(data.items)
+      && typeof data.summary.rowsChecked === 'number';
+
+    if (!isValid) {
+      throw new Error('Cleanup audit response shape is incomplete.');
+    }
+  }
+
   function isEmptyData(route, data) {
+    if (route === 'cleanupAudit') {
+      return data && Array.isArray(data.items) && data.items.length === 0;
+    }
     if (route === 'dashboard') {
       return data && data.today && Array.isArray(data.today.tasks) && data.today.tasks.length === 0;
     }
@@ -126,6 +141,14 @@
       return dashboard;
     }
 
+    if (route === 'cleanupAudit') {
+      const scaffoldInfo = await getJsonp('scaffoldInfo', {});
+      validateScaffoldSafety(scaffoldInfo);
+      const audit = await getJsonp(route, params);
+      validateCleanupAudit(audit);
+      return audit;
+    }
+
     const scaffoldInfo = await getJsonp('scaffoldInfo', {});
     validateScaffoldSafety(scaffoldInfo);
     const data = await getJsonp(route, params);
@@ -183,6 +206,9 @@
     },
     getDashboard: function (options) {
       return readRoute('dashboard', options || {});
+    },
+    getCleanupAudit: function () {
+      return readRoute('cleanupAudit', {});
     },
   });
 }(window));

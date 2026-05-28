@@ -63,6 +63,9 @@ function doGet(event) {
     case 'dashboard':
       response = baFoxGetDashboard_(parameters);
       break;
+    case 'cleanupAudit':
+      response = baFoxBuildCleanupAuditDryRun();
+      break;
     default:
       response = baFoxError(
         'ROUTE_NOT_FOUND',
