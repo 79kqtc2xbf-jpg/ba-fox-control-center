@@ -94,6 +94,7 @@ Do not enable triggers, notifications, Gmail automation, or webhook configuratio
 ?route=open
 ?route=pushes
 ?route=dashboard
+?route=cleanupAudit
 ```
 
 Optional read-only filters:
@@ -170,3 +171,25 @@ It detects duplicate task IDs, near-duplicates, non-canonical statuses and prior
 5. Confirm `CleanupReview` was not created or populated.
 6. Confirm `AuditLog`, `Reports`, and `NotificationQueue` were not edited.
 7. Confirm no `doPost` write path, Web/PWA write behavior, trigger, Google Chat, Gmail, Telegram, Railway, endpoint URL, secret, Sheet ID, or webhook was added.
+
+## Stage V2.6G Read-only Cleanup Audit Route
+
+`doGet(e)` exposes one additional read-only route:
+
+```text
+?route=cleanupAudit
+```
+
+The route calls `baFoxBuildCleanupAuditDryRun()` and supports the same normal JSON and JSONP callback behavior as the other read routes.
+
+### Manual V2.6G Smoke Test
+
+1. Run `baFoxBuildCleanupAuditDryRun()` in Apps Script.
+2. Test `<WEB_APP_URL>?route=cleanupAudit`.
+3. Test `<WEB_APP_URL>?route=cleanupAudit&callback=BAFoxJsonpCallback_1`.
+4. Open the local dashboard and confirm the `Аудит данных` section renders summary counts, issue groups, and audit suggestions.
+5. Confirm the browser makes no POST requests.
+6. Confirm `Tasks` was not edited.
+7. Confirm `CleanupReview` was not created or populated.
+8. Confirm `AuditLog`, `Reports`, and `NotificationQueue` remain headers-only.
+9. Confirm no trigger, Google Chat, Gmail, Telegram, Railway, endpoint URL, secret, Sheet ID, or webhook was added.
