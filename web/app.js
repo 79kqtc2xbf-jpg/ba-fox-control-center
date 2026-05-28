@@ -2,6 +2,7 @@ const viewLabels = Object.freeze({
   today: ['Сегодня', 'Задачи на сегодня'],
   open: ['Открытые', 'Все открытые задачи'],
   pushes: ['Пуши', 'Ожидают следующего шага'],
+  audit: ['Аудит данных', 'Audit-only cleanup report'],
   system: ['Система', 'Безопасный режим'],
 });
 
@@ -20,6 +21,7 @@ const elements = {
 let activeTab = 'today';
 let dashboardState = BAFoxClient.createLoadingState('dashboard');
 let scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
+let cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
 
 function escapeHtml(value) {
   return String(value == null ? '' : value)
@@ -50,6 +52,10 @@ function scaffoldData() {
   return scaffoldState.data || dashboardData().scaffoldInfo || {};
 }
 
+function cleanupAuditData() {
+  return cleanupAuditState.data || {};
+}
+
 function taskRowsForTab() {
   const data = dashboardData();
   const collection = {
@@ -67,8 +73,8 @@ function summaryCount(sectionName) {
 
 function renderModeBanner() {
   const loading = dashboardState.status === 'loading' || scaffoldState.status === 'loading';
-  const isMock = dashboardState.isMock || scaffoldState.isMock;
-  const failed = dashboardState.status === 'error' || scaffoldState.status === 'error';
+  const isMock = dashboardState.isMock || scaffoldState.isMock || cleanupAuditState.isMock;
+  const failed = dashboardState.status === 'error' || scaffoldState.status === 'error' || cleanupAuditState.status === 'error';
   if (loading) {
     elements.modeBanner.className = 'mode-banner';
     elements.modeBanner.innerHTML = '<strong>Read-only dashboard</strong><span>Проверяю безопасную конфигурацию источника данных...</span>';
@@ -84,16 +90,18 @@ function renderModeBanner() {
 
 function renderSummary() {
   if (dashboardState.status === 'loading') {
-    elements.summaryCards.innerHTML = ['Сегодня', 'Открытые', 'Пуши', 'Режим'].map(function (label) {
+    elements.summaryCards.innerHTML = ['Сегодня', 'Открытые', 'Пуши', 'Аудит', 'Режим'].map(function (label) {
       return '<article class="summary-card loading"><strong>...</strong><span>' + label + '</span></article>';
     }).join('');
     return;
   }
 
+  const auditSummary = cleanupAuditData().summary || {};
   const cards = [
     { value: summaryCount('today'), label: 'Сегодня' },
     { value: summaryCount('open'), label: 'Открытые' },
     { value: summaryCount('pushes'), label: 'Пуши' },
+    { value: auditSummary.rowsChecked == null ? '-' : auditSummary.rowsChecked, label: 'Строк аудита' },
     { value: dashboardState.isMock ? 'Demo' : 'Read', label: 'Режим' },
   ];
 
@@ -111,6 +119,12 @@ function statusText() {
   }
   if (activeTab === 'system') {
     return 'Этот экран показывает только состояние read-only контура.';
+  }
+  if (activeTab === 'audit') {
+    if (cleanupAuditState.status === 'error') {
+      return 'Ошибка чтения audit-only отчета: показан безопасный demo-набор.';
+    }
+    return 'Аудит только показывает предложения. Кнопок очистки, архивации и нормализации здесь нет.';
   }
   return dashboardState.isMock
     ? 'Это демонстрационные задачи. Изменение статуса и отправка данных отключены.'
@@ -167,16 +181,100 @@ function renderSystem() {
   }).join('') + '</div>';
 }
 
+function auditSummaryRows(summary) {
+  return [
+    ['Проверено строк', summary.rowsChecked],
+    ['Дубликаты ID', summary.duplicateGroups],
+    ['Near-duplicates', summary.nearDuplicateGroups],
+    ['Статусы', summary.nonCanonicalStatuses],
+    ['Приоритеты', summary.nonCanonicalPriorities],
+    ['V2 поля', summary.missingV2Fields],
+    ['Даты', summary.vagueDates],
+    ['Legacy active', summary.activeLegacyRows],
+    ['Архив-кандидаты', summary.archiveCandidates],
+  ];
+}
+
+function groupAuditItems(items) {
+  return items.reduce(function (groups, item) {
+    const key = item.issueType || 'UNKNOWN';
+    groups[key] = groups[key] || [];
+    groups[key].push(item);
+    return groups;
+  }, {});
+}
+
+function renderAudit() {
+  if (cleanupAuditState.status === 'loading') {
+    elements.taskList.innerHTML = '<article class="loading-state">Загружаю audit-only отчет...</article>';
+    return;
+  }
+
+  const audit = cleanupAuditData();
+  const summary = audit.summary || {};
+  const items = Array.isArray(audit.items) ? audit.items : [];
+  const groups = groupAuditItems(items);
+  const summaryHtml = auditSummaryRows(summary).map(function (row) {
+    return '<article class="audit-summary-card"><strong>' + escapeHtml(row[1] == null ? '-' : row[1]) + '</strong><span>' + escapeHtml(row[0]) + '</span></article>';
+  }).join('');
+  const groupHtml = Object.keys(groups).sort().map(function (issueType) {
+    return '<span class="audit-group-chip">' + escapeHtml(issueType) + ': ' + groups[issueType].length + '</span>';
+  }).join('');
+
+  if (!items.length) {
+    elements.taskList.innerHTML = [
+      '<section class="audit-section">',
+      '<div class="audit-summary-grid">' + summaryHtml + '</div>',
+      '<article class="empty-state">',
+      '<strong>Audit-only отчет не нашел предложений</strong>',
+      '<span>Это только экран просмотра. Никаких изменений в Tasks не выполняется.</span>',
+      '</article>',
+      '</section>',
+    ].join('');
+    return;
+  }
+
+  elements.taskList.innerHTML = [
+    '<section class="audit-section">',
+    '<div class="audit-summary-grid">' + summaryHtml + '</div>',
+    '<div class="audit-groups" aria-label="Группы проблем">' + groupHtml + '</div>',
+    '<div class="audit-items">',
+    items.map(function (item) {
+      return [
+        '<article class="audit-card">',
+        '<div>',
+        '<div class="audit-card-title">' + escapeHtml(item.issueType) + ' · row ' + escapeHtml(item.rowNumber) + '</div>',
+        '<div class="task-meta">Task ID: ' + escapeHtml(item.taskId || '-') + '</div>',
+        '</div>',
+        '<div class="audit-values">',
+        '<span><strong>Сейчас:</strong> ' + escapeHtml(item.currentValue || '-') + '</span>',
+        '<span><strong>Предложение:</strong> ' + escapeHtml(item.proposedValue || '-') + '</span>',
+        '<span><strong>Действие:</strong> ' + escapeHtml(item.suggestedAction || 'REVIEW_REQUIRED') + '</span>',
+        '<span><strong>Approval:</strong> ' + (item.needsLisaApproval ? 'Lisa required' : 'not required') + '</span>',
+        '</div>',
+        '<p>' + escapeHtml(item.notes || '') + '</p>',
+        '</article>',
+      ].join('');
+    }).join(''),
+    '</div>',
+    '</section>',
+  ].join('');
+}
+
 function renderPanel() {
   const label = viewLabels[activeTab];
   elements.panelEyebrow.textContent = label[0];
   elements.panelTitle.textContent = label[1];
-  elements.panelBadge.textContent = dashboardState.isMock ? 'Demo / Read-only' : 'Read-only';
+  elements.panelBadge.textContent = dashboardState.isMock || cleanupAuditState.isMock ? 'Demo / Read-only' : 'Read-only';
   elements.statusMessage.textContent = statusText();
-  elements.statusMessage.classList.toggle('error', dashboardState.status === 'error' || scaffoldState.status === 'error');
+  elements.statusMessage.classList.toggle('error', dashboardState.status === 'error' || scaffoldState.status === 'error' || cleanupAuditState.status === 'error');
 
-  if (dashboardState.status === 'loading') {
+  if (dashboardState.status === 'loading' || (activeTab === 'audit' && cleanupAuditState.status === 'loading')) {
     elements.taskList.innerHTML = '<article class="loading-state">Загружаю данные для просмотра...</article>';
+    return;
+  }
+  if (activeTab === 'audit') {
+    renderAudit();
     return;
   }
   if (activeTab === 'system') {
@@ -203,13 +301,16 @@ function setTab(tabName) {
 async function loadDashboard() {
   dashboardState = BAFoxClient.createLoadingState('dashboard');
   scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
+  cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
   render();
   const states = await Promise.all([
     BAFoxClient.getDashboard(),
     BAFoxClient.getScaffoldInfo(),
+    BAFoxClient.getCleanupAudit(),
   ]);
   dashboardState = states[0];
   scaffoldState = states[1];
+  cleanupAuditState = states[2];
   render();
 }
 
