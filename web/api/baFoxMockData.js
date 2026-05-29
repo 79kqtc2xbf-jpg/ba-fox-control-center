@@ -85,7 +85,7 @@
 
   const cleanupAudit = {
     summary: {
-      rowsChecked: 24,
+      rowsChecked: 32,
       duplicateGroups: 1,
       nearDuplicateGroups: 2,
       nonCanonicalStatuses: 3,
@@ -96,6 +96,17 @@
       archiveCandidates: 1,
     },
     items: [
+      {
+        rowNumber: 4,
+        taskId: 'MOCK-001',
+        issueType: 'DUPLICATE_ID',
+        currentValue: 'MOCK-001',
+        proposedValue: 'MOCK-001',
+        confidence: 0.95,
+        suggestedAction: 'MERGE_CONTEXT_ONLY',
+        needsLisaApproval: true,
+        notes: 'Duplicate task ID appears in demo audit output. Review before choosing a primary row.',
+      },
       {
         rowNumber: 7,
         taskId: 'MOCK-002',
@@ -117,6 +128,39 @@
         suggestedAction: 'REVIEW_REQUIRED',
         needsLisaApproval: true,
         notes: 'Same organization and normalized title appear elsewhere. Review only.',
+      },
+      {
+        rowNumber: 15,
+        taskId: 'MOCK-011',
+        issueType: 'PRIORITY_NORMALIZATION',
+        currentValue: 'Medium',
+        proposedValue: 'Средний',
+        confidence: 0.9,
+        suggestedAction: 'NORMALIZE',
+        needsLisaApproval: true,
+        notes: 'Priority mapping can be reviewed before any future cleanup write stage.',
+      },
+      {
+        rowNumber: 16,
+        taskId: 'MOCK-012',
+        issueType: 'TASK_TYPE_MISSING',
+        currentValue: '',
+        proposedValue: 'work',
+        confidence: 0.5,
+        suggestedAction: 'REVIEW_REQUIRED',
+        needsLisaApproval: true,
+        notes: 'Active row has missing V2 task type. Display-only default is not a write decision.',
+      },
+      {
+        rowNumber: 17,
+        taskId: 'MOCK-013',
+        issueType: 'OWNER_MISSING',
+        currentValue: '',
+        proposedValue: 'Lisa',
+        confidence: 0.5,
+        suggestedAction: 'REVIEW_REQUIRED',
+        needsLisaApproval: true,
+        notes: 'Active row has missing owner. Lisa approval is required before cleanup.',
       },
       {
         rowNumber: 18,
