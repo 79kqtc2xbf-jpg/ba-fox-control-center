@@ -1,0 +1,118 @@
+openapi: 3.1.0
+info:
+  title: BA Fox GPT Action
+  version: 0.1.0
+  description: |
+    Action endpoint for the custom GPT "Executive Fox / BA Fox".
+    The GPT uses this action to read and update BA Fox Control Center Google Sheet.
+
+    Source of truth remains Google Sheet.
+    Telegram remains the operational interface.
+    This GPT Action is the ChatGPT-side execution layer.
+servers:
+  - url: https://SCRIPT_ID_PLACEHOLDER.googleusercontent.com/macros/exec
+    description: Replace with your deployed Google Apps Script Web App URL.
+paths:
+  /:
+    post:
+      operationId: baFoxSheetAction
+      summary: Read or update BA Fox Google Sheet
+      description: |
+        Single endpoint used by the custom GPT to add tasks, update task status,
+        list open tasks, and save daily report snapshots.
+      security:
+        - apiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - action
+              properties:
+                action:
+                  type: string
+                  enum:
+                    - add_task
+                    - update_task_status
+                    - list_open_tasks
+                    - list_today_tasks
+                    - append_daily_report
+                task:
+                  type: object
+                  description: Task object for add_task.
+                  properties:
+                    id:
+                      type: string
+                      description: Optional stable ID. If empty, Apps Script creates one.
+                    date:
+                      type: string
+                      description: YYYY-MM-DD.
+                    category:
+                      type: string
+                    organization:
+                      type: string
+                    title:
+                      type: string
+                    steps:
+                      type: string
+                    source:
+                      type: string
+                    priority:
+                      type: string
+                      enum: [Высокий, Средний, Низкий]
+                    deadline:
+                      type: string
+                    reminder_mode:
+                      type: string
+                    status:
+                      type: string
+                    next_reminder:
+                      type: string
+                    result:
+                      type: string
+                    channel:
+                      type: string
+                task_id:
+                  type: string
+                  description: Existing task ID for update_task_status.
+                status:
+                  type: string
+                  description: New status for update_task_status.
+                result:
+                  type: string
+                  description: Optional comment/result for update_task_status.
+                date:
+                  type: string
+                  description: Optional YYYY-MM-DD filter for list_today_tasks or daily report.
+                report_type:
+                  type: string
+                  enum: [daily_result, daily_plan, weekly_report]
+                report_text:
+                  type: string
+              additionalProperties: false
+      responses:
+        "200":
+          description: Action completed.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    type: object
+        "401":
+          description: Unauthorized.
+        "500":
+          description: Server error.
+components:
+  securitySchemes:
+    apiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-BA-FOX-KEY
