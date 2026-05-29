@@ -10,6 +10,7 @@ The visible screen renders:
 Today
 Open tasks
 Pushes
+Data audit
 System status
 ```
 
@@ -40,6 +41,7 @@ Read-only dashboard
 ```js
 BAFoxClient.getDashboard()
 BAFoxClient.getScaffoldInfo()
+BAFoxClient.getCleanupAudit()
 ```
 
 The client remains limited to GET-only routes:
@@ -50,6 +52,7 @@ today
 open
 pushes
 dashboard
+cleanupAudit
 ```
 
 The dashboard has loading, success, empty, and error handling. An error uses safe mock fallback data instead of exposing or changing live tasks.
@@ -84,16 +87,18 @@ The real URL must never appear in a committed file, documentation, screenshot, o
 
 1. Open `web/index.html` in a browser.
 2. Confirm the banner says `Demo mode / mock data` and `Только просмотр`.
-3. Confirm the summary shows counts for `Сегодня`, `Открытые`, and `Пуши`.
-4. Switch among `Сегодня`, `Открытые`, `Пуши`, and `Система`.
+3. Confirm the summary shows counts for `Сегодня`, `Открытые`, `Пуши`, and audit rows.
+4. Switch among `Сегодня`, `Открытые`, `Пуши`, `Аудит данных`, and `Система`.
 5. Confirm the system screen shows writes, automation, and triggers as disabled.
-6. Confirm there are no buttons to add, close, edit, or change a task.
+6. In `Аудит данных`, confirm filters work, issues are grouped by type, severity labels appear, and the review format preview is display-only.
+7. Confirm there are no buttons to add, close, edit, archive, normalize, approve, export, or change a task.
 
 Optional browser console check:
 
 ```js
 await BAFoxClient.getDashboard()
 await BAFoxClient.getScaffoldInfo()
+await BAFoxClient.getCleanupAudit()
 ```
 
 Expected default response state:

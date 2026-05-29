@@ -18,7 +18,24 @@ const elements = {
   modeBanner: document.querySelector('#modeBanner'),
 };
 
+const auditFilters = Object.freeze([
+  { id: 'all', label: 'All', issueTypes: [] },
+  { id: 'duplicates', label: 'Duplicates', issueTypes: ['DUPLICATE_ID', 'NEAR_DUPLICATE'] },
+  { id: 'statuses', label: 'Statuses', issueTypes: ['STATUS_NORMALIZATION'] },
+  { id: 'priorities', label: 'Priorities', issueTypes: ['PRIORITY_NORMALIZATION'] },
+  { id: 'dates', label: 'Dates', issueTypes: ['CORRUPTED_FIELD'] },
+  { id: 'missingV2', label: 'Missing V2 fields', issueTypes: ['TASK_TYPE_MISSING', 'OWNER_MISSING'] },
+  { id: 'archive', label: 'Archive candidates', issueTypes: ['ARCHIVE_CANDIDATE'] },
+]);
+
+const severityRank = Object.freeze({
+  high: 1,
+  medium: 2,
+  low: 3,
+});
+
 let activeTab = 'today';
+let activeAuditFilter = 'all';
 let dashboardState = BAFoxClient.createLoadingState('dashboard');
 let scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
 let cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
@@ -195,6 +212,57 @@ function auditSummaryRows(summary) {
   ];
 }
 
+function auditSeverity(item) {
+  const issueType = item.issueType || '';
+  const confidence = Number(item.confidence || 0);
+  if (['DUPLICATE_ID', 'NEAR_DUPLICATE', 'CORRUPTED_FIELD'].includes(issueType)) {
+    return 'high';
+  }
+  if (item.needsLisaApproval || ['STATUS_NORMALIZATION', 'PRIORITY_NORMALIZATION', 'ARCHIVE_CANDIDATE'].includes(issueType)) {
+    return 'medium';
+  }
+  if (confidence < 0.6 || ['TASK_TYPE_MISSING', 'OWNER_MISSING', 'ACTIVE_LEGACY_ROW'].includes(issueType)) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+function auditItemWithSeverity(item) {
+  return Object.assign({}, item, {
+    severity: auditSeverity(item),
+  });
+}
+
+function sortedAuditItems(items) {
+  return items.map(auditItemWithSeverity).sort(function (left, right) {
+    var severityDiff = severityRank[left.severity] - severityRank[right.severity];
+    if (severityDiff !== 0) {
+      return severityDiff;
+    }
+    var typeDiff = String(left.issueType || '').localeCompare(String(right.issueType || ''));
+    if (typeDiff !== 0) {
+      return typeDiff;
+    }
+    return Number(left.rowNumber || 0) - Number(right.rowNumber || 0);
+  });
+}
+
+function auditFilterConfig(filterId) {
+  return auditFilters.find(function (filter) {
+    return filter.id === filterId;
+  }) || auditFilters[0];
+}
+
+function filteredAuditItems(items) {
+  const filter = auditFilterConfig(activeAuditFilter);
+  if (!filter.issueTypes.length) {
+    return items;
+  }
+  return items.filter(function (item) {
+    return filter.issueTypes.includes(item.issueType);
+  });
+}
+
 function groupAuditItems(items) {
   return items.reduce(function (groups, item) {
     const key = item.issueType || 'UNKNOWN';
@@ -204,26 +272,102 @@ function groupAuditItems(items) {
   }, {});
 }
 
+function severityCounts(items) {
+  return items.reduce(function (counts, item) {
+    counts[item.severity] = (counts[item.severity] || 0) + 1;
+    return counts;
+  }, { high: 0, medium: 0, low: 0 });
+}
+
+function auditFilterHtml(items) {
+  return auditFilters.map(function (filter) {
+    const count = filter.issueTypes.length
+      ? items.filter(function (item) { return filter.issueTypes.includes(item.issueType); }).length
+      : items.length;
+    const activeClass = filter.id === activeAuditFilter ? ' active' : '';
+    return '<button class="audit-filter' + activeClass + '" type="button" data-audit-filter="' + escapeHtml(filter.id) + '">' + escapeHtml(filter.label) + ' <span>' + count + '</span></button>';
+  }).join('');
+}
+
+function reviewPreviewRows(items) {
+  return items.slice(0, 5).map(function (item) {
+    return [
+      'row ' + (item.rowNumber || '-'),
+      item.taskId || '-',
+      item.issueType || '-',
+      item.severity,
+      item.suggestedAction || 'REVIEW_REQUIRED',
+      item.needsLisaApproval ? 'Lisa approval' : 'no approval flag',
+    ].join(' | ');
+  });
+}
+
+function renderReviewPreview(items) {
+  const rows = reviewPreviewRows(items);
+  if (!rows.length) {
+    return '';
+  }
+  return [
+    '<aside class="review-preview" aria-label="Review format preview">',
+    '<div>',
+    '<strong>Review format preview</strong>',
+    '<span>Только предварительный вид. Экспорта и записи нет.</span>',
+    '</div>',
+    '<pre>' + escapeHtml(rows.join('\n')) + '</pre>',
+    '</aside>',
+  ].join('');
+}
+
 function renderAudit() {
   if (cleanupAuditState.status === 'loading') {
-    elements.taskList.innerHTML = '<article class="loading-state">Загружаю audit-only отчет...</article>';
+    elements.taskList.innerHTML = [
+      '<section class="audit-section">',
+      '<article class="loading-state">',
+      '<strong>Загружаю audit-only отчет...</strong>',
+      '<span>Это только чтение. BA Fox ничего не меняет в таблице.</span>',
+      '</article>',
+      '</section>',
+    ].join('');
+    return;
+  }
+  if (cleanupAuditState.status === 'error') {
+    elements.taskList.innerHTML = [
+      '<section class="audit-section">',
+      '<article class="empty-state error-state">',
+      '<strong>Не удалось загрузить audit-only отчет</strong>',
+      '<span>Показывать или применять cleanup-действия нельзя. Проверьте read-only endpoint.</span>',
+      '</article>',
+      '</section>',
+    ].join('');
     return;
   }
 
   const audit = cleanupAuditData();
   const summary = audit.summary || {};
-  const items = Array.isArray(audit.items) ? audit.items : [];
-  const groups = groupAuditItems(items);
+  const items = sortedAuditItems(Array.isArray(audit.items) ? audit.items : []);
+  const visibleItems = filteredAuditItems(items);
+  const groups = groupAuditItems(visibleItems);
+  const severities = severityCounts(items);
   const summaryHtml = auditSummaryRows(summary).map(function (row) {
     return '<article class="audit-summary-card"><strong>' + escapeHtml(row[1] == null ? '-' : row[1]) + '</strong><span>' + escapeHtml(row[0]) + '</span></article>';
   }).join('');
   const groupHtml = Object.keys(groups).sort().map(function (issueType) {
     return '<span class="audit-group-chip">' + escapeHtml(issueType) + ': ' + groups[issueType].length + '</span>';
   }).join('');
+  const compactSummaryHtml = [
+    ['High', severities.high, 'high'],
+    ['Medium', severities.medium, 'medium'],
+    ['Low', severities.low, 'low'],
+    ['Visible', visibleItems.length, 'visible'],
+  ].map(function (row) {
+    return '<article class="audit-compact-card ' + escapeHtml(row[2]) + '"><strong>' + escapeHtml(row[1]) + '</strong><span>' + escapeHtml(row[0]) + '</span></article>';
+  }).join('');
+  const explanation = '<p class="audit-explainer">Это только аудит. BA Fox ничего не меняет в таблице.</p>';
 
   if (!items.length) {
     elements.taskList.innerHTML = [
       '<section class="audit-section">',
+      explanation,
       '<div class="audit-summary-grid">' + summaryHtml + '</div>',
       '<article class="empty-state">',
       '<strong>Audit-only отчет не нашел предложений</strong>',
@@ -236,19 +380,23 @@ function renderAudit() {
 
   elements.taskList.innerHTML = [
     '<section class="audit-section">',
+    explanation,
     '<div class="audit-summary-grid">' + summaryHtml + '</div>',
-    '<div class="audit-groups" aria-label="Группы проблем">' + groupHtml + '</div>',
+    '<div class="audit-compact-grid">' + compactSummaryHtml + '</div>',
+    '<div class="audit-filters" aria-label="Фильтры аудита">' + auditFilterHtml(items) + '</div>',
+    '<div class="audit-groups" aria-label="Группы проблем">' + (groupHtml || '<span class="audit-group-chip muted">Нет элементов для фильтра</span>') + '</div>',
     '<div class="audit-items">',
-    items.map(function (item) {
+    visibleItems.map(function (item) {
       return [
-        '<article class="audit-card">',
+        '<article class="audit-card" data-severity="' + escapeHtml(item.severity) + '">',
         '<div>',
-        '<div class="audit-card-title">' + escapeHtml(item.issueType) + ' · row ' + escapeHtml(item.rowNumber) + '</div>',
+        '<div class="audit-card-title"><span>' + escapeHtml(item.issueType) + ' · row ' + escapeHtml(item.rowNumber) + '</span><strong class="severity-pill ' + escapeHtml(item.severity) + '">' + escapeHtml(item.severity) + '</strong></div>',
         '<div class="task-meta">Task ID: ' + escapeHtml(item.taskId || '-') + '</div>',
         '</div>',
         '<div class="audit-values">',
         '<span><strong>Сейчас:</strong> ' + escapeHtml(item.currentValue || '-') + '</span>',
         '<span><strong>Предложение:</strong> ' + escapeHtml(item.proposedValue || '-') + '</span>',
+        '<span><strong>Confidence:</strong> ' + escapeHtml(item.confidence == null ? '-' : item.confidence) + '</span>',
         '<span><strong>Действие:</strong> ' + escapeHtml(item.suggestedAction || 'REVIEW_REQUIRED') + '</span>',
         '<span><strong>Approval:</strong> ' + (item.needsLisaApproval ? 'Lisa required' : 'not required') + '</span>',
         '</div>',
@@ -257,6 +405,7 @@ function renderAudit() {
       ].join('');
     }).join(''),
     '</div>',
+    visibleItems.length ? renderReviewPreview(visibleItems) : '<article class="empty-state"><strong>Для фильтра нет элементов</strong><span>Выберите All или другой фильтр.</span></article>',
     '</section>',
   ].join('');
 }
@@ -328,6 +477,15 @@ elements.tabs.forEach(function (tab) {
   tab.addEventListener('click', function () {
     setTab(tab.dataset.tab);
   });
+});
+
+elements.taskList.addEventListener('click', function (event) {
+  const filterButton = event.target.closest('[data-audit-filter]');
+  if (!filterButton) {
+    return;
+  }
+  activeAuditFilter = filterButton.dataset.auditFilter || 'all';
+  renderAudit();
 });
 
 async function initializeDashboard() {
