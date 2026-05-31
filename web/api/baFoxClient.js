@@ -171,11 +171,11 @@
       script.src = buildRouteUrl(route, query);
       script.onerror = function () {
         cleanup();
-        reject(new Error('Read-only JSONP endpoint request failed.'));
+        reject(new Error('Read-only JSONP endpoint request failed. URL: ' + script.src));
       };
       timeoutId = global.setTimeout(function () {
         cleanup();
-        reject(new Error('Read-only JSONP endpoint timed out.'));
+        reject(new Error('Read-only JSONP endpoint timed out. URL: ' + script.src));
       }, JSONP_TIMEOUT_MS);
       global.document.head.appendChild(script);
     });
@@ -258,12 +258,15 @@
     } catch (clientError) {
       const fallback = global.BAFoxMockData.getResponse(route, params).data;
       const rateLimited = isRateLimitError(clientError);
+      const diagnosticMessage = clientError && clientError.message
+        ? clientError.message
+        : 'Unknown endpoint error.';
       return global.BAFoxUiState.error(route, clientError, {
         isMock: true,
         fallbackData: fallback,
         message: rateLimited
           ? RATE_LIMIT_MESSAGE
-          : 'Endpoint недоступен или небезопасен. Показываю mock data.',
+          : 'Live endpoint error: ' + diagnosticMessage,
       });
     }
   }
