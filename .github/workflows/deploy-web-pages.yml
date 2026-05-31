@@ -1,0 +1,56 @@
+name: Deploy BA Fox Web Preview
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'web/**'
+      - '.github/workflows/deploy-web-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: ba-fox-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build static web bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+          cp -R web/. dist/
+          cat > dist/config.local.js <<'EOF'
+          window.BA_FOX_CONFIG = {
+            APPS_SCRIPT_ENDPOINT: '${{ secrets.BA_FOX_APPS_SCRIPT_ENDPOINT }}',
+            USE_MOCK_DATA: ${{ secrets.BA_FOX_APPS_SCRIPT_ENDPOINT == '' && 'true' || 'false' }},
+          };
+          EOF
+          touch dist/.nojekyll
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
