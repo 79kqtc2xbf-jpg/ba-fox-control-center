@@ -31,9 +31,9 @@ var BA_FOX_CLEANUP_AUDIT = {
   FINAL_STATUSES: ['Выполнено', 'Отменено', 'Архив', 'Done', 'Cancelled', 'Archived']
 };
 
-function baFoxBuildCleanupAuditDryRun() {
+function baFoxBuildCleanupAuditDryRun(storeResult) {
   try {
-    var storeResult = baFoxReadTasksRows();
+    storeResult = storeResult || baFoxReadTasksRows();
     var rows = storeResult.rows || [];
     var normalizedRows = rows.map(function(row, index) {
       return {

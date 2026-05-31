@@ -40,6 +40,17 @@ let dashboardState = BAFoxClient.createLoadingState('dashboard');
 let scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
 let cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
 
+function stateFromFullDashboard(fullState, route, data) {
+  return {
+    status: fullState.status,
+    route: route,
+    message: fullState.message,
+    data: data || null,
+    error: fullState.error,
+    isMock: fullState.isMock,
+  };
+}
+
 function escapeHtml(value) {
   return String(value == null ? '' : value)
     .replace(/&/g, '&amp;')
@@ -99,7 +110,7 @@ function renderModeBanner() {
   }
   elements.modeBanner.className = 'mode-banner ' + (failed ? 'warning' : isMock ? 'mock' : 'live');
   elements.modeBanner.innerHTML = failed
-    ? '<strong>Demo mode / mock data</strong><span>Read-only источник недоступен. Показаны безопасные демо-данные.</span>'
+    ? '<strong>Demo mode / mock data</strong><span>' + escapeHtml(dashboardState.message || cleanupAuditState.message || 'Read-only источник недоступен. Показаны безопасные демо-данные.') + '</span>'
     : isMock
       ? '<strong>Demo mode / mock data</strong><span>Без подключения к рабочей таблице и без изменений задач.</span>'
       : '<strong>Read-only data</strong><span>Данные загружены только для просмотра.</span>';
@@ -132,14 +143,14 @@ function statusText() {
     return 'Загружаю безопасный обзор...';
   }
   if (dashboardState.status === 'error' || scaffoldState.status === 'error') {
-    return 'Ошибка чтения: рабочие данные не открыты, ниже показан demo-набор.';
+    return dashboardState.message || 'Ошибка чтения: рабочие данные не открыты, ниже показан demo-набор.';
   }
   if (activeTab === 'system') {
     return 'Этот экран показывает только состояние read-only контура.';
   }
   if (activeTab === 'audit') {
     if (cleanupAuditState.status === 'error') {
-      return 'Ошибка чтения audit-only отчета: показан безопасный demo-набор.';
+      return cleanupAuditState.message || 'Ошибка чтения audit-only отчета: показан безопасный demo-набор.';
     }
     return 'Аудит только показывает предложения. Кнопок очистки, архивации и нормализации здесь нет.';
   }
@@ -448,18 +459,15 @@ function setTab(tabName) {
 }
 
 async function loadDashboard() {
-  dashboardState = BAFoxClient.createLoadingState('dashboard');
+  dashboardState = BAFoxClient.createLoadingState('fullDashboard');
   scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
   cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
   render();
-  const states = await Promise.all([
-    BAFoxClient.getDashboard(),
-    BAFoxClient.getScaffoldInfo(),
-    BAFoxClient.getCleanupAudit(),
-  ]);
-  dashboardState = states[0];
-  scaffoldState = states[1];
-  cleanupAuditState = states[2];
+  const fullDashboardState = await BAFoxClient.getFullDashboard();
+  const data = fullDashboardState.data || {};
+  dashboardState = stateFromFullDashboard(fullDashboardState, 'dashboard', data);
+  scaffoldState = stateFromFullDashboard(fullDashboardState, 'scaffoldInfo', data.scaffoldInfo);
+  cleanupAuditState = stateFromFullDashboard(fullDashboardState, 'cleanupAudit', data.cleanupAudit);
   render();
 }
 

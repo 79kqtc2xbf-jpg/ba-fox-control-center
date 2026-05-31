@@ -5,9 +5,12 @@
     'open',
     'pushes',
     'dashboard',
+    'fullDashboard',
     'cleanupAudit',
+    'safetyStatus',
   ]);
   const JSONP_TIMEOUT_MS = 10000;
+  const RATE_LIMIT_MESSAGE = 'Google Sheets временно ограничил чтение. BA Fox повторит попытку позже.';
   let jsonpRequestSequence = 0;
 
   function assertRoute(route) {
@@ -42,7 +45,10 @@
       const message = response.error && response.error.message
         ? response.error.message
         : 'Read-only endpoint returned an error.';
-      throw new Error(message);
+      const error = new Error(message);
+      error.code = response.error && response.error.code;
+      error.details = response.error && response.error.details;
+      throw error;
     }
     return response.data;
   }
@@ -76,9 +82,59 @@
     }
   }
 
+  function validateSafetyStatus(data) {
+    const isValid = data
+      && data.dryRun === true
+      && data.readLive === true
+      && data.sheets
+      && data.counts
+      && data.sheets.AuditLog
+      && data.sheets.Reports
+      && data.sheets.NotificationQueue;
+
+    if (!isValid) {
+      throw new Error('Safety status response shape is incomplete.');
+    }
+  }
+
+  function validateFullDashboard(data) {
+    validateScaffoldSafety(data && data.scaffoldInfo);
+    validateReadSafety(data && data.today);
+    validateReadSafety(data && data.open);
+    validateReadSafety(data && data.pushes);
+    validateCleanupAudit(data && data.cleanupAudit);
+  }
+
+  function isRateLimitError(error) {
+    const code = error && error.code;
+    const message = String(error && error.message ? error.message : '').toLowerCase();
+    return code === 'SHEETS_RATE_LIMITED'
+      || message.includes('too many requests')
+      || message.includes('rate limit')
+      || message.includes('quota')
+      || message.includes('429');
+  }
+
+  function backoffDelayMs(error, attempt) {
+    const retryAfterSeconds = error && error.details && Number(error.details.retryAfterSeconds);
+    if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+      return Math.min(retryAfterSeconds * 1000, 5000);
+    }
+    return attempt === 0 ? 1200 : 2500;
+  }
+
+  function wait(ms) {
+    return new Promise(function (resolve) {
+      global.setTimeout(resolve, ms);
+    });
+  }
+
   function isEmptyData(route, data) {
     if (route === 'cleanupAudit') {
       return data && Array.isArray(data.items) && data.items.length === 0;
+    }
+    if (route === 'fullDashboard') {
+      return data && data.today && Array.isArray(data.today.tasks) && data.today.tasks.length === 0;
     }
     if (route === 'dashboard') {
       return data && data.today && Array.isArray(data.today.tasks) && data.today.tasks.length === 0;
@@ -141,12 +197,24 @@
       return dashboard;
     }
 
+    if (route === 'fullDashboard') {
+      const fullDashboard = await getJsonp(route, params);
+      validateFullDashboard(fullDashboard);
+      return fullDashboard;
+    }
+
     if (route === 'cleanupAudit') {
       const scaffoldInfo = await getJsonp('scaffoldInfo', {});
       validateScaffoldSafety(scaffoldInfo);
       const audit = await getJsonp(route, params);
       validateCleanupAudit(audit);
       return audit;
+    }
+
+    if (route === 'safetyStatus') {
+      const safetyStatus = await getJsonp(route, params);
+      validateSafetyStatus(safetyStatus);
+      return safetyStatus;
     }
 
     const scaffoldInfo = await getJsonp('scaffoldInfo', {});
@@ -171,7 +239,16 @@
     }
 
     try {
-      const data = await readLive(route, params);
+      let data;
+      try {
+        data = await readLive(route, params);
+      } catch (firstError) {
+        if (!isRateLimitError(firstError)) {
+          throw firstError;
+        }
+        await wait(backoffDelayMs(firstError, 0));
+        data = await readLive(route, params);
+      }
       if (isEmptyData(route, data)) {
         return global.BAFoxUiState.empty(route, data, {
           message: 'В этом разделе нет задач.',
@@ -180,10 +257,13 @@
       return global.BAFoxUiState.success(route, data);
     } catch (clientError) {
       const fallback = global.BAFoxMockData.getResponse(route, params).data;
+      const rateLimited = isRateLimitError(clientError);
       return global.BAFoxUiState.error(route, clientError, {
         isMock: true,
         fallbackData: fallback,
-        message: 'Endpoint недоступен или небезопасен. Показываю mock data.',
+        message: rateLimited
+          ? RATE_LIMIT_MESSAGE
+          : 'Endpoint недоступен или небезопасен. Показываю mock data.',
       });
     }
   }
@@ -207,8 +287,14 @@
     getDashboard: function (options) {
       return readRoute('dashboard', options || {});
     },
+    getFullDashboard: function (options) {
+      return readRoute('fullDashboard', options || {});
+    },
     getCleanupAudit: function () {
       return readRoute('cleanupAudit', {});
+    },
+    getSafetyStatus: function () {
+      return readRoute('safetyStatus', {});
     },
   });
 }(window));

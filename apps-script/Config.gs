@@ -1,5 +1,5 @@
 var BA_FOX_CONFIG = {
-  VERSION: 'v2.4-read-only',
+  VERSION: 'v2.6i-read-only-cache',
   DRY_RUN: true,
   READ_LIVE_SHEETS: true,
   TIMEZONE: 'Asia/Bangkok',

@@ -94,7 +94,9 @@ Do not enable triggers, notifications, Gmail automation, or webhook configuratio
 ?route=open
 ?route=pushes
 ?route=dashboard
+?route=fullDashboard
 ?route=cleanupAudit
+?route=safetyStatus
 ```
 
 Optional read-only filters:
@@ -105,7 +107,7 @@ Optional read-only filters:
 ?route=pushes&dateRange=today
 ```
 
-The `dashboard` route combines scaffold information, today tasks, open tasks, and push tasks. Unknown routes return a safe JSON error. `doPost` remains disabled and returns `NOT_IMPLEMENTED`.
+The `dashboard` route combines scaffold information, today tasks, open tasks, and push tasks using one `Tasks` read for that request. Unknown routes return a safe JSON error. `doPost` remains disabled and returns `NOT_IMPLEMENTED`.
 
 ### Manual V2.5 Smoke Test
 
@@ -193,3 +195,54 @@ The route calls `baFoxBuildCleanupAuditDryRun()` and supports the same normal JS
 7. Confirm `CleanupReview` was not created or populated.
 8. Confirm `AuditLog`, `Reports`, and `NotificationQueue` remain headers-only.
 9. Confirm no trigger, Google Chat, Gmail, Telegram, Railway, endpoint URL, secret, Sheet ID, or webhook was added.
+
+## Stage V2.6I Cache, Full Dashboard, And Safety Status
+
+`doGet(e)` now caches successful read-only route responses with Apps Script `CacheService` for 45 seconds. Cache failures are ignored so large read-only payloads can still be served uncached.
+
+The preferred Web/PWA route is:
+
+```text
+?route=fullDashboard
+```
+
+It reads `Tasks` once and returns:
+
+```text
+scaffoldInfo
+today
+open
+pushes
+cleanupAudit
+```
+
+The read-only safety route is:
+
+```text
+?route=safetyStatus
+```
+
+It returns status and data-row counts for `AuditLog`, `Reports`, and `NotificationQueue`. It only reads sheet metadata/counts and does not append, update, clear, archive, normalize, approve, or export anything.
+
+Both routes support normal JSON and the same restricted JSONP callback behavior:
+
+```text
+<WEB_APP_URL>?route=fullDashboard&callback=BAFoxJsonpCallback_1
+<WEB_APP_URL>?route=safetyStatus&callback=BAFoxJsonpCallback_1
+```
+
+If Google Sheets temporarily rate-limits reads, the route returns `SHEETS_RATE_LIMITED` with a retry hint. The Web/PWA shows a friendly read-only message and falls back to mock data.
+
+### Manual V2.6I Smoke Test
+
+1. Run `baFoxScaffoldInfo()` and confirm read-only flags remain safe.
+2. Test `<WEB_APP_URL>?route=fullDashboard`.
+3. Test `<WEB_APP_URL>?route=safetyStatus`.
+4. Test JSONP for both routes with a `BAFoxJsonpCallback_...` callback.
+5. Confirm `fullDashboard` returns `scaffoldInfo`, `today`, `open`, `pushes`, and `cleanupAudit`.
+6. Confirm `safetyStatus` shows `AuditLog`, `Reports`, and `NotificationQueue` counts and does not write.
+7. Open the local dashboard and confirm it renders from `fullDashboard`.
+8. Confirm `Аудит данных` still renders.
+9. Confirm browser traffic has no POST requests and no write/action buttons.
+10. Confirm `Tasks`, `CleanupReview`, `AuditLog`, `Reports`, and `NotificationQueue` were not edited.
+11. Confirm no trigger, Google Chat, Gmail, Telegram, Railway, endpoint URL, `config.local.js`, secret, Sheet ID, or webhook was added.
