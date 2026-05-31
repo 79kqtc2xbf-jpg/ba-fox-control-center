@@ -55,10 +55,10 @@ function baFoxTaskNeedsControl_(task) {
   });
 }
 
-function baFoxListTodayTasks(request) {
+function baFoxListTodayTasks(request, storeResult) {
   var normalized = baFoxNormalizeRequest(request);
   var date = baFoxDateOrToday(normalized.date);
-  var storeResult = baFoxReadTasksRows();
+  storeResult = storeResult || baFoxReadTasksRows();
 
   return {
     date: date,
@@ -72,10 +72,10 @@ function baFoxListTodayTasks(request) {
   };
 }
 
-function baFoxListOpenTasks(request) {
+function baFoxListOpenTasks(request, storeResult) {
   var normalized = baFoxNormalizeRequest(request);
   var taskType = baFoxSafeString(normalized.taskType || normalized.scope || 'all');
-  var storeResult = baFoxReadTasksRows();
+  storeResult = storeResult || baFoxReadTasksRows();
 
   return {
     taskType: taskType,
@@ -90,10 +90,10 @@ function baFoxListOpenTasks(request) {
   };
 }
 
-function baFoxListPushTasks(request) {
+function baFoxListPushTasks(request, storeResult) {
   var normalized = baFoxNormalizeRequest(request);
   var dateRange = baFoxSafeString(normalized.dateRange || 'today');
-  var storeResult = baFoxReadTasksRows();
+  storeResult = storeResult || baFoxReadTasksRows();
 
   return {
     dateRange: dateRange,

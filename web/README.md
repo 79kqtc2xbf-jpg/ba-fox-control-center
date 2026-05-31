@@ -39,9 +39,7 @@ Read-only dashboard
 `web/app.js` reads the view model only through:
 
 ```js
-BAFoxClient.getDashboard()
-BAFoxClient.getScaffoldInfo()
-BAFoxClient.getCleanupAudit()
+BAFoxClient.getFullDashboard()
 ```
 
 The client remains limited to GET-only routes:
@@ -52,10 +50,18 @@ today
 open
 pushes
 dashboard
+fullDashboard
 cleanupAudit
+safetyStatus
 ```
 
-The dashboard has loading, success, empty, and error handling. An error uses safe mock fallback data instead of exposing or changing live tasks.
+The dashboard prefers `fullDashboard` so one live read can provide the task views and cleanup audit together. The dashboard has loading, success, empty, and error handling. A 429/rate-limit response shows:
+
+```text
+Google Sheets временно ограничил чтение. BA Fox повторит попытку позже.
+```
+
+Errors use safe mock fallback data instead of exposing or changing live tasks.
 
 ## Configuration
 
@@ -96,9 +102,8 @@ The real URL must never appear in a committed file, documentation, screenshot, o
 Optional browser console check:
 
 ```js
-await BAFoxClient.getDashboard()
-await BAFoxClient.getScaffoldInfo()
-await BAFoxClient.getCleanupAudit()
+await BAFoxClient.getFullDashboard()
+await BAFoxClient.getSafetyStatus()
 ```
 
 Expected default response state:

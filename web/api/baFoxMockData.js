@@ -1,6 +1,6 @@
 (function (global) {
   const scaffoldInfo = {
-    version: 'v2.6a-mock-client',
+    version: 'v2.6i-mock-client',
     dryRun: true,
     readLiveSheets: true,
     liveAutomationEnabled: false,
@@ -187,6 +187,42 @@
     ],
   };
 
+  const safetyStatus = {
+    dryRun: true,
+    readLive: true,
+    sheets: {
+      AuditLog: {
+        sheet: 'AuditLog',
+        exists: true,
+        status: 'headers_only',
+        headerColumns: 10,
+        dataRows: 0,
+        headersOnly: true,
+      },
+      Reports: {
+        sheet: 'Reports',
+        exists: true,
+        status: 'headers_only',
+        headerColumns: 10,
+        dataRows: 0,
+        headersOnly: true,
+      },
+      NotificationQueue: {
+        sheet: 'NotificationQueue',
+        exists: true,
+        status: 'headers_only',
+        headerColumns: 12,
+        dataRows: 0,
+        headersOnly: true,
+      },
+    },
+    counts: {
+      AuditLog: 0,
+      Reports: 0,
+      NotificationQueue: 0,
+    },
+  };
+
   function clone(data) {
     return JSON.parse(JSON.stringify(data));
   }
@@ -251,8 +287,18 @@
           open: clone(getOpenData(input.taskType)),
           pushes: clone(getPushData(input.dateRange)),
         });
+      case 'fullDashboard':
+        return success({
+          scaffoldInfo: clone(scaffoldInfo),
+          today: clone(getTodayData(input.date)),
+          open: clone(getOpenData(input.taskType)),
+          pushes: clone(getPushData(input.dateRange)),
+          cleanupAudit: clone(cleanupAudit),
+        });
       case 'cleanupAudit':
         return success(clone(cleanupAudit));
+      case 'safetyStatus':
+        return success(clone(safetyStatus));
       default:
         return {
           ok: false,
