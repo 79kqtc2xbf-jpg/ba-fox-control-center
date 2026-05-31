@@ -4,6 +4,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'web/**'
+      - '.github/workflows/deploy-web-pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -34,18 +37,29 @@ jobs:
           rm -rf dist
           mkdir -p dist
           cp -R web/. dist/
-          cat > dist/config.example.js <<EOF
-          window.BA_FOX_CONFIG = {
-            APPS_SCRIPT_ENDPOINT: '${BA_FOX_APPS_SCRIPT_ENDPOINT}',
-            USE_MOCK_DATA: false,
-          };
-          EOF
-          cat > dist/config.local.js <<EOF
-          window.BA_FOX_CONFIG = {
-            APPS_SCRIPT_ENDPOINT: '${BA_FOX_APPS_SCRIPT_ENDPOINT}',
-            USE_MOCK_DATA: false,
-          };
-          EOF
+          rm -f dist/config.local.js
+          endpoint="$(
+            printf '%s' "${BA_FOX_APPS_SCRIPT_ENDPOINT:-}" \
+              | tr -d '\r' \
+              | grep -Eo 'https://script\.google\.com(/a)?/macros/[^[:space:]]+/exec' \
+              | tail -n 1 || true
+          )"
+          if [[ -z "${endpoint}" ]]; then
+            echo "BA_FOX_APPS_SCRIPT_ENDPOINT must contain a published Apps Script /exec URL." >&2
+            exit 1
+          fi
+          python3 - "${endpoint}" > dist/config.runtime.js <<'PY'
+          import json
+          import sys
+
+          endpoint = sys.argv[1].strip()
+          payload = {
+              "APPS_SCRIPT_ENDPOINT": endpoint,
+              "USE_MOCK_DATA": False,
+          }
+          print("window.BA_FOX_RUNTIME_CONFIG = " + json.dumps(payload, separators=(",", ":")) + ";")
+          print("window.BA_FOX_CONFIG = Object.assign({}, window.BA_FOX_CONFIG || {}, window.BA_FOX_RUNTIME_CONFIG);")
+          PY
           touch dist/.nojekyll
 
       - name: Setup Pages

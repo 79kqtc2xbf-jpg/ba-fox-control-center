@@ -5,7 +5,11 @@
   });
 
   function getConfig() {
-    const suppliedConfig = global.BA_FOX_CONFIG || {};
+    const suppliedConfig = Object.assign(
+      {},
+      global.BA_FOX_CONFIG || {},
+      global.BA_FOX_RUNTIME_CONFIG || {}
+    );
     const endpoint = typeof suppliedConfig.APPS_SCRIPT_ENDPOINT === 'string'
       ? suppliedConfig.APPS_SCRIPT_ENDPOINT.trim()
       : DEFAULT_CONFIG.APPS_SCRIPT_ENDPOINT;
