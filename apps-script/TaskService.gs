@@ -220,3 +220,120 @@ function baFoxSetTaskComment(request) {
     })
   });
 }
+
+function baFoxTaskActionMap_() {
+  return {
+    markDone: { status: 'Выполнено' },
+    moveToWork: { status: 'В работе' },
+    moveToPush: { status: 'Пуш' },
+    moveToWaiting: { status: 'Ждём ответ' },
+    moveToBlocker: { status: 'Блокер' },
+    archiveTask: { status: 'Архив', archived: true },
+    snoozeTask: { snooze: true }
+  };
+}
+
+function baFoxValidateSafeReminder_(value) {
+  var reminder = baFoxSafeString(value);
+  return /^\d{4}-\d{2}-\d{2}(T| )\d{2}:\d{2}(:\d{2})?$/.test(reminder);
+}
+
+function baFoxTaskAction(request) {
+  var normalized = baFoxNormalizeRequest(request);
+  var missing = baFoxRequired(normalized, ['taskId', 'action']);
+  if (missing.length) {
+    return baFoxError('VALIDATION_ERROR', 'Missing required fields.', { missing: missing });
+  }
+
+  if (BA_FOX_CONFIG.SAFE_WRITE_MODE !== true) {
+    return baFoxError('SAFE_WRITES_DISABLED', 'Safe task actions are disabled.', {});
+  }
+
+  var actionMap = baFoxTaskActionMap_();
+  var actionConfig = actionMap[normalized.action];
+  if (!actionConfig) {
+    return baFoxError('ACTION_NOT_ALLOWED', 'Task action is not allowed.', { action: normalized.action });
+  }
+
+  if (actionConfig.snooze && !baFoxValidateSafeReminder_(normalized.nextReminder)) {
+    return baFoxError('VALIDATION_ERROR', 'Snooze requires a safe nextReminder date/time.', {
+      nextReminder: normalized.nextReminder || ''
+    });
+  }
+
+  var match = baFoxFindTaskRow_(normalized.taskId);
+  if (!match.ok) {
+    baFoxAuditTaskAction({
+      timestamp: baFoxIsoNow(),
+      actor: 'BA Fox Web',
+      taskId: normalized.taskId,
+      action: normalized.action,
+      routeAction: 'taskAction/' + normalized.action,
+      source: 'web',
+      result: 'failed',
+      errorCode: match.error.error && match.error.error.code
+    });
+    return match.error;
+  }
+
+  var previous = baFoxNormalizeTaskRow(match.row);
+  var now = baFoxIsoNow();
+  var patch = {
+    UPDATED_AT: now
+  };
+
+  if (actionConfig.snooze) {
+    patch.NEXT_REMINDER = baFoxSafeString(normalized.nextReminder);
+  } else {
+    patch.STATUS = actionConfig.status;
+    if (normalized.action === 'markDone') {
+      patch.COMPLETED_AT = now;
+    }
+    if (actionConfig.archived === true) {
+      patch.ARCHIVED = true;
+    }
+  }
+
+  var updateResponse = baFoxUpdateTaskActionRow(normalized.taskId, patch);
+  if (!updateResponse.ok) {
+    baFoxAuditTaskAction({
+      timestamp: now,
+      actor: 'BA Fox Web',
+      taskId: normalized.taskId,
+      action: normalized.action,
+      previousStatus: previous.status,
+      previousNextReminder: previous.nextReminder,
+      routeAction: 'taskAction/' + normalized.action,
+      source: 'web',
+      result: 'failed',
+      errorCode: updateResponse.error && updateResponse.error.code
+    });
+    return updateResponse;
+  }
+
+  var auditResult = baFoxAuditTaskAction({
+    timestamp: now,
+    actor: 'BA Fox Web',
+    taskId: normalized.taskId,
+    action: normalized.action,
+    previousStatus: previous.status,
+    newStatus: actionConfig.snooze ? previous.status : actionConfig.status,
+    previousNextReminder: previous.nextReminder,
+    newNextReminder: actionConfig.snooze ? patch.NEXT_REMINDER : previous.nextReminder,
+    routeAction: 'taskAction/' + normalized.action,
+    source: 'web',
+    result: 'success',
+    errorCode: ''
+  });
+
+  return baFoxOk({
+    taskId: normalized.taskId,
+    action: normalized.action,
+    previousStatus: previous.status,
+    newStatus: actionConfig.snooze ? previous.status : actionConfig.status,
+    previousNextReminder: previous.nextReminder,
+    newNextReminder: actionConfig.snooze ? patch.NEXT_REMINDER : previous.nextReminder,
+    updateResult: updateResponse.data,
+    auditResult: auditResult
+  });
+}

@@ -131,6 +131,10 @@ function baFoxGetSafetyStatus_() {
   return baFoxOk({
     dryRun: BA_FOX_CONFIG.DRY_RUN,
     readLive: BA_FOX_CONFIG.READ_LIVE_SHEETS,
+    readLiveSheets: BA_FOX_CONFIG.READ_LIVE_SHEETS,
+    safeWritesEnabled: BA_FOX_CONFIG.SAFE_WRITE_MODE === true,
+    liveAutomationEnabled: false,
+    triggersEnabled: false,
     sheets: {
       AuditLog: auditLog,
       Reports: reports,
@@ -196,10 +200,13 @@ function baFoxBuildRouteResponse_(route, parameters) {
     case 'safetyStatus':
       response = baFoxGetSafetyStatus_();
       break;
+    case 'taskAction':
+      response = taskAction(parameters);
+      break;
     default:
       response = baFoxError(
         'ROUTE_NOT_FOUND',
-        'Unknown read-only route.',
+        'Unknown route.',
         { route: route }
       );
   }
@@ -225,7 +232,9 @@ function doGet(event) {
     response = baFoxGetCachedResponse_(route, parameters);
     if (!response) {
       response = baFoxBuildRouteResponse_(route, parameters);
-      baFoxPutCachedResponse_(route, parameters, response);
+      if (route !== 'taskAction') {
+        baFoxPutCachedResponse_(route, parameters, response);
+      }
     }
   } catch (err) {
     response = baFoxReadErrorResponse_(err);

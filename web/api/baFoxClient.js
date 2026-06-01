@@ -9,13 +9,16 @@
     'cleanupAudit',
     'safetyStatus',
   ]);
+  const WRITE_ROUTES = Object.freeze([
+    'taskAction',
+  ]);
   const JSONP_TIMEOUT_MS = 10000;
   const RATE_LIMIT_MESSAGE = 'Google Sheets временно ограничил чтение. BA Fox повторит попытку позже.';
   let jsonpRequestSequence = 0;
 
   function assertRoute(route) {
-    if (!READ_ONLY_ROUTES.includes(route)) {
-      throw new Error('Unsupported read-only route: ' + route);
+    if (!READ_ONLY_ROUTES.includes(route) && !WRITE_ROUTES.includes(route)) {
+      throw new Error('Unsupported route: ' + route);
     }
   }
 
@@ -298,6 +301,13 @@
     },
     getSafetyStatus: function () {
       return readRoute('safetyStatus', {});
+    },
+    runTaskAction: async function (options) {
+      const config = global.BAFoxConfig.getConfig();
+      if (config.useMockData) {
+        throw new Error('Safe task actions are disabled in mock mode.');
+      }
+      return getJsonp('taskAction', options || {});
     },
   });
 }(window));

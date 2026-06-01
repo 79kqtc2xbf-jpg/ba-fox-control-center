@@ -2,6 +2,8 @@ const viewLabels = Object.freeze({
   today: ['Сегодня', 'Задачи на сегодня'],
   open: ['Открытые', 'Все открытые задачи'],
   pushes: ['Пуши', 'Ожидают следующего шага'],
+  waitList: ['Wait List', 'Ответы и пуши'],
+  focus: ['Daily Focus', 'Главное на сегодня'],
   audit: ['Аудит данных', 'Audit-only cleanup report'],
   system: ['Система', 'Безопасный режим'],
 });
@@ -34,11 +36,44 @@ const severityRank = Object.freeze({
   low: 3,
 });
 
+const taskFilters = Object.freeze([
+  { id: 'all', label: 'All' },
+  { id: 'high', label: 'High priority' },
+  { id: 'blockers', label: 'Blockers' },
+  { id: 'push', label: 'Push' },
+  { id: 'waiting', label: 'Waiting' },
+  { id: 'documents', label: 'Documents' },
+  { id: 'communication', label: 'Communication' },
+  { id: 'automation', label: 'Automation' },
+]);
+
+const waitingStatuses = Object.freeze([
+  'Ждём ответ',
+  'Ждём подтверждение',
+  'Ждём подписание',
+  'Wait list',
+  'Пуш',
+]);
+
+const actionLabels = Object.freeze({
+  moveToWork: 'В работу',
+  moveToPush: 'Пуш',
+  moveToWaiting: 'Ждём',
+  moveToBlocker: 'Блокер',
+  markDone: 'Готово',
+  archiveTask: 'Архив',
+  snoozeOneDay: '+1 день',
+  snoozeThreeDays: '+3 дня',
+  snoozeNextWeek: 'Следующая неделя',
+});
+
 let activeTab = 'today';
+let activeTaskFilter = 'all';
 let activeAuditFilter = 'all';
 let dashboardState = BAFoxClient.createLoadingState('dashboard');
 let scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
 let cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
+let taskActionState = {};
 
 function stateFromFullDashboard(fullState, route, data) {
   return {
@@ -84,19 +119,141 @@ function cleanupAuditData() {
   return cleanupAuditState.data || {};
 }
 
-function taskRowsForTab() {
+function allOpenTasks() {
+  const data = dashboardData();
+  return data.open && Array.isArray(data.open.tasks) ? data.open.tasks : [];
+}
+
+function todayIsoBangkok() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date()).reduce(function (acc, part) {
+    acc[part.type] = part.value;
+    return acc;
+  }, {});
+  return parts.year + '-' + parts.month + '-' + parts.day;
+}
+
+function normalizeText(value) {
+  return String(value == null ? '' : value).trim().toLowerCase();
+}
+
+function isFinalTask(task) {
+  return ['выполнено', 'done', 'cancelled', 'archived', 'архив'].includes(normalizeText(task.status)) || task.archived === true;
+}
+
+function dateSignalIsDue(value, today) {
+  const text = normalizeText(value);
+  const match = text.match(/\d{4}-\d{2}-\d{2}/);
+  if (match) {
+    return match[0] <= today;
+  }
+  return ['сегодня', 'today', 'overdue', 'просрочено'].some(function (signal) {
+    return text.includes(signal);
+  });
+}
+
+function isHighPriority(task) {
+  const priority = normalizeText(task.priority);
+  return ['high', 'высокий', 'высокая', 'важно'].some(function (signal) {
+    return priority.includes(signal);
+  });
+}
+
+function derivedTodayTasks() {
+  const data = dashboardData();
+  const backendToday = data.today && Array.isArray(data.today.tasks) ? data.today.tasks : [];
+  if (backendToday.length) {
+    return backendToday;
+  }
+  const today = todayIsoBangkok();
+  const priorityStatuses = ['пуш', 'блокер', 'ждём ответ', 'ждём подтверждение', 'ждём подписание'];
+  return allOpenTasks().filter(function (task) {
+    const status = normalizeText(task.status);
+    return !isFinalTask(task) && (
+      dateSignalIsDue(task.nextReminder, today)
+      || dateSignalIsDue(task.deadline, today)
+      || isHighPriority(task)
+      || priorityStatuses.includes(status)
+    );
+  });
+}
+
+function waitListTasks() {
+  return allOpenTasks().filter(function (task) {
+    return waitingStatuses.some(function (status) {
+      return normalizeText(status) === normalizeText(task.status);
+    });
+  });
+}
+
+function focusTasks() {
+  const combined = derivedTodayTasks().concat(waitListTasks()).concat(taskRowsForBaseTab('pushes'));
+  const seen = {};
+  return combined.filter(function (task) {
+    const key = task.id || task.title;
+    if (seen[key]) {
+      return false;
+    }
+    seen[key] = true;
+    return !isFinalTask(task);
+  }).sort(function (left, right) {
+    return taskScore(right) - taskScore(left);
+  });
+}
+
+function taskScore(task) {
+  let score = 0;
+  const status = normalizeText(task.status);
+  if (isHighPriority(task)) score += 5;
+  if (status === 'блокер') score += 5;
+  if (status === 'пуш') score += 4;
+  if (status.includes('ждём') || status.includes('wait')) score += 3;
+  if (dateSignalIsDue(task.deadline, todayIsoBangkok())) score += 4;
+  if (dateSignalIsDue(task.nextReminder, todayIsoBangkok())) score += 3;
+  return score;
+}
+
+function taskRowsForBaseTab(tabName) {
   const data = dashboardData();
   const collection = {
     today: data.today,
     open: data.open,
     pushes: data.pushes,
-  }[activeTab];
+  }[tabName];
   return collection && Array.isArray(collection.tasks) ? collection.tasks : [];
 }
 
+function taskRowsForTab() {
+  if (activeTab === 'today') {
+    return derivedTodayTasks();
+  }
+  if (activeTab === 'waitList') {
+    return waitListTasks();
+  }
+  if (activeTab === 'focus') {
+    return focusTasks().slice(0, 15);
+  }
+  return taskRowsForBaseTab(activeTab);
+}
+
 function summaryCount(sectionName) {
+  if (sectionName === 'waitList') {
+    return waitListTasks().length;
+  }
+  if (sectionName === 'focus') {
+    return focusTasks().slice(0, 5).length;
+  }
   const section = dashboardData()[sectionName];
   return section && Array.isArray(section.tasks) ? section.tasks.length : '-';
+}
+
+function safeWritesEnabled() {
+  const info = scaffoldData();
+  return info.safeWritesEnabled === true && !dashboardState.isMock;
 }
 
 function renderModeBanner() {
@@ -113,7 +270,9 @@ function renderModeBanner() {
     ? '<strong>Demo mode / mock data</strong><span>' + escapeHtml(dashboardState.message || cleanupAuditState.message || 'Read-only источник недоступен. Показаны безопасные демо-данные.') + '</span>'
     : isMock
       ? '<strong>Demo mode / mock data</strong><span>Без подключения к рабочей таблице и без изменений задач.</span>'
-      : '<strong>Read-only data</strong><span>Данные загружены только для просмотра.</span>';
+      : safeWritesEnabled()
+        ? '<strong>Live data / safe actions</strong><span>Доступны только безопасные изменения статуса и напоминаний.</span>'
+        : '<strong>Read-only data</strong><span>Данные загружены только для просмотра. Safe actions отключены.</span>';
 }
 
 function renderSummary() {
@@ -129,8 +288,10 @@ function renderSummary() {
     { value: summaryCount('today'), label: 'Сегодня' },
     { value: summaryCount('open'), label: 'Открытые' },
     { value: summaryCount('pushes'), label: 'Пуши' },
+    { value: summaryCount('waitList'), label: 'Wait List' },
+    { value: summaryCount('focus'), label: 'Daily Focus' },
     { value: auditSummary.rowsChecked == null ? '-' : auditSummary.rowsChecked, label: 'Строк аудита' },
-    { value: dashboardState.isMock ? 'Demo' : 'Read', label: 'Режим' },
+    { value: safeWritesEnabled() ? 'Safe' : dashboardState.isMock ? 'Demo' : 'Read', label: 'Режим' },
   ];
 
   elements.summaryCards.innerHTML = cards.map(function (card) {
@@ -146,7 +307,7 @@ function statusText() {
     return dashboardState.message || 'Ошибка чтения: рабочие данные не открыты, ниже показан demo-набор.';
   }
   if (activeTab === 'system') {
-    return 'Этот экран показывает только состояние read-only контура.';
+    return 'Этот экран показывает состояние live read, safe writes и отключенной автоматизации.';
   }
   if (activeTab === 'audit') {
     if (cleanupAuditState.status === 'error') {
@@ -156,7 +317,9 @@ function statusText() {
   }
   return dashboardState.isMock
     ? 'Это демонстрационные задачи. Изменение статуса и отправка данных отключены.'
-    : 'Данные доступны только для чтения.';
+    : safeWritesEnabled()
+      ? 'Safe actions меняют только статус, архивный флаг или nextReminder.'
+      : 'Данные доступны только для чтения. Safe actions отключены.';
 }
 
 function renderEmpty() {
@@ -169,25 +332,96 @@ function renderEmpty() {
 }
 
 function taskMeta(task) {
-  return [task.organization, task.priority ? 'Приоритет: ' + task.priority : '', task.deadline ? 'Срок: ' + task.deadline : '']
+  return [task.organization, task.priority ? 'Приоритет: ' + task.priority : '', task.deadline ? 'Срок: ' + task.deadline : '', task.nextReminder ? 'Напоминание: ' + task.nextReminder : '']
     .filter(Boolean)
     .join(' · ');
 }
 
+function taskMatchesFilter(task, filterId) {
+  const text = [task.status, task.priority, task.category, task.title, task.comment, task.source, task.channel].map(normalizeText).join(' ');
+  if (filterId === 'all') return true;
+  if (filterId === 'high') return isHighPriority(task);
+  if (filterId === 'blockers') return text.includes('блокер') || text.includes('blocked');
+  if (filterId === 'push') return text.includes('пуш') || text.includes('push');
+  if (filterId === 'waiting') return text.includes('ждём') || text.includes('ждем') || text.includes('waiting') || text.includes('wait list');
+  if (filterId === 'documents') return text.includes('документ') || text.includes('document') || text.includes('contract');
+  if (filterId === 'communication') return text.includes('письм') || text.includes('email') || text.includes('звон') || text.includes('call') || text.includes('чат');
+  if (filterId === 'automation') return text.includes('automation') || text.includes('автомат');
+  return true;
+}
+
+function taskFilterHtml(tasks) {
+  if (!['today', 'open', 'pushes', 'waitList', 'focus'].includes(activeTab)) {
+    return '';
+  }
+  return '<div class="task-filters" aria-label="Фильтры задач">' + taskFilters.map(function (filter) {
+    const count = tasks.filter(function (task) { return taskMatchesFilter(task, filter.id); }).length;
+    const activeClass = filter.id === activeTaskFilter ? ' active' : '';
+    return '<button class="task-filter' + activeClass + '" type="button" data-task-filter="' + escapeHtml(filter.id) + '">' + escapeHtml(filter.label) + ' <span>' + count + '</span></button>';
+  }).join('') + '</div>';
+}
+
+function taskDetailHtml(label, value) {
+  if (!value) {
+    return '';
+  }
+  return '<span><strong>' + escapeHtml(label) + ':</strong> ' + escapeHtml(value) + '</span>';
+}
+
+function actionButtonsHtml(task) {
+  const disabled = !safeWritesEnabled();
+  const state = taskActionState[task.id] || {};
+  const busy = state.status === 'loading';
+  const actions = ['moveToWork', 'moveToPush', 'moveToWaiting', 'moveToBlocker', 'markDone', 'archiveTask', 'snoozeOneDay', 'snoozeThreeDays', 'snoozeNextWeek'];
+  const buttons = actions.map(function (action) {
+    const label = busy && state.action === action ? '...' : actionLabels[action];
+    return '<button class="task-action" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="' + escapeHtml(action) + '"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>';
+  }).join('');
+  const message = state.status === 'error'
+    ? '<div class="task-error">' + escapeHtml(state.message || 'Action failed') + '</div>'
+    : disabled
+      ? '<div class="task-notice">Safe actions отключены.</div>'
+      : '';
+  return '<div class="task-actions">' + buttons + '</div>' + message;
+}
+
 function renderTasks() {
   const tasks = taskRowsForTab();
+  const visibleTasks = tasks.filter(function (task) {
+    return taskMatchesFilter(task, activeTaskFilter);
+  });
   if (!tasks.length) {
     renderEmpty();
     return;
   }
 
-  elements.taskList.innerHTML = tasks.map(function (task) {
+  if (!visibleTasks.length) {
+    elements.taskList.innerHTML = taskFilterHtml(tasks) + [
+      '<article class="empty-state">',
+      '<strong>Для фильтра нет задач</strong>',
+      '<span>Выберите All или другой фильтр.</span>',
+      '</article>',
+    ].join('');
+    return;
+  }
+
+  const intro = activeTab === 'focus'
+    ? '<section class="focus-grid"><article><strong>Top 5</strong><span>' + escapeHtml(focusTasks().slice(0, 5).map(function (task) { return task.title; }).join(' · ') || '-') + '</span></article><article><strong>Blockers</strong><span>' + escapeHtml(allOpenTasks().filter(function (task) { return normalizeText(task.status) === 'блокер'; }).length) + '</span></article><article><strong>Waiting / Push</strong><span>' + escapeHtml(waitListTasks().length) + '</span></article></section>'
+    : '';
+
+  elements.taskList.innerHTML = taskFilterHtml(tasks) + intro + visibleTasks.map(function (task) {
     return [
       '<article class="task-card" data-status="' + escapeHtml(task.status) + '">',
       '<div class="status-dot" aria-hidden="true"></div>',
-      '<div>',
+      '<div class="task-body">',
       '<div class="task-title">' + escapeHtml(task.title) + '</div>',
       '<div class="task-meta">' + escapeHtml(taskMeta(task)) + '</div>',
+      '<div class="task-details">',
+      taskDetailHtml('Комментарий', task.comment),
+      taskDetailHtml('Источник', task.source || task.appSource || task.channel),
+      taskDetailHtml('Task ID', task.id),
+      '</div>',
+      actionButtonsHtml(task),
       '</div>',
       '<span class="task-chip">' + escapeHtml(task.status) + '</span>',
       '</article>',
@@ -199,7 +433,8 @@ function renderSystem() {
   const info = scaffoldData();
   const rows = [
     ['Источник', dashboardState.isMock ? 'Mock fixture' : 'Read-only API'],
-    ['Запись', info.dryRun === true ? 'Отключена (dry-run)' : 'Не подтверждено'],
+    ['Safe writes', info.safeWritesEnabled === true ? 'Включены' : 'Отключены'],
+    ['Read live Sheets', info.readLiveSheets === true ? 'Включено' : 'Отключено'],
     ['Автоматизация', info.liveAutomationEnabled === false ? 'Отключена' : 'Не подтверждено'],
     ['Триггеры', info.triggersEnabled === false ? 'Отключены' : 'Не подтверждено'],
     ['Версия', info.version || '-'],
@@ -452,6 +687,7 @@ function render() {
 
 function setTab(tabName) {
   activeTab = tabName;
+  activeTaskFilter = 'all';
   elements.tabs.forEach(function (tab) {
     tab.classList.toggle('active', tab.dataset.tab === tabName);
   });
@@ -489,12 +725,90 @@ elements.tabs.forEach(function (tab) {
 
 elements.taskList.addEventListener('click', function (event) {
   const filterButton = event.target.closest('[data-audit-filter]');
-  if (!filterButton) {
+  if (filterButton) {
+    activeAuditFilter = filterButton.dataset.auditFilter || 'all';
+    renderAudit();
     return;
   }
-  activeAuditFilter = filterButton.dataset.auditFilter || 'all';
-  renderAudit();
+
+  const taskFilterButton = event.target.closest('[data-task-filter]');
+  if (taskFilterButton) {
+    activeTaskFilter = taskFilterButton.dataset.taskFilter || 'all';
+    renderTasks();
+    return;
+  }
+
+  const actionButton = event.target.closest('[data-task-action]');
+  if (actionButton) {
+    handleTaskAction(actionButton);
+  }
 });
+
+function safeReminderFor(action) {
+  const today = todayIsoBangkok();
+  const date = new Date(today + 'T00:00:00Z');
+  if (action === 'snoozeOneDay') {
+    date.setUTCDate(date.getUTCDate() + 1);
+  } else if (action === 'snoozeThreeDays') {
+    date.setUTCDate(date.getUTCDate() + 3);
+  } else if (action === 'snoozeNextWeek') {
+    const bangkokWeekday = date.getUTCDay();
+    const daysUntilMonday = bangkokWeekday === 1 ? 7 : (8 - bangkokWeekday) % 7;
+    date.setUTCDate(date.getUTCDate() + daysUntilMonday);
+  }
+  return date.toISOString().slice(0, 10) + ' 10:00';
+}
+
+function backendAction(action) {
+  if (action === 'snoozeOneDay' || action === 'snoozeThreeDays' || action === 'snoozeNextWeek') {
+    return 'snoozeTask';
+  }
+  return action;
+}
+
+async function handleTaskAction(button) {
+  const taskId = button.dataset.taskId;
+  const action = button.dataset.taskAction;
+  if (!taskId || !action || !safeWritesEnabled()) {
+    return;
+  }
+  if (action === 'markDone' && !window.confirm('Отметить задачу выполненной?')) {
+    return;
+  }
+  if (action === 'archiveTask' && !window.confirm('Переместить задачу в архив? Строка не будет удалена.')) {
+    return;
+  }
+
+  const payload = {
+    taskId: taskId,
+    action: backendAction(action),
+  };
+  if (payload.action === 'snoozeTask') {
+    payload.nextReminder = safeReminderFor(action);
+  }
+
+  taskActionState[taskId] = {
+    status: 'loading',
+    action: action,
+  };
+  renderPanel();
+
+  try {
+    await BAFoxClient.runTaskAction(payload);
+    taskActionState[taskId] = {
+      status: 'success',
+      action: action,
+    };
+    await loadDashboard();
+  } catch (error) {
+    taskActionState[taskId] = {
+      status: 'error',
+      action: action,
+      message: error && error.message ? error.message : 'Action failed',
+    };
+    renderPanel();
+  }
+}
 
 async function initializeDashboard() {
   formatBangkokTime();
