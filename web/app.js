@@ -9,6 +9,7 @@ const viewLabels = Object.freeze({
 });
 
 const elements = {
+  tabBar: document.querySelector('.tabs'),
   tabs: document.querySelectorAll('.tab'),
   summaryCards: document.querySelector('#summaryCards'),
   panelEyebrow: document.querySelector('#panelEyebrow'),
@@ -686,10 +687,15 @@ function render() {
 }
 
 function setTab(tabName) {
+  if (!Object.prototype.hasOwnProperty.call(viewLabels, tabName)) {
+    return;
+  }
   activeTab = tabName;
   activeTaskFilter = 'all';
   elements.tabs.forEach(function (tab) {
-    tab.classList.toggle('active', tab.dataset.tab === tabName);
+    const isActive = tab.dataset.tab === tabName;
+    tab.classList.toggle('active', isActive);
+    tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
   renderPanel();
 }
@@ -717,10 +723,13 @@ function loadOptionalLocalConfig() {
   });
 }
 
-elements.tabs.forEach(function (tab) {
-  tab.addEventListener('click', function () {
-    setTab(tab.dataset.tab);
-  });
+elements.tabBar.addEventListener('click', function (event) {
+  const tab = event.target.closest('[data-tab]');
+  if (!tab || !elements.tabBar.contains(tab)) {
+    return;
+  }
+  event.preventDefault();
+  setTab(tab.dataset.tab);
 });
 
 elements.taskList.addEventListener('click', function (event) {
