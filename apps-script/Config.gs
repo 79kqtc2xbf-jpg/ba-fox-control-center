@@ -2,7 +2,7 @@ var BA_FOX_CONFIG = {
   VERSION: 'v2.7.4-safe-task-actions',
   DRY_RUN: true,
   READ_LIVE_SHEETS: true,
-  SAFE_WRITE_MODE: true,
+  SAFE_WRITE_MODE: false,
   TIMEZONE: 'Asia/Bangkok',
   SHEETS: {
     TASKS: 'Tasks',
@@ -54,8 +54,7 @@ var BA_FOX_CONFIG = {
     'Ждём подписание',
     'Перенести',
     'Пуш',
-    'Блокер',
-    'Архив'
+    'Блокер'
   ],
   CONTROL_SIGNALS: [
     'push',
