@@ -83,6 +83,16 @@ const actionStatusUpdates = Object.freeze({
   markDone: 'Выполнено',
 });
 
+const actionSuccessMessages = Object.freeze({
+  moveToWork: 'Задача переведена в работу.',
+  moveToPush: 'Задача переведена в пуши.',
+  moveToWaiting: 'Задача переведена в ожидание ответа.',
+  markDone: 'Задача отмечена готовой.',
+  snoozeOneDay: 'Напоминание поставлено на завтра.',
+  snoozeThreeDays: 'Напоминание поставлено через 3 дня.',
+  snoozeNextWeek: 'Напоминание поставлено на следующую неделю.',
+});
+
 const taskGroupLabels = Object.freeze({
   urgent: ['Срочно', 'Нужно решить первым'],
   waiting: ['Ждут ответа', 'Ответы и подтверждения'],
@@ -579,9 +589,11 @@ function actionButtonsHtml(task) {
   }).join('');
   const message = state.status === 'error'
     ? '<div class="task-error">' + escapeHtml(state.message || 'Действие не выполнено') + '</div>'
-    : disabled
-      ? '<div class="task-notice">Безопасные действия отключены.</div>'
-      : '';
+    : state.status === 'success'
+      ? '<div class="task-success">' + escapeHtml(state.message || 'Готово. Данные обновлены.') + '</div>'
+      : disabled
+        ? '<div class="task-notice">Безопасные действия отключены.</div>'
+        : '';
   return [
     '<div class="task-actions">',
     '<details class="action-menu"><summary>Перевести в</summary><div>' + moveButtons + '</div></details>',
@@ -948,6 +960,23 @@ async function loadDashboard() {
   render();
 }
 
+async function refreshDashboardAfterAction(taskId, successMessage) {
+  const previousTab = activeTab;
+  const previousFilter = activeTaskFilter;
+  const fullDashboardState = await BAFoxClient.getFullDashboard();
+  const data = fullDashboardState.data || {};
+  dashboardState = stateFromFullDashboard(fullDashboardState, 'dashboard', data);
+  scaffoldState = stateFromFullDashboard(fullDashboardState, 'scaffoldInfo', data.scaffoldInfo);
+  cleanupAuditState = stateFromFullDashboard(fullDashboardState, 'cleanupAudit', data.cleanupAudit);
+  activeTab = previousTab;
+  activeTaskFilter = previousFilter;
+  taskActionState[taskId] = {
+    status: 'success',
+    message: successMessage || 'Готово. Данные обновлены.',
+  };
+  render();
+}
+
 function loadOptionalLocalConfig() {
   return new Promise(function (resolve) {
     const localConfigScript = document.createElement('script');
@@ -1128,13 +1157,24 @@ async function handleTaskAction(button) {
     taskActionState[taskId] = {
       status: 'success',
       action: action,
+      message: actionSuccessMessages[action] || 'Готово. Данные обновлены.',
     };
     render();
+    try {
+      await refreshDashboardAfterAction(taskId, taskActionState[taskId].message);
+    } catch (refreshError) {
+      taskActionState[taskId] = {
+        status: 'error',
+        action: action,
+        message: 'Действие выполнено, но не удалось обновить данные. Обновите экран вручную.',
+      };
+      renderPanel();
+    }
   } catch (error) {
     taskActionState[taskId] = {
       status: 'error',
       action: action,
-      message: error && error.message ? error.message : 'Action failed',
+      message: error && error.message ? error.message : 'Действие не выполнено. Попробуйте ещё раз.',
     };
     renderPanel();
   }
