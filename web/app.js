@@ -2,9 +2,9 @@ const viewLabels = Object.freeze({
   today: ['Сегодня', 'Задачи на сегодня'],
   open: ['Открытые', 'Все открытые задачи'],
   pushes: ['Пуши', 'Ожидают следующего шага'],
-  waitList: ['Wait List', 'Ответы и пуши'],
-  focus: ['Daily Focus', 'Главное на сегодня'],
-  audit: ['Аудит данных', 'Audit-only cleanup report'],
+  waitList: ['Ждут ответа', 'Ответы и пуши'],
+  focus: ['Фокус дня', 'Главное на сегодня'],
+  audit: ['Аудит данных', 'Отчёт проверки данных'],
   system: ['Система', 'Безопасный режим'],
 });
 
@@ -22,13 +22,13 @@ const elements = {
 };
 
 const auditFilters = Object.freeze([
-  { id: 'all', label: 'All', issueTypes: [] },
-  { id: 'duplicates', label: 'Duplicates', issueTypes: ['DUPLICATE_ID', 'NEAR_DUPLICATE'] },
-  { id: 'statuses', label: 'Statuses', issueTypes: ['STATUS_NORMALIZATION'] },
-  { id: 'priorities', label: 'Priorities', issueTypes: ['PRIORITY_NORMALIZATION'] },
-  { id: 'dates', label: 'Dates', issueTypes: ['CORRUPTED_FIELD'] },
-  { id: 'missingV2', label: 'Missing V2 fields', issueTypes: ['TASK_TYPE_MISSING', 'OWNER_MISSING'] },
-  { id: 'archive', label: 'Archive candidates', issueTypes: ['ARCHIVE_CANDIDATE'] },
+  { id: 'all', label: 'Все', issueTypes: [] },
+  { id: 'duplicates', label: 'Дубликаты', issueTypes: ['DUPLICATE_ID', 'NEAR_DUPLICATE'] },
+  { id: 'statuses', label: 'Статусы', issueTypes: ['STATUS_NORMALIZATION'] },
+  { id: 'priorities', label: 'Приоритеты', issueTypes: ['PRIORITY_NORMALIZATION'] },
+  { id: 'dates', label: 'Даты', issueTypes: ['CORRUPTED_FIELD'] },
+  { id: 'missingV2', label: 'Поля V2', issueTypes: ['TASK_TYPE_MISSING', 'OWNER_MISSING'] },
+  { id: 'archive', label: 'Архив-кандидаты', issueTypes: ['ARCHIVE_CANDIDATE'] },
 ]);
 
 const severityRank = Object.freeze({
@@ -38,14 +38,14 @@ const severityRank = Object.freeze({
 });
 
 const taskFilters = Object.freeze([
-  { id: 'all', label: 'All' },
-  { id: 'high', label: 'High priority' },
-  { id: 'blockers', label: 'Blockers' },
-  { id: 'push', label: 'Push' },
-  { id: 'waiting', label: 'Waiting' },
-  { id: 'documents', label: 'Documents' },
-  { id: 'communication', label: 'Communication' },
-  { id: 'automation', label: 'Automation' },
+  { id: 'all', label: 'Все' },
+  { id: 'high', label: 'Высокий приоритет' },
+  { id: 'blockers', label: 'Блокеры' },
+  { id: 'push', label: 'Пуши' },
+  { id: 'waiting', label: 'Ждут ответа' },
+  { id: 'documents', label: 'Документы' },
+  { id: 'communication', label: 'Коммуникации' },
+  { id: 'automation', label: 'Автоматизация' },
 ]);
 
 const waitingStatuses = Object.freeze([
@@ -57,13 +57,13 @@ const waitingStatuses = Object.freeze([
 ]);
 
 const actionLabels = Object.freeze({
-  moveToWork: 'In Progress',
-  moveToPush: 'Push',
-  moveToWaiting: 'Waiting',
-  markDone: 'Complete',
-  snoozeOneDay: 'Tomorrow',
+  moveToWork: 'В работе',
+  moveToPush: 'Пуш',
+  moveToWaiting: 'Ждёт ответа',
+  markDone: 'Готово',
+  snoozeOneDay: 'Завтра',
   snoozeThreeDays: '+3 дня',
-  snoozeNextWeek: 'Next week',
+  snoozeNextWeek: 'Следующая неделя',
 });
 
 const allowedTaskActions = Object.freeze([
@@ -84,11 +84,11 @@ const actionStatusUpdates = Object.freeze({
 });
 
 const taskGroupLabels = Object.freeze({
-  urgent: ['Urgent', 'Нужно решить первым'],
-  waiting: ['Waiting for response', 'Ответы и подтверждения'],
-  pushes: ['Pushes', 'Нужен следующий касание'],
-  overdue: ['Overdue', 'Просрочено или горит'],
-  remaining: ['Remaining tasks', 'Остальная очередь'],
+  urgent: ['Срочно', 'Нужно решить первым'],
+  waiting: ['Ждут ответа', 'Ответы и подтверждения'],
+  pushes: ['Пуши', 'Нужно следующее касание'],
+  overdue: ['Просрочено', 'Просрочено или горит'],
+  remaining: ['Остальные задачи', 'Остальная очередь'],
 });
 
 let activeTab = 'today';
@@ -161,8 +161,42 @@ function todayIsoBangkok() {
   return parts.year + '-' + parts.month + '-' + parts.day;
 }
 
+function addDaysIso(dateIso, days) {
+  const date = new Date(dateIso + 'T00:00:00Z');
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 function normalizeText(value) {
   return String(value == null ? '' : value).trim().toLowerCase();
+}
+
+function isoDateFromValue(value) {
+  const match = String(value || '').match(/\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : '';
+}
+
+function humanDate(value) {
+  const text = String(value || '').trim();
+  const isoDate = isoDateFromValue(text);
+  if (!isoDate) {
+    return text;
+  }
+
+  const normalizedTime = text.match(/\b\d{1,2}:\d{2}\b/);
+  const formatter = new Intl.DateTimeFormat('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'Asia/Bangkok',
+  });
+  const formattedDate = formatter.format(new Date(isoDate + 'T00:00:00Z'));
+  return normalizedTime ? formattedDate + ', ' + normalizedTime[0] : formattedDate;
+}
+
+function removeIsoDateNoise(value) {
+  return String(value || '').replace(/\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2})?(?:[+-]\d{2}:?\d{2}|Z)?)?/g, function (match) {
+    return humanDate(match);
+  });
 }
 
 function isFinalTask(task) {
@@ -306,6 +340,35 @@ function taskRowsForTab() {
   return taskRowsForBaseTab(activeTab);
 }
 
+function taskUrgencyBucket(task) {
+  const today = todayIsoBangkok();
+  const tomorrow = addDaysIso(today, 1);
+  const relevantDate = isoDateFromValue(task.deadline) || isoDateFromValue(task.nextReminder);
+  const text = normalizeText([task.deadline, task.nextReminder, task.status].join(' '));
+  if (isOverdueTask(task) || (relevantDate && relevantDate < today)) {
+    return 0;
+  }
+  if (relevantDate === today || text.includes('сегодня') || text.includes('today')) {
+    return 1;
+  }
+  if (relevantDate === tomorrow || text.includes('завтра') || text.includes('tomorrow')) {
+    return 2;
+  }
+  return 3;
+}
+
+function compareTaskUrgency(left, right) {
+  const bucketDiff = taskUrgencyBucket(left) - taskUrgencyBucket(right);
+  if (bucketDiff !== 0) {
+    return bucketDiff;
+  }
+  const scoreDiff = taskScore(right) - taskScore(left);
+  if (scoreDiff !== 0) {
+    return scoreDiff;
+  }
+  return String(left.title || '').localeCompare(String(right.title || ''), 'ru');
+}
+
 function groupedTasks(tasks) {
   const groups = {
     urgent: [],
@@ -329,6 +392,10 @@ function groupedTasks(tasks) {
     }
   });
 
+  Object.keys(groups).forEach(function (key) {
+    groups[key].sort(compareTaskUrgency);
+  });
+
   return groups;
 }
 
@@ -349,7 +416,7 @@ function safeWritesEnabled() {
 }
 
 function writeModeLabel() {
-  return safeWritesEnabled() ? 'SAFE WRITE ENABLED' : 'READ ONLY MODE';
+  return safeWritesEnabled() ? 'БЕЗОПАСНАЯ ЗАПИСЬ ВКЛЮЧЕНА' : 'ТОЛЬКО ЧТЕНИЕ';
 }
 
 function renderModeBanner() {
@@ -358,22 +425,22 @@ function renderModeBanner() {
   const failed = dashboardState.status === 'error' || scaffoldState.status === 'error' || cleanupAuditState.status === 'error';
   if (loading) {
     elements.modeBanner.className = 'mode-banner';
-    elements.modeBanner.innerHTML = '<strong>Read-only dashboard</strong><span>Проверяю безопасную конфигурацию источника данных...</span>';
+    elements.modeBanner.innerHTML = '<strong>Проверка режима</strong><span>Проверяю безопасную конфигурацию источника данных...</span>';
     return;
   }
   elements.modeBanner.className = 'mode-banner ' + (failed ? 'warning' : isMock ? 'mock' : 'live');
   elements.modeBanner.innerHTML = failed
-    ? '<strong>Demo mode / mock data</strong><span>' + escapeHtml(dashboardState.message || cleanupAuditState.message || 'Read-only источник недоступен. Показаны безопасные демо-данные.') + '</span>'
+    ? '<strong>Демо-режим</strong><span>' + escapeHtml(dashboardState.message || cleanupAuditState.message || 'Источник недоступен. Показаны безопасные демо-данные.') + '</span>'
     : isMock
-      ? '<strong>Demo mode / mock data</strong><span>Без подключения к рабочей таблице и без изменений задач.</span>'
+      ? '<strong>Демо-режим</strong><span>Без подключения к рабочей таблице и без изменений задач.</span>'
       : safeWritesEnabled()
-        ? '<strong>SAFE WRITE ENABLED</strong><span>Доступны только безопасные изменения статуса и напоминаний.</span>'
-        : '<strong>READ ONLY MODE</strong><span>Данные загружены только для просмотра. Safe actions отключены.</span>';
+        ? '<strong>БЕЗОПАСНАЯ ЗАПИСЬ ВКЛЮЧЕНА</strong><span>Доступны только безопасные изменения статуса и напоминаний.</span>'
+        : '<strong>ТОЛЬКО ЧТЕНИЕ</strong><span>Данные загружены только для просмотра. Безопасные действия отключены.</span>';
 }
 
 function renderSummary() {
   if (dashboardState.status === 'loading') {
-    elements.summaryCards.innerHTML = ['Urgent', 'Waiting', 'Pushes', 'Overdue'].map(function (label) {
+    elements.summaryCards.innerHTML = ['Срочно', 'Ждут ответа', 'Пуши', 'Просрочено'].map(function (label) {
       return '<article class="summary-card loading"><strong>...</strong><span>' + label + '</span></article>';
     }).join('');
     return;
@@ -381,10 +448,10 @@ function renderSummary() {
 
   const openTasks = allOpenTasks();
   const cards = [
-    { value: openTasks.filter(isUrgentTask).length, label: 'Urgent', tone: 'urgent' },
-    { value: openTasks.filter(isWaitingTask).length, label: 'Waiting', tone: 'waiting' },
-    { value: openTasks.filter(isPushTask).length, label: 'Pushes', tone: 'push' },
-    { value: openTasks.filter(isOverdueTask).length, label: 'Overdue', tone: 'overdue' },
+    { value: openTasks.filter(isUrgentTask).length, label: 'Срочно', tone: 'urgent' },
+    { value: openTasks.filter(isWaitingTask).length, label: 'Ждут ответа', tone: 'waiting' },
+    { value: openTasks.filter(isPushTask).length, label: 'Пуши', tone: 'push' },
+    { value: openTasks.filter(isOverdueTask).length, label: 'Просрочено', tone: 'overdue' },
   ];
 
   elements.summaryCards.innerHTML = cards.map(function (card) {
@@ -411,8 +478,8 @@ function statusText() {
   return dashboardState.isMock
     ? 'Это демонстрационные задачи. Изменение статуса и отправка данных отключены.'
     : safeWritesEnabled()
-      ? 'Safe actions меняют только статус или nextReminder.'
-      : 'Данные доступны только для чтения. Safe actions отключены.';
+      ? 'Безопасные действия меняют только статус или напоминание.'
+      : 'Данные доступны только для чтения. Безопасные действия отключены.';
 }
 
 function renderEmpty() {
@@ -425,7 +492,7 @@ function renderEmpty() {
 }
 
 function taskMeta(task) {
-  return [task.organization, task.deadline ? 'Deadline: ' + task.deadline : '', task.nextReminder ? 'Reminder: ' + task.nextReminder : '']
+  return [task.organization, task.deadline ? 'Срок: ' + humanDate(task.deadline) : '', task.nextReminder ? 'Напомнить: ' + humanDate(task.nextReminder) : '']
     .filter(Boolean)
     .join(' · ');
 }
@@ -473,7 +540,7 @@ function firstUsefulLine(value) {
 }
 
 function nextActionText(task) {
-  return firstUsefulLine(task.steps) || firstUsefulLine(task.comment) || firstUsefulLine(task.nextReminder) || 'Определить следующий шаг';
+  return removeIsoDateNoise(firstUsefulLine(task.steps) || firstUsefulLine(task.comment) || humanDate(task.nextReminder) || 'Определить следующий шаг');
 }
 
 function taskTone(task) {
@@ -489,17 +556,17 @@ function actionButtonsHtml(task) {
   const state = taskActionState[task.id] || {};
   const busy = state.status === 'loading';
   const moveOptions = [
-    ['moveToWork', 'In Progress', false],
-    ['moveToWaiting', 'Waiting', false],
-    ['moveToPush', 'Push', false],
-    ['moveToBlocker', 'Blocker', true],
+    ['moveToWork', 'В работе', false],
+    ['moveToWaiting', 'Ждёт ответа', false],
+    ['moveToPush', 'Пуш', false],
+    ['moveToBlocker', 'Блокер', true],
   ];
   const reminderOptions = [
-    ['snoozeOneDay', 'Tomorrow'],
-    ['snoozeThreeDays', '+3 days'],
-    ['snoozeNextWeek', 'Next week'],
+    ['snoozeOneDay', 'Завтра'],
+    ['snoozeThreeDays', '+3 дня'],
+    ['snoozeNextWeek', 'Следующая неделя'],
   ];
-  const completeLabel = busy && state.action === 'markDone' ? '...' : '✓ Complete';
+  const completeLabel = busy && state.action === 'markDone' ? '...' : '✓ Готово';
   const moveButtons = moveOptions.map(function (option) {
     const action = option[0];
     const label = busy && state.action === action ? '...' : option[1];
@@ -511,14 +578,14 @@ function actionButtonsHtml(task) {
     return '<button class="menu-action" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="' + escapeHtml(action) + '"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>';
   }).join('');
   const message = state.status === 'error'
-    ? '<div class="task-error">' + escapeHtml(state.message || 'Action failed') + '</div>'
+    ? '<div class="task-error">' + escapeHtml(state.message || 'Действие не выполнено') + '</div>'
     : disabled
-      ? '<div class="task-notice">Safe actions отключены.</div>'
+      ? '<div class="task-notice">Безопасные действия отключены.</div>'
       : '';
   return [
     '<div class="task-actions">',
-    '<details class="action-menu"><summary>Move to...</summary><div>' + moveButtons + '</div></details>',
-    '<details class="action-menu"><summary>Reminder</summary><div>' + reminderButtons + '</div></details>',
+    '<details class="action-menu"><summary>Перевести в</summary><div>' + moveButtons + '</div></details>',
+    '<details class="action-menu"><summary>Напомнить</summary><div>' + reminderButtons + '</div></details>',
     '<button class="task-action secondary" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="markDone"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(completeLabel) + '</button>',
     '</div>',
     message,
@@ -529,16 +596,16 @@ function taskCardHtml(task) {
   return [
     '<article class="task-card" data-tone="' + escapeHtml(taskTone(task)) + '">',
     '<div class="task-body">',
-    '<div class="task-title">' + escapeHtml(task.title) + '</div>',
-    '<div class="next-action"><strong>👉 Next action:</strong> <span>' + escapeHtml(nextActionText(task)) + '</span></div>',
+    '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title)) + '</div>',
+    '<div class="next-action"><strong>👉 Следующее действие:</strong> <span>' + escapeHtml(nextActionText(task)) + '</span></div>',
     '<div class="task-meta">' + escapeHtml(taskMeta(task)) + '</div>',
     '<div class="task-topline">',
-    '<span class="task-chip">' + escapeHtml(task.status || 'No status') + '</span>',
+    '<span class="task-chip">' + escapeHtml(task.status || 'Без статуса') + '</span>',
     task.priority ? '<span class="priority-label">' + escapeHtml(task.priority) + '</span>' : '',
     '</div>',
     '<div class="task-details">',
     taskDetailHtml('Источник', task.source || task.appSource || task.channel),
-    taskDetailHtml('Task ID', task.id),
+    taskDetailHtml('ID задачи', task.id),
     '</div>',
     actionButtonsHtml(task),
     '</div>',
@@ -579,7 +646,7 @@ function renderTasks() {
     elements.taskList.innerHTML = taskFilterHtml(tasks) + [
       '<article class="empty-state">',
       '<strong>Для фильтра нет задач</strong>',
-      '<span>Выберите All или другой фильтр.</span>',
+      '<span>Выберите «Все» или другой фильтр.</span>',
       '</article>',
     ].join('');
     return;
@@ -591,9 +658,9 @@ function renderTasks() {
 function renderSystem() {
   const info = scaffoldData();
   const rows = [
-    ['Источник', dashboardState.isMock ? 'Mock fixture' : 'Read-only API'],
-    ['Safe writes', info.safeWritesEnabled === true ? 'Включены' : 'Отключены'],
-    ['Read live Sheets', info.readLiveSheets === true ? 'Включено' : 'Отключено'],
+    ['Источник', dashboardState.isMock ? 'Демо-данные' : 'API только для чтения'],
+    ['Безопасная запись', info.safeWritesEnabled === true ? 'Включена' : 'Отключена'],
+    ['Живые данные Sheets', info.readLiveSheets === true ? 'Включены' : 'Отключены'],
     ['Автоматизация', info.liveAutomationEnabled === false ? 'Отключена' : 'Не подтверждено'],
     ['Триггеры', info.triggersEnabled === false ? 'Отключены' : 'Не подтверждено'],
     ['Версия', info.version || '-'],
@@ -607,12 +674,12 @@ function auditSummaryRows(summary) {
   return [
     ['Проверено строк', summary.rowsChecked],
     ['Дубликаты ID', summary.duplicateGroups],
-    ['Near-duplicates', summary.nearDuplicateGroups],
+    ['Похожие дубликаты', summary.nearDuplicateGroups],
     ['Статусы', summary.nonCanonicalStatuses],
     ['Приоритеты', summary.nonCanonicalPriorities],
     ['V2 поля', summary.missingV2Fields],
     ['Даты', summary.vagueDates],
-    ['Legacy active', summary.activeLegacyRows],
+    ['Legacy активные', summary.activeLegacyRows],
     ['Архив-кандидаты', summary.archiveCandidates],
   ];
 }
@@ -702,7 +769,7 @@ function reviewPreviewRows(items) {
       item.issueType || '-',
       item.severity,
       item.suggestedAction || 'REVIEW_REQUIRED',
-      item.needsLisaApproval ? 'Lisa approval' : 'no approval flag',
+      item.needsLisaApproval ? 'нужно согласование Lisa' : 'без согласования',
     ].join(' | ');
   });
 }
@@ -713,10 +780,10 @@ function renderReviewPreview(items) {
     return '';
   }
   return [
-    '<aside class="review-preview" aria-label="Review format preview">',
+    '<aside class="review-preview" aria-label="Предпросмотр формата проверки">',
     '<div>',
-    '<strong>Review format preview</strong>',
-    '<span>Только предварительный вид. Экспорта и записи нет.</span>',
+    '<strong>Предпросмотр формата проверки</strong>',
+      '<span>Только предварительный вид. Экспорта и записи нет.</span>',
     '</div>',
     '<pre>' + escapeHtml(rows.join('\n')) + '</pre>',
     '</aside>',
@@ -760,10 +827,10 @@ function renderAudit() {
     return '<span class="audit-group-chip">' + escapeHtml(issueType) + ': ' + groups[issueType].length + '</span>';
   }).join('');
   const compactSummaryHtml = [
-    ['High', severities.high, 'high'],
-    ['Medium', severities.medium, 'medium'],
-    ['Low', severities.low, 'low'],
-    ['Visible', visibleItems.length, 'visible'],
+    ['Высокий', severities.high, 'high'],
+    ['Средний', severities.medium, 'medium'],
+    ['Низкий', severities.low, 'low'],
+    ['Видимо', visibleItems.length, 'visible'],
   ].map(function (row) {
     return '<article class="audit-compact-card ' + escapeHtml(row[2]) + '"><strong>' + escapeHtml(row[1]) + '</strong><span>' + escapeHtml(row[0]) + '</span></article>';
   }).join('');
@@ -796,21 +863,21 @@ function renderAudit() {
         '<article class="audit-card" data-severity="' + escapeHtml(item.severity) + '">',
         '<div>',
         '<div class="audit-card-title"><span>' + escapeHtml(item.issueType) + ' · row ' + escapeHtml(item.rowNumber) + '</span><strong class="severity-pill ' + escapeHtml(item.severity) + '">' + escapeHtml(item.severity) + '</strong></div>',
-        '<div class="task-meta">Task ID: ' + escapeHtml(item.taskId || '-') + '</div>',
+        '<div class="task-meta">ID задачи: ' + escapeHtml(item.taskId || '-') + '</div>',
         '</div>',
         '<div class="audit-values">',
         '<span><strong>Сейчас:</strong> ' + escapeHtml(item.currentValue || '-') + '</span>',
         '<span><strong>Предложение:</strong> ' + escapeHtml(item.proposedValue || '-') + '</span>',
-        '<span><strong>Confidence:</strong> ' + escapeHtml(item.confidence == null ? '-' : item.confidence) + '</span>',
+        '<span><strong>Уверенность:</strong> ' + escapeHtml(item.confidence == null ? '-' : item.confidence) + '</span>',
         '<span><strong>Действие:</strong> ' + escapeHtml(item.suggestedAction || 'REVIEW_REQUIRED') + '</span>',
-        '<span><strong>Approval:</strong> ' + (item.needsLisaApproval ? 'Lisa required' : 'not required') + '</span>',
+        '<span><strong>Согласование:</strong> ' + (item.needsLisaApproval ? 'Нужно согласование Lisa' : 'Не требуется') + '</span>',
         '</div>',
         '<p>' + escapeHtml(item.notes || '') + '</p>',
         '</article>',
       ].join('');
     }).join(''),
     '</div>',
-    visibleItems.length ? renderReviewPreview(visibleItems) : '<article class="empty-state"><strong>Для фильтра нет элементов</strong><span>Выберите All или другой фильтр.</span></article>',
+    visibleItems.length ? renderReviewPreview(visibleItems) : '<article class="empty-state"><strong>Для фильтра нет элементов</strong><span>Выберите «Все» или другой фильтр.</span></article>',
     '</section>',
   ].join('');
 }
@@ -819,7 +886,7 @@ function renderPanel() {
   const label = viewLabels[activeTab];
   elements.panelEyebrow.textContent = label[0];
   elements.panelTitle.textContent = label[1];
-  elements.panelBadge.textContent = dashboardState.isMock || cleanupAuditState.isMock ? 'Demo / READ ONLY MODE' : writeModeLabel();
+  elements.panelBadge.textContent = dashboardState.isMock || cleanupAuditState.isMock ? 'ДЕМО / ТОЛЬКО ЧТЕНИЕ' : writeModeLabel();
   elements.statusMessage.textContent = statusText();
   elements.statusMessage.classList.toggle('error', dashboardState.status === 'error' || scaffoldState.status === 'error' || cleanupAuditState.status === 'error');
 
@@ -839,9 +906,19 @@ function renderPanel() {
 }
 
 function render() {
+  localizeStaticLabels();
   renderModeBanner();
   renderSummary();
   renderPanel();
+}
+
+function localizeStaticLabels() {
+  elements.tabs.forEach(function (tab) {
+    const label = viewLabels[tab.dataset.tab];
+    if (label) {
+      tab.textContent = label[0];
+    }
+  });
 }
 
 function setTab(tabName) {

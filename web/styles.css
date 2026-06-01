@@ -1046,21 +1046,25 @@ h1 {
 
 .next-action {
   display: block;
-  margin: 0 0 2px;
+  margin: 0 0 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: #f0f8f4;
   color: var(--text);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.22;
 }
 
 .next-action strong {
   color: var(--accent);
-  font-size: 11px;
+  font-size: 12px;
   letter-spacing: 0;
   text-transform: none;
 }
 
 .next-action span {
   color: var(--text);
+  font-weight: 750;
 }
 
 .task-meta,
