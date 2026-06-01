@@ -12,6 +12,12 @@
   const WRITE_ROUTES = Object.freeze([
     'taskAction',
   ]);
+  const TASK_ACTION_MESSAGES = Object.freeze({
+    ACTION_NOT_ALLOWED: 'Это действие пока не включено для BA Fox Web.',
+    SAFE_WRITES_DISABLED: 'Safe write mode выключен. Действия доступны только для просмотра.',
+    TASK_NOT_FOUND: 'Задача не найдена в таблице.',
+    VALIDATION_ERROR: 'Не хватает данных для безопасного действия.',
+  });
   const JSONP_TIMEOUT_MS = 10000;
   const RATE_LIMIT_MESSAGE = 'Google Sheets временно ограничил чтение. BA Fox повторит попытку позже.';
   let jsonpRequestSequence = 0;
@@ -307,7 +313,14 @@
       if (config.useMockData) {
         throw new Error('Safe task actions are disabled in mock mode.');
       }
-      return getJsonp('taskAction', options || {});
+      try {
+        return await getJsonp('taskAction', options || {});
+      } catch (error) {
+        if (error && error.code && TASK_ACTION_MESSAGES[error.code]) {
+          error.message = TASK_ACTION_MESSAGES[error.code];
+        }
+        throw error;
+      }
     },
   });
 }(window));

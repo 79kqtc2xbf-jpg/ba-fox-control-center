@@ -227,8 +227,6 @@ function baFoxTaskActionMap_() {
     moveToWork: { status: 'В работе' },
     moveToPush: { status: 'Пуш' },
     moveToWaiting: { status: 'Ждём ответ' },
-    moveToBlocker: { status: 'Блокер' },
-    archiveTask: { status: 'Архив', archived: true },
     snoozeTask: { snooze: true }
   };
 }

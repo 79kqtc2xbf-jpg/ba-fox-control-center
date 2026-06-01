@@ -60,12 +60,27 @@ const actionLabels = Object.freeze({
   moveToWork: 'В работу',
   moveToPush: 'Пуш',
   moveToWaiting: 'Ждём',
-  moveToBlocker: 'Блокер',
   markDone: 'Готово',
-  archiveTask: 'Архив',
   snoozeOneDay: '+1 день',
   snoozeThreeDays: '+3 дня',
   snoozeNextWeek: 'Следующая неделя',
+});
+
+const allowedTaskActions = Object.freeze([
+  'moveToWork',
+  'moveToPush',
+  'moveToWaiting',
+  'markDone',
+  'snoozeOneDay',
+  'snoozeThreeDays',
+  'snoozeNextWeek',
+]);
+
+const actionStatusUpdates = Object.freeze({
+  moveToWork: 'В работе',
+  moveToPush: 'Пуш',
+  moveToWaiting: 'Ждём ответ',
+  markDone: 'Выполнено',
 });
 
 let activeTab = 'today';
@@ -257,6 +272,10 @@ function safeWritesEnabled() {
   return info.safeWritesEnabled === true && !dashboardState.isMock;
 }
 
+function writeModeLabel() {
+  return safeWritesEnabled() ? 'SAFE WRITE ENABLED' : 'READ ONLY MODE';
+}
+
 function renderModeBanner() {
   const loading = dashboardState.status === 'loading' || scaffoldState.status === 'loading';
   const isMock = dashboardState.isMock || scaffoldState.isMock || cleanupAuditState.isMock;
@@ -272,8 +291,8 @@ function renderModeBanner() {
     : isMock
       ? '<strong>Demo mode / mock data</strong><span>Без подключения к рабочей таблице и без изменений задач.</span>'
       : safeWritesEnabled()
-        ? '<strong>Live data / safe actions</strong><span>Доступны только безопасные изменения статуса и напоминаний.</span>'
-        : '<strong>Read-only data</strong><span>Данные загружены только для просмотра. Safe actions отключены.</span>';
+        ? '<strong>SAFE WRITE ENABLED</strong><span>Доступны только безопасные изменения статуса и напоминаний.</span>'
+        : '<strong>READ ONLY MODE</strong><span>Данные загружены только для просмотра. Safe actions отключены.</span>';
 }
 
 function renderSummary() {
@@ -292,7 +311,7 @@ function renderSummary() {
     { value: summaryCount('waitList'), label: 'Wait List' },
     { value: summaryCount('focus'), label: 'Daily Focus' },
     { value: auditSummary.rowsChecked == null ? '-' : auditSummary.rowsChecked, label: 'Строк аудита' },
-    { value: safeWritesEnabled() ? 'Safe' : dashboardState.isMock ? 'Demo' : 'Read', label: 'Режим' },
+    { value: safeWritesEnabled() ? 'Safe' : dashboardState.isMock ? 'Demo' : 'Read', label: writeModeLabel() },
   ];
 
   elements.summaryCards.innerHTML = cards.map(function (card) {
@@ -319,7 +338,7 @@ function statusText() {
   return dashboardState.isMock
     ? 'Это демонстрационные задачи. Изменение статуса и отправка данных отключены.'
     : safeWritesEnabled()
-      ? 'Safe actions меняют только статус, архивный флаг или nextReminder.'
+      ? 'Safe actions меняют только статус или nextReminder.'
       : 'Данные доступны только для чтения. Safe actions отключены.';
 }
 
@@ -373,8 +392,7 @@ function actionButtonsHtml(task) {
   const disabled = !safeWritesEnabled();
   const state = taskActionState[task.id] || {};
   const busy = state.status === 'loading';
-  const actions = ['moveToWork', 'moveToPush', 'moveToWaiting', 'moveToBlocker', 'markDone', 'archiveTask', 'snoozeOneDay', 'snoozeThreeDays', 'snoozeNextWeek'];
-  const buttons = actions.map(function (action) {
+  const buttons = allowedTaskActions.map(function (action) {
     const label = busy && state.action === action ? '...' : actionLabels[action];
     return '<button class="task-action" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="' + escapeHtml(action) + '"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>';
   }).join('');
@@ -661,7 +679,7 @@ function renderPanel() {
   const label = viewLabels[activeTab];
   elements.panelEyebrow.textContent = label[0];
   elements.panelTitle.textContent = label[1];
-  elements.panelBadge.textContent = dashboardState.isMock || cleanupAuditState.isMock ? 'Demo / Read-only' : 'Read-only';
+  elements.panelBadge.textContent = dashboardState.isMock || cleanupAuditState.isMock ? 'Demo / READ ONLY MODE' : writeModeLabel();
   elements.statusMessage.textContent = statusText();
   elements.statusMessage.classList.toggle('error', dashboardState.status === 'error' || scaffoldState.status === 'error' || cleanupAuditState.status === 'error');
 
@@ -775,16 +793,98 @@ function backendAction(action) {
   return action;
 }
 
+function cloneTaskWithAction(task, actionData) {
+  const updated = Object.assign({}, task);
+  if (actionData.newStatus) {
+    updated.status = actionData.newStatus;
+  }
+  if (actionData.newNextReminder !== undefined) {
+    updated.nextReminder = actionData.newNextReminder;
+  }
+  if (updated.status === 'Выполнено') {
+    updated.completedAt = updated.completedAt || new Date().toISOString();
+  }
+  return updated;
+}
+
+function findTaskForAction(taskId) {
+  const data = dashboardData();
+  const sections = [data.today, data.open, data.pushes];
+  for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
+    const section = sections[sectionIndex];
+    if (!section || !Array.isArray(section.tasks)) {
+      continue;
+    }
+    const task = section.tasks.find(function (candidate) {
+      return candidate.id === taskId;
+    });
+    if (task) {
+      return task;
+    }
+  }
+  return null;
+}
+
+function taskBelongsInPushes(task) {
+  const text = [task.status, task.category, task.reminderMode].map(normalizeText).join(' ');
+  return ['пуш', 'ждём ответ', 'ждем ответ', 'waiting', 'push', 'control', 'follow-up', 'контроль'].some(function (signal) {
+    return text.includes(signal);
+  });
+}
+
+function updateSectionTasks(section, taskId, updatedTask, includeUpdatedTask) {
+  if (!section || !Array.isArray(section.tasks)) {
+    return;
+  }
+  let found = false;
+  section.tasks = section.tasks.reduce(function (tasks, task) {
+    if (task.id !== taskId) {
+      tasks.push(task);
+      return tasks;
+    }
+    found = true;
+    if (includeUpdatedTask(updatedTask)) {
+      tasks.push(updatedTask);
+    }
+    return tasks;
+  }, []);
+  if (!found && includeUpdatedTask(updatedTask)) {
+    section.tasks.push(updatedTask);
+  }
+}
+
+function applyTaskActionResult(taskId, action, actionData) {
+  const data = dashboardData();
+  const currentTask = findTaskForAction(taskId);
+  if (!currentTask) {
+    return;
+  }
+  const updatedTask = cloneTaskWithAction(currentTask, actionData);
+  const isDone = normalizeText(updatedTask.status) === 'выполнено';
+
+  updateSectionTasks(data.open, taskId, updatedTask, function () {
+    return !isDone;
+  });
+  updateSectionTasks(data.today, taskId, updatedTask, function (task) {
+    return !isDone && (
+      dateSignalIsDue(task.nextReminder, todayIsoBangkok())
+      || dateSignalIsDue(task.deadline, todayIsoBangkok())
+      || isHighPriority(task)
+      || ['пуш', 'ждём ответ', 'ждём подтверждение', 'ждём подписание'].includes(normalizeText(task.status))
+    );
+  });
+  updateSectionTasks(data.pushes, taskId, updatedTask, function (task) {
+    return !isDone && taskBelongsInPushes(task);
+  });
+}
+
 async function handleTaskAction(button) {
   const taskId = button.dataset.taskId;
   const action = button.dataset.taskAction;
-  if (!taskId || !action || !safeWritesEnabled()) {
+  if (!taskId || !action || !allowedTaskActions.includes(action) || !safeWritesEnabled()) {
     return;
   }
   if (action === 'markDone' && !window.confirm('Отметить задачу выполненной?')) {
-    return;
-  }
-  if (action === 'archiveTask' && !window.confirm('Переместить задачу в архив? Строка не будет удалена.')) {
     return;
   }
 
@@ -803,12 +903,16 @@ async function handleTaskAction(button) {
   renderPanel();
 
   try {
-    await BAFoxClient.runTaskAction(payload);
+    const actionData = await BAFoxClient.runTaskAction(payload);
+    applyTaskActionResult(taskId, action, Object.assign({
+      newStatus: actionStatusUpdates[action],
+      newNextReminder: payload.action === 'snoozeTask' ? payload.nextReminder : undefined,
+    }, actionData || {}));
     taskActionState[taskId] = {
       status: 'success',
       action: action,
     };
-    await loadDashboard();
+    render();
   } catch (error) {
     taskActionState[taskId] = {
       status: 'error',

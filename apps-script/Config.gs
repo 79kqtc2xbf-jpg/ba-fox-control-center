@@ -1,8 +1,8 @@
 var BA_FOX_CONFIG = {
-  VERSION: 'v2.7.4-safe-task-actions',
+  VERSION: 'v2.7.5-safe-real-actions',
   DRY_RUN: true,
   READ_LIVE_SHEETS: true,
-  SAFE_WRITE_MODE: false,
+  SAFE_WRITE_MODE: true,
   TIMEZONE: 'Asia/Bangkok',
   SHEETS: {
     TASKS: 'Tasks',
