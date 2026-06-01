@@ -1,4 +1,5 @@
 window.BA_FOX_CONFIG = {
   APPS_SCRIPT_ENDPOINT: '',
+  BA_FOX_ACTION_TOKEN: '',
   USE_MOCK_DATA: true,
 };

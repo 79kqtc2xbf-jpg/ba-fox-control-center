@@ -1,6 +1,7 @@
 (function (global) {
   const DEFAULT_CONFIG = Object.freeze({
     APPS_SCRIPT_ENDPOINT: '',
+    BA_FOX_ACTION_TOKEN: '',
     USE_MOCK_DATA: true,
   });
 
@@ -14,11 +15,16 @@
       ? suppliedConfig.APPS_SCRIPT_ENDPOINT.trim()
       : DEFAULT_CONFIG.APPS_SCRIPT_ENDPOINT;
     const useMockData = !endpoint || suppliedConfig.USE_MOCK_DATA !== false;
+    const actionToken = typeof suppliedConfig.BA_FOX_ACTION_TOKEN === 'string'
+      ? suppliedConfig.BA_FOX_ACTION_TOKEN.trim()
+      : DEFAULT_CONFIG.BA_FOX_ACTION_TOKEN;
 
     return Object.freeze({
       endpoint,
+      actionToken,
       useMockData,
       hasEndpoint: Boolean(endpoint),
+      hasActionToken: Boolean(actionToken),
     });
   }
 

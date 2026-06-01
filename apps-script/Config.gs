@@ -3,6 +3,7 @@ var BA_FOX_CONFIG = {
   DRY_RUN: true,
   READ_LIVE_SHEETS: true,
   SAFE_WRITE_MODE: true,
+  ACTION_TOKEN: '',
   TIMEZONE: 'Asia/Bangkok',
   SHEETS: {
     TASKS: 'Tasks',

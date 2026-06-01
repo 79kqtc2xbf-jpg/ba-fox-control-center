@@ -51,11 +51,14 @@
       throw new Error('Invalid endpoint response shape.');
     }
     if (!response.ok) {
+      const code = typeof response.error === 'string'
+        ? response.error
+        : response.error && response.error.code;
       const message = response.error && response.error.message
         ? response.error.message
-        : 'Read-only endpoint returned an error.';
+        : code || 'Read-only endpoint returned an error.';
       const error = new Error(message);
-      error.code = response.error && response.error.code;
+      error.code = code;
       error.details = response.error && response.error.details;
       throw error;
     }
@@ -313,8 +316,15 @@
       if (config.useMockData) {
         throw new Error('Safe task actions are disabled in mock mode.');
       }
+      if (!config.actionToken) {
+        const missingTokenError = new Error('Action token is not configured for safe writes.');
+        missingTokenError.code = 'UNAUTHORIZED';
+        throw missingTokenError;
+      }
       try {
-        return await getJsonp('taskAction', options || {});
+        return await getJsonp('taskAction', Object.assign({}, options || {}, {
+          token: config.actionToken,
+        }));
       } catch (error) {
         if (error && error.code && TASK_ACTION_MESSAGES[error.code]) {
           error.message = TASK_ACTION_MESSAGES[error.code];
