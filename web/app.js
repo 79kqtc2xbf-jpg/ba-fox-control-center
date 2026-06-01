@@ -425,7 +425,7 @@ function renderEmpty() {
 }
 
 function taskMeta(task) {
-  return [task.organization, task.priority ? 'Приоритет: ' + task.priority : '', task.deadline ? 'Срок: ' + task.deadline : '', task.nextReminder ? 'Напоминание: ' + task.nextReminder : '']
+  return [task.organization, task.deadline ? 'Deadline: ' + task.deadline : '', task.nextReminder ? 'Reminder: ' + task.nextReminder : '']
     .filter(Boolean)
     .join(' · ');
 }
@@ -517,9 +517,9 @@ function actionButtonsHtml(task) {
       : '';
   return [
     '<div class="task-actions">',
-    '<button class="task-action primary" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="markDone"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(completeLabel) + '</button>',
     '<details class="action-menu"><summary>Move to...</summary><div>' + moveButtons + '</div></details>',
     '<details class="action-menu"><summary>Reminder</summary><div>' + reminderButtons + '</div></details>',
+    '<button class="task-action secondary" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="markDone"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(completeLabel) + '</button>',
     '</div>',
     message,
   ].join('');
@@ -529,13 +529,13 @@ function taskCardHtml(task) {
   return [
     '<article class="task-card" data-tone="' + escapeHtml(taskTone(task)) + '">',
     '<div class="task-body">',
+    '<div class="task-title">' + escapeHtml(task.title) + '</div>',
+    '<div class="next-action"><strong>👉 Next action:</strong> <span>' + escapeHtml(nextActionText(task)) + '</span></div>',
+    '<div class="task-meta">' + escapeHtml(taskMeta(task)) + '</div>',
     '<div class="task-topline">',
     '<span class="task-chip">' + escapeHtml(task.status || 'No status') + '</span>',
     task.priority ? '<span class="priority-label">' + escapeHtml(task.priority) + '</span>' : '',
     '</div>',
-    '<div class="task-title">' + escapeHtml(task.title) + '</div>',
-    '<div class="next-action"><strong>Next Action</strong><span>' + escapeHtml(nextActionText(task)) + '</span></div>',
-    '<div class="task-meta">' + escapeHtml(taskMeta(task)) + '</div>',
     '<div class="task-details">',
     taskDetailHtml('Источник', task.source || task.appSource || task.channel),
     taskDetailHtml('Task ID', task.id),
