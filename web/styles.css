@@ -132,7 +132,7 @@ h1 {
 
 .tabs {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 6px;
   margin: 0 0 14px;
   padding: 5px;
@@ -158,7 +158,7 @@ h1 {
 
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(7, 1fr);
   gap: 10px;
   margin-bottom: 14px;
 }
@@ -249,6 +249,10 @@ h1 {
   background: #fff;
 }
 
+.task-body {
+  min-width: 0;
+}
+
 .status-dot {
   width: 10px;
   height: 10px;
@@ -275,6 +279,116 @@ h1 {
 
 .task-meta {
   overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.task-details {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.task-details strong {
+  color: var(--text);
+}
+
+.task-filters,
+.task-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.task-filters {
+  margin-bottom: 4px;
+}
+
+.task-filter,
+.task-action {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 10px;
+}
+
+.task-filter {
+  border-radius: 999px;
+  color: var(--muted);
+}
+
+.task-filter span {
+  color: var(--accent);
+}
+
+.task-filter.active {
+  border-color: var(--text);
+  background: var(--text);
+  color: #fff;
+}
+
+.task-filter.active span {
+  color: #fff;
+}
+
+.task-actions {
+  margin-top: 10px;
+}
+
+.task-action:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.task-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.task-error,
+.task-notice {
+  margin-top: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.task-error {
+  color: var(--danger);
+}
+
+.task-notice {
+  color: var(--muted);
+}
+
+.focus-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 9px;
+}
+
+.focus-grid article {
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fbfcfd;
+}
+
+.focus-grid strong,
+.focus-grid span {
+  display: block;
+}
+
+.focus-grid span {
+  margin-top: 5px;
   color: var(--muted);
   font-size: 13px;
   line-height: 1.4;
@@ -607,6 +721,7 @@ h1 {
   }
 
   .tabs,
+  .focus-grid,
   .audit-summary-grid,
   .audit-compact-grid {
     grid-template-columns: repeat(2, 1fr);

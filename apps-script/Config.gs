@@ -1,7 +1,8 @@
 var BA_FOX_CONFIG = {
-  VERSION: 'v2.6i-read-only-cache',
+  VERSION: 'v2.7.4-safe-task-actions',
   DRY_RUN: true,
   READ_LIVE_SHEETS: true,
+  SAFE_WRITE_MODE: true,
   TIMEZONE: 'Asia/Bangkok',
   SHEETS: {
     TASKS: 'Tasks',
@@ -38,7 +39,7 @@ var BA_FOX_CONFIG = {
     EXTERNAL_REF: 24,
     ARCHIVED: 25
   },
-  FINAL_STATUSES: ['Done', 'Cancelled', 'Archived', 'Выполнено'],
+  FINAL_STATUSES: ['Done', 'Cancelled', 'Archived', 'Выполнено', 'Архив'],
   OPEN_STATUSES: [
     'Not started',
     'In progress',
@@ -49,8 +50,12 @@ var BA_FOX_CONFIG = {
     'Не начато',
     'В работе',
     'Ждём ответ',
+    'Ждём подтверждение',
+    'Ждём подписание',
     'Перенести',
-    'Пуш'
+    'Пуш',
+    'Блокер',
+    'Архив'
   ],
   CONTROL_SIGNALS: [
     'push',

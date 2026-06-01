@@ -22,6 +22,10 @@ function updateTaskComment(request) {
   return baFoxSetTaskComment(request);
 }
 
+function taskAction(request) {
+  return baFoxTaskAction(request);
+}
+
 function buildDailyReportDraft(request) {
   return baFoxBuildDailyReportDraft(request);
 }

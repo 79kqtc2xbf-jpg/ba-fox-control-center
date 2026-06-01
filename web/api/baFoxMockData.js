@@ -3,6 +3,7 @@
     version: 'v2.6i-mock-client',
     dryRun: true,
     readLiveSheets: true,
+    safeWritesEnabled: false,
     liveAutomationEnabled: false,
     triggersEnabled: false,
     source: 'mock',
@@ -190,6 +191,10 @@
   const safetyStatus = {
     dryRun: true,
     readLive: true,
+    readLiveSheets: true,
+    safeWritesEnabled: false,
+    liveAutomationEnabled: false,
+    triggersEnabled: false,
     sheets: {
       AuditLog: {
         sheet: 'AuditLog',
