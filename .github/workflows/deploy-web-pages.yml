@@ -56,6 +56,7 @@ jobs:
           endpoint = sys.argv[1].strip()
           action_token = sys.argv[2].strip()
           payload = {
+              "BA_FOX_APPS_SCRIPT_ENDPOINT": endpoint,
               "APPS_SCRIPT_ENDPOINT": endpoint,
               "BA_FOX_ACTION_TOKEN": action_token,
               "USE_MOCK_DATA": False,

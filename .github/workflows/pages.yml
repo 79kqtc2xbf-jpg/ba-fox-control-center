@@ -31,10 +31,48 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
+      - name: Build static web bundle
+        shell: bash
+        env:
+          BA_FOX_APPS_SCRIPT_ENDPOINT: ${{ secrets.BA_FOX_APPS_SCRIPT_ENDPOINT }}
+          BA_FOX_ACTION_TOKEN: ${{ secrets.BA_FOX_ACTION_TOKEN }}
+        run: |
+          set -euo pipefail
+          rm -rf dist
+          mkdir -p dist
+          cp -R web/. dist/
+          rm -f dist/config.local.js
+          endpoint="$(
+            printf '%s' "${BA_FOX_APPS_SCRIPT_ENDPOINT:-}" \
+              | tr -d '\r' \
+              | grep -Eo 'https://script\.google\.com(/a)?/macros/[^[:space:]]+/exec' \
+              | tail -n 1 || true
+          )"
+          if [[ -z "${endpoint}" ]]; then
+            echo "BA_FOX_APPS_SCRIPT_ENDPOINT must contain a published Apps Script /exec URL." >&2
+            exit 1
+          fi
+          python3 - "${endpoint}" "${BA_FOX_ACTION_TOKEN:-}" > dist/config.runtime.js <<'PY'
+          import json
+          import sys
+
+          endpoint = sys.argv[1].strip()
+          action_token = sys.argv[2].strip()
+          payload = {
+              "BA_FOX_APPS_SCRIPT_ENDPOINT": endpoint,
+              "APPS_SCRIPT_ENDPOINT": endpoint,
+              "BA_FOX_ACTION_TOKEN": action_token,
+              "USE_MOCK_DATA": False,
+          }
+          print("window.BA_FOX_RUNTIME_CONFIG = " + json.dumps(payload, separators=(",", ":")) + ";")
+          print("window.BA_FOX_CONFIG = Object.assign({}, window.BA_FOX_CONFIG || {}, window.BA_FOX_RUNTIME_CONFIG);")
+          PY
+          touch dist/.nojekyll
+
       - name: Upload web artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: web
+          path: dist
 
       - name: Deploy to GitHub Pages
         id: deployment
