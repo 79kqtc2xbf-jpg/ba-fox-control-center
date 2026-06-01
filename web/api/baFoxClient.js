@@ -14,9 +14,10 @@
   ]);
   const TASK_ACTION_MESSAGES = Object.freeze({
     ACTION_NOT_ALLOWED: 'Это действие пока не включено для BA Fox Web.',
-    SAFE_WRITES_DISABLED: 'Safe write mode выключен. Действия доступны только для просмотра.',
+    SAFE_WRITES_DISABLED: 'Безопасная запись выключена. Действия доступны только для просмотра.',
     TASK_NOT_FOUND: 'Задача не найдена в таблице.',
     VALIDATION_ERROR: 'Не хватает данных для безопасного действия.',
+    UNAUTHORIZED: 'Нет доступа для выполнения действия. Проверьте action token.',
   });
   const JSONP_TIMEOUT_MS = 10000;
   const RATE_LIMIT_MESSAGE = 'Google Sheets временно ограничил чтение. BA Fox повторит попытку позже.';
@@ -314,10 +315,10 @@
     runTaskAction: async function (options) {
       const config = global.BAFoxConfig.getConfig();
       if (config.useMockData) {
-        throw new Error('Safe task actions are disabled in mock mode.');
+        throw new Error('Безопасные действия отключены в демо-режиме.');
       }
       if (!config.actionToken) {
-        const missingTokenError = new Error('Action token is not configured for safe writes.');
+        const missingTokenError = new Error('Action token не настроен для безопасных действий.');
         missingTokenError.code = 'UNAUTHORIZED';
         throw missingTokenError;
       }

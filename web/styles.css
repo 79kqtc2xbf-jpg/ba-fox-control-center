@@ -355,8 +355,9 @@ h1 {
 }
 
 .task-error,
-.task-notice {
-  margin-top: 8px;
+.task-notice,
+.task-success {
+  margin-top: 6px;
   font-size: 12px;
   font-weight: 700;
 }
@@ -367,6 +368,10 @@ h1 {
 
 .task-notice {
   color: var(--muted);
+}
+
+.task-success {
+  color: var(--accent);
 }
 
 .focus-grid {
@@ -1169,6 +1174,14 @@ h1 {
 .menu-action:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.task-success,
+.task-error,
+.task-notice {
+  margin-top: 4px;
+  font-size: 10px;
+  line-height: 1.25;
 }
 
 .loading-state,
