@@ -57,13 +57,13 @@ const waitingStatuses = Object.freeze([
 ]);
 
 const actionLabels = Object.freeze({
-  moveToWork: 'В работу',
-  moveToPush: 'Пуш',
-  moveToWaiting: 'Ждём',
-  markDone: 'Готово',
-  snoozeOneDay: '+1 день',
+  moveToWork: 'In Progress',
+  moveToPush: 'Push',
+  moveToWaiting: 'Waiting',
+  markDone: 'Complete',
+  snoozeOneDay: 'Tomorrow',
   snoozeThreeDays: '+3 дня',
-  snoozeNextWeek: 'Следующая неделя',
+  snoozeNextWeek: 'Next week',
 });
 
 const allowedTaskActions = Object.freeze([
@@ -81,6 +81,14 @@ const actionStatusUpdates = Object.freeze({
   moveToPush: 'Пуш',
   moveToWaiting: 'Ждём ответ',
   markDone: 'Выполнено',
+});
+
+const taskGroupLabels = Object.freeze({
+  urgent: ['Urgent', 'Нужно решить первым'],
+  waiting: ['Waiting for response', 'Ответы и подтверждения'],
+  pushes: ['Pushes', 'Нужен следующий касание'],
+  overdue: ['Overdue', 'Просрочено или горит'],
+  remaining: ['Remaining tasks', 'Остальная очередь'],
 });
 
 let activeTab = 'today';
@@ -172,11 +180,53 @@ function dateSignalIsDue(value, today) {
   });
 }
 
+function dateSignalIsOverdue(value, today) {
+  const text = normalizeText(value);
+  const match = text.match(/\d{4}-\d{2}-\d{2}/);
+  if (match) {
+    return match[0] < today;
+  }
+  return ['overdue', 'просрочено'].some(function (signal) {
+    return text.includes(signal);
+  });
+}
+
 function isHighPriority(task) {
   const priority = normalizeText(task.priority);
   return ['high', 'высокий', 'высокая', 'важно'].some(function (signal) {
     return priority.includes(signal);
   });
+}
+
+function isWaitingTask(task) {
+  const status = normalizeText(task.status);
+  return ['ждём ответ', 'ждём подтверждение', 'ждём подписание', 'wait list', 'waiting'].some(function (signal) {
+    return status.includes(signal);
+  });
+}
+
+function isPushTask(task) {
+  const status = normalizeText(task.status);
+  const category = normalizeText(task.category);
+  const reminderMode = normalizeText(task.reminderMode);
+  return status.includes('пуш') || status.includes('push') || category.includes('push') || reminderMode.includes('push');
+}
+
+function isBlockerTask(task) {
+  const status = normalizeText(task.status);
+  return status.includes('блокер') || status.includes('blocked') || status.includes('blocker');
+}
+
+function isOverdueTask(task) {
+  const today = todayIsoBangkok();
+  const status = normalizeText(task.status);
+  return !isFinalTask(task) && (
+    status.includes('просроч') || status.includes('overdue') || dateSignalIsOverdue(task.deadline, today)
+  );
+}
+
+function isUrgentTask(task) {
+  return !isFinalTask(task) && (isHighPriority(task) || isBlockerTask(task));
 }
 
 function derivedTodayTasks() {
@@ -256,6 +306,32 @@ function taskRowsForTab() {
   return taskRowsForBaseTab(activeTab);
 }
 
+function groupedTasks(tasks) {
+  const groups = {
+    urgent: [],
+    waiting: [],
+    pushes: [],
+    overdue: [],
+    remaining: [],
+  };
+
+  tasks.forEach(function (task) {
+    if (isUrgentTask(task)) {
+      groups.urgent.push(task);
+    } else if (isWaitingTask(task)) {
+      groups.waiting.push(task);
+    } else if (isPushTask(task)) {
+      groups.pushes.push(task);
+    } else if (isOverdueTask(task)) {
+      groups.overdue.push(task);
+    } else {
+      groups.remaining.push(task);
+    }
+  });
+
+  return groups;
+}
+
 function summaryCount(sectionName) {
   if (sectionName === 'waitList') {
     return waitListTasks().length;
@@ -297,25 +373,22 @@ function renderModeBanner() {
 
 function renderSummary() {
   if (dashboardState.status === 'loading') {
-    elements.summaryCards.innerHTML = ['Сегодня', 'Открытые', 'Пуши', 'Аудит', 'Режим'].map(function (label) {
+    elements.summaryCards.innerHTML = ['Urgent', 'Waiting', 'Pushes', 'Overdue'].map(function (label) {
       return '<article class="summary-card loading"><strong>...</strong><span>' + label + '</span></article>';
     }).join('');
     return;
   }
 
-  const auditSummary = cleanupAuditData().summary || {};
+  const openTasks = allOpenTasks();
   const cards = [
-    { value: summaryCount('today'), label: 'Сегодня' },
-    { value: summaryCount('open'), label: 'Открытые' },
-    { value: summaryCount('pushes'), label: 'Пуши' },
-    { value: summaryCount('waitList'), label: 'Wait List' },
-    { value: summaryCount('focus'), label: 'Daily Focus' },
-    { value: auditSummary.rowsChecked == null ? '-' : auditSummary.rowsChecked, label: 'Строк аудита' },
-    { value: safeWritesEnabled() ? 'Safe' : dashboardState.isMock ? 'Demo' : 'Read', label: writeModeLabel() },
+    { value: openTasks.filter(isUrgentTask).length, label: 'Urgent', tone: 'urgent' },
+    { value: openTasks.filter(isWaitingTask).length, label: 'Waiting', tone: 'waiting' },
+    { value: openTasks.filter(isPushTask).length, label: 'Pushes', tone: 'push' },
+    { value: openTasks.filter(isOverdueTask).length, label: 'Overdue', tone: 'overdue' },
   ];
 
   elements.summaryCards.innerHTML = cards.map(function (card) {
-    return '<article class="summary-card"><strong>' + escapeHtml(card.value) + '</strong><span>' + card.label + '</span></article>';
+    return '<article class="summary-card ' + escapeHtml(card.tone) + '"><strong>' + escapeHtml(card.value) + '</strong><span>' + card.label + '</span></article>';
   }).join('');
 }
 
@@ -345,8 +418,8 @@ function statusText() {
 function renderEmpty() {
   elements.taskList.innerHTML = [
     '<article class="empty-state">',
-    '<strong>В этом разделе пока нет задач</strong>',
-    '<span>Это корректное пустое состояние read-only dashboard.</span>',
+    '<strong>Очередь пуста</strong>',
+    '<span>В этом разделе нет задач для действия.</span>',
     '</article>',
   ].join('');
 }
@@ -371,7 +444,7 @@ function taskMatchesFilter(task, filterId) {
 }
 
 function taskFilterHtml(tasks) {
-  if (!['today', 'open', 'pushes', 'waitList', 'focus'].includes(activeTab)) {
+  if (!['open', 'pushes', 'waitList', 'focus'].includes(activeTab)) {
     return '';
   }
   return '<div class="task-filters" aria-label="Фильтры задач">' + taskFilters.map(function (filter) {
@@ -388,20 +461,108 @@ function taskDetailHtml(label, value) {
   return '<span><strong>' + escapeHtml(label) + ':</strong> ' + escapeHtml(value) + '</span>';
 }
 
+function firstUsefulLine(value) {
+  return String(value || '')
+    .split(/\n+/)
+    .map(function (line) {
+      return line.replace(/^\s*\d+[\).\s-]*/, '').trim();
+    })
+    .find(function (line) {
+      return line.length > 0;
+    }) || '';
+}
+
+function nextActionText(task) {
+  return firstUsefulLine(task.steps) || firstUsefulLine(task.comment) || firstUsefulLine(task.nextReminder) || 'Определить следующий шаг';
+}
+
+function taskTone(task) {
+  if (isOverdueTask(task)) return 'overdue';
+  if (isBlockerTask(task)) return 'blocker';
+  if (isPushTask(task)) return 'push';
+  if (isWaitingTask(task)) return 'waiting';
+  return 'work';
+}
+
 function actionButtonsHtml(task) {
   const disabled = !safeWritesEnabled();
   const state = taskActionState[task.id] || {};
   const busy = state.status === 'loading';
-  const buttons = allowedTaskActions.map(function (action) {
-    const label = busy && state.action === action ? '...' : actionLabels[action];
-    return '<button class="task-action" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="' + escapeHtml(action) + '"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>';
+  const moveOptions = [
+    ['moveToWork', 'In Progress', false],
+    ['moveToWaiting', 'Waiting', false],
+    ['moveToPush', 'Push', false],
+    ['moveToBlocker', 'Blocker', true],
+  ];
+  const reminderOptions = [
+    ['snoozeOneDay', 'Tomorrow'],
+    ['snoozeThreeDays', '+3 days'],
+    ['snoozeNextWeek', 'Next week'],
+  ];
+  const completeLabel = busy && state.action === 'markDone' ? '...' : '✓ Complete';
+  const moveButtons = moveOptions.map(function (option) {
+    const action = option[0];
+    const label = busy && state.action === action ? '...' : option[1];
+    return '<button class="menu-action" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="' + escapeHtml(action) + '"' + (disabled || busy || option[2] ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>';
+  }).join('');
+  const reminderButtons = reminderOptions.map(function (option) {
+    const action = option[0];
+    const label = busy && state.action === action ? '...' : option[1];
+    return '<button class="menu-action" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="' + escapeHtml(action) + '"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>';
   }).join('');
   const message = state.status === 'error'
     ? '<div class="task-error">' + escapeHtml(state.message || 'Action failed') + '</div>'
     : disabled
       ? '<div class="task-notice">Safe actions отключены.</div>'
       : '';
-  return '<div class="task-actions">' + buttons + '</div>' + message;
+  return [
+    '<div class="task-actions">',
+    '<button class="task-action primary" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="markDone"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(completeLabel) + '</button>',
+    '<details class="action-menu"><summary>Move to...</summary><div>' + moveButtons + '</div></details>',
+    '<details class="action-menu"><summary>Reminder</summary><div>' + reminderButtons + '</div></details>',
+    '</div>',
+    message,
+  ].join('');
+}
+
+function taskCardHtml(task) {
+  return [
+    '<article class="task-card" data-tone="' + escapeHtml(taskTone(task)) + '">',
+    '<div class="task-body">',
+    '<div class="task-topline">',
+    '<span class="task-chip">' + escapeHtml(task.status || 'No status') + '</span>',
+    task.priority ? '<span class="priority-label">' + escapeHtml(task.priority) + '</span>' : '',
+    '</div>',
+    '<div class="task-title">' + escapeHtml(task.title) + '</div>',
+    '<div class="next-action"><strong>Next Action</strong><span>' + escapeHtml(nextActionText(task)) + '</span></div>',
+    '<div class="task-meta">' + escapeHtml(taskMeta(task)) + '</div>',
+    '<div class="task-details">',
+    taskDetailHtml('Источник', task.source || task.appSource || task.channel),
+    taskDetailHtml('Task ID', task.id),
+    '</div>',
+    actionButtonsHtml(task),
+    '</div>',
+    '</article>',
+  ].join('');
+}
+
+function taskGroupsHtml(tasks) {
+  const groups = groupedTasks(tasks);
+  return Object.keys(taskGroupLabels).map(function (groupId) {
+    const groupTasks = groups[groupId];
+    if (!groupTasks.length) {
+      return '';
+    }
+    const label = taskGroupLabels[groupId];
+    return [
+      '<section class="task-group" data-group="' + escapeHtml(groupId) + '">',
+      '<div class="task-group-header"><div><h3>' + escapeHtml(label[0]) + '</h3><span>' + escapeHtml(label[1]) + '</span></div><strong>' + groupTasks.length + '</strong></div>',
+      '<div class="task-group-list">',
+      groupTasks.map(taskCardHtml).join(''),
+      '</div>',
+      '</section>',
+    ].join('');
+  }).join('');
 }
 
 function renderTasks() {
@@ -424,28 +585,7 @@ function renderTasks() {
     return;
   }
 
-  const intro = activeTab === 'focus'
-    ? '<section class="focus-grid"><article><strong>Top 5</strong><span>' + escapeHtml(focusTasks().slice(0, 5).map(function (task) { return task.title; }).join(' · ') || '-') + '</span></article><article><strong>Blockers</strong><span>' + escapeHtml(allOpenTasks().filter(function (task) { return normalizeText(task.status) === 'блокер'; }).length) + '</span></article><article><strong>Waiting / Push</strong><span>' + escapeHtml(waitListTasks().length) + '</span></article></section>'
-    : '';
-
-  elements.taskList.innerHTML = taskFilterHtml(tasks) + intro + visibleTasks.map(function (task) {
-    return [
-      '<article class="task-card" data-status="' + escapeHtml(task.status) + '">',
-      '<div class="status-dot" aria-hidden="true"></div>',
-      '<div class="task-body">',
-      '<div class="task-title">' + escapeHtml(task.title) + '</div>',
-      '<div class="task-meta">' + escapeHtml(taskMeta(task)) + '</div>',
-      '<div class="task-details">',
-      taskDetailHtml('Комментарий', task.comment),
-      taskDetailHtml('Источник', task.source || task.appSource || task.channel),
-      taskDetailHtml('Task ID', task.id),
-      '</div>',
-      actionButtonsHtml(task),
-      '</div>',
-      '<span class="task-chip">' + escapeHtml(task.status) + '</span>',
-      '</article>',
-    ].join('');
-  }).join('');
+  elements.taskList.innerHTML = taskFilterHtml(tasks) + taskGroupsHtml(visibleTasks);
 }
 
 function renderSystem() {
