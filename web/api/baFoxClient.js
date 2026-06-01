@@ -12,6 +12,12 @@
   const WRITE_ROUTES = Object.freeze([
     'taskAction',
   ]);
+  const TASK_ACTION_MESSAGES = Object.freeze({
+    ACTION_NOT_ALLOWED: 'Это действие пока не включено для BA Fox Web.',
+    SAFE_WRITES_DISABLED: 'Safe write mode выключен. Действия доступны только для просмотра.',
+    TASK_NOT_FOUND: 'Задача не найдена в таблице.',
+    VALIDATION_ERROR: 'Не хватает данных для безопасного действия.',
+  });
   const JSONP_TIMEOUT_MS = 10000;
   const RATE_LIMIT_MESSAGE = 'Google Sheets временно ограничил чтение. BA Fox повторит попытку позже.';
   let jsonpRequestSequence = 0;
@@ -45,11 +51,14 @@
       throw new Error('Invalid endpoint response shape.');
     }
     if (!response.ok) {
+      const code = typeof response.error === 'string'
+        ? response.error
+        : response.error && response.error.code;
       const message = response.error && response.error.message
         ? response.error.message
-        : 'Read-only endpoint returned an error.';
+        : code || 'Read-only endpoint returned an error.';
       const error = new Error(message);
-      error.code = response.error && response.error.code;
+      error.code = code;
       error.details = response.error && response.error.details;
       throw error;
     }
@@ -307,7 +316,21 @@
       if (config.useMockData) {
         throw new Error('Safe task actions are disabled in mock mode.');
       }
-      return getJsonp('taskAction', options || {});
+      if (!config.actionToken) {
+        const missingTokenError = new Error('Action token is not configured for safe writes.');
+        missingTokenError.code = 'UNAUTHORIZED';
+        throw missingTokenError;
+      }
+      try {
+        return await getJsonp('taskAction', Object.assign({}, options || {}, {
+          token: config.actionToken,
+        }));
+      } catch (error) {
+        if (error && error.code && TASK_ACTION_MESSAGES[error.code]) {
+          error.message = TASK_ACTION_MESSAGES[error.code];
+        }
+        throw error;
+      }
     },
   });
 }(window));

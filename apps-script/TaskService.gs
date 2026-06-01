@@ -227,8 +227,6 @@ function baFoxTaskActionMap_() {
     moveToWork: { status: 'В работе' },
     moveToPush: { status: 'Пуш' },
     moveToWaiting: { status: 'Ждём ответ' },
-    moveToBlocker: { status: 'Блокер' },
-    archiveTask: { status: 'Архив', archived: true },
     snoozeTask: { snooze: true }
   };
 }
@@ -238,11 +236,42 @@ function baFoxValidateSafeReminder_(value) {
   return /^\d{4}-\d{2}-\d{2}(T| )\d{2}:\d{2}(:\d{2})?$/.test(reminder);
 }
 
+function baFoxConfiguredActionToken_() {
+  if (baFoxSafeString(BA_FOX_CONFIG.ACTION_TOKEN)) {
+    return baFoxSafeString(BA_FOX_CONFIG.ACTION_TOKEN);
+  }
+  if (typeof PropertiesService === 'undefined') {
+    return '';
+  }
+  try {
+    return baFoxSafeString(PropertiesService.getScriptProperties().getProperty('BA_FOX_ACTION_TOKEN'));
+  } catch (err) {
+    return '';
+  }
+}
+
+function baFoxActionTokenMatches_(token) {
+  var expectedToken = baFoxConfiguredActionToken_();
+  return Boolean(expectedToken) && baFoxSafeString(token) === expectedToken;
+}
+
+function baFoxUnauthorized_() {
+  return {
+    ok: false,
+    data: null,
+    error: 'UNAUTHORIZED'
+  };
+}
+
 function baFoxTaskAction(request) {
   var normalized = baFoxNormalizeRequest(request);
   var missing = baFoxRequired(normalized, ['taskId', 'action']);
   if (missing.length) {
     return baFoxError('VALIDATION_ERROR', 'Missing required fields.', { missing: missing });
+  }
+
+  if (!baFoxActionTokenMatches_(normalized.token)) {
+    return baFoxUnauthorized_();
   }
 
   if (BA_FOX_CONFIG.SAFE_WRITE_MODE !== true) {
