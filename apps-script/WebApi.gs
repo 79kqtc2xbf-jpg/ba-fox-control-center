@@ -14,6 +14,10 @@ function addTask(request) {
   return baFoxCreateTask(request);
 }
 
+function createTask(request) {
+  return baFoxSafeCreateTask(request);
+}
+
 function updateTaskStatus(request) {
   return baFoxSetTaskStatus(request);
 }

@@ -19,6 +19,14 @@ const elements = {
   taskList: document.querySelector('#taskList'),
   todayLabel: document.querySelector('#todayLabel'),
   modeBanner: document.querySelector('#modeBanner'),
+  writeModePill: document.querySelector('#writeModePill'),
+  createTaskButton: document.querySelector('#createTaskButton'),
+  createTaskModal: document.querySelector('#createTaskModal'),
+  createTaskForm: document.querySelector('#createTaskForm'),
+  createTaskMessage: document.querySelector('#createTaskMessage'),
+  submitCreateTask: document.querySelector('#submitCreateTask'),
+  cancelCreateTask: document.querySelector('#cancelCreateTask'),
+  cancelCreateTaskTop: document.querySelector('#cancelCreateTaskTop'),
 };
 
 const auditFilters = Object.freeze([
@@ -108,6 +116,8 @@ let dashboardState = BAFoxClient.createLoadingState('dashboard');
 let scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
 let cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
 let taskActionState = {};
+let createTaskState = { status: 'idle', message: '' };
+let flashMessage = '';
 
 function stateFromFullDashboard(fullState, route, data) {
   return {
@@ -444,8 +454,17 @@ function renderModeBanner() {
     : isMock
       ? '<strong>Демо-режим</strong><span>Без подключения к рабочей таблице и без изменений задач.</span>'
       : safeWritesEnabled()
-        ? '<strong>БЕЗОПАСНАЯ ЗАПИСЬ ВКЛЮЧЕНА</strong><span>Доступны только безопасные изменения статуса и напоминаний.</span>'
+        ? '<strong>БЕЗОПАСНАЯ ЗАПИСЬ ВКЛЮЧЕНА</strong><span>Доступны только безопасное создание задач, статус и напоминание.</span>'
         : '<strong>ТОЛЬКО ЧТЕНИЕ</strong><span>Данные загружены только для просмотра. Безопасные действия отключены.</span>';
+}
+
+function renderCreateTaskButton() {
+  const loading = dashboardState.status === 'loading' || scaffoldState.status === 'loading';
+  elements.createTaskButton.disabled = loading || !safeWritesEnabled();
+  elements.writeModePill.textContent = safeWritesEnabled() ? 'Safe create' : 'Только просмотр';
+  elements.createTaskButton.title = safeWritesEnabled()
+    ? 'Создать новую задачу'
+    : 'Создание доступно только при SAFE WRITE ENABLED и настроенном action token.';
 }
 
 function renderSummary() {
@@ -470,6 +489,9 @@ function renderSummary() {
 }
 
 function statusText() {
+  if (flashMessage) {
+    return flashMessage;
+  }
   if (dashboardState.status === 'loading') {
     return 'Загружаю безопасный обзор...';
   }
@@ -488,7 +510,7 @@ function statusText() {
   return dashboardState.isMock
     ? 'Это демонстрационные задачи. Изменение статуса и отправка данных отключены.'
     : safeWritesEnabled()
-      ? 'Безопасные действия меняют только статус или напоминание.'
+      ? 'Безопасные действия создают новую задачу или меняют только статус и напоминание.'
       : 'Данные доступны только для чтения. Безопасные действия отключены.';
 }
 
@@ -920,6 +942,7 @@ function renderPanel() {
 function render() {
   localizeStaticLabels();
   renderModeBanner();
+  renderCreateTaskButton();
   renderSummary();
   renderPanel();
 }
@@ -939,12 +962,102 @@ function setTab(tabName) {
   }
   activeTab = tabName;
   activeTaskFilter = 'all';
+  flashMessage = '';
   elements.tabs.forEach(function (tab) {
     const isActive = tab.dataset.tab === tabName;
     tab.classList.toggle('active', isActive);
     tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
   renderPanel();
+}
+
+function renderCreateTaskModal() {
+  const busy = createTaskState.status === 'loading';
+  elements.submitCreateTask.disabled = busy;
+  elements.cancelCreateTask.disabled = busy;
+  elements.cancelCreateTaskTop.disabled = busy;
+  elements.createTaskMessage.textContent = createTaskState.message || '';
+  elements.createTaskMessage.classList.toggle('error', createTaskState.status === 'error');
+}
+
+function openCreateTaskModal() {
+  if (!safeWritesEnabled()) {
+    return;
+  }
+  createTaskState = { status: 'idle', message: '' };
+  elements.createTaskForm.reset();
+  elements.createTaskModal.hidden = false;
+  renderCreateTaskModal();
+  elements.createTaskForm.elements.title.focus();
+}
+
+function closeCreateTaskModal() {
+  if (createTaskState.status === 'loading') {
+    return;
+  }
+  elements.createTaskModal.hidden = true;
+  createTaskState = { status: 'idle', message: '' };
+  renderCreateTaskModal();
+}
+
+function createTaskPayloadFromForm() {
+  const formData = new FormData(elements.createTaskForm);
+  return {
+    title: String(formData.get('title') || '').trim(),
+    organization: String(formData.get('organization') || '').trim(),
+    nextAction: String(formData.get('nextAction') || '').trim(),
+    deadline: String(formData.get('deadline') || '').trim(),
+  };
+}
+
+function validateCreateTaskPayload(payload) {
+  const missing = [];
+  if (!payload.title) {
+    missing.push('Название задачи');
+  }
+  if (!payload.nextAction) {
+    missing.push('Следующее действие');
+  }
+  return missing;
+}
+
+async function handleCreateTaskSubmit(event) {
+  event.preventDefault();
+  if (!safeWritesEnabled()) {
+    return;
+  }
+
+  const payload = createTaskPayloadFromForm();
+  const missing = validateCreateTaskPayload(payload);
+  if (missing.length) {
+    createTaskState = {
+      status: 'error',
+      message: 'Заполните: ' + missing.join(', ') + '.',
+    };
+    renderCreateTaskModal();
+    return;
+  }
+
+  createTaskState = {
+    status: 'loading',
+    message: 'Создаю задачу...',
+  };
+  renderCreateTaskModal();
+
+  try {
+    const result = await BAFoxClient.createTask(payload);
+    elements.createTaskModal.hidden = true;
+    createTaskState = { status: 'success', message: '' };
+    await loadDashboard();
+    flashMessage = 'Задача создана: ' + (result && result.taskId ? result.taskId : 'новая задача') + '.';
+    render();
+  } catch (error) {
+    createTaskState = {
+      status: 'error',
+      message: error && error.message ? error.message : 'Не удалось создать задачу.',
+    };
+    renderCreateTaskModal();
+  }
 }
 
 async function loadDashboard() {
@@ -994,6 +1107,16 @@ elements.tabBar.addEventListener('click', function (event) {
   }
   event.preventDefault();
   setTab(tab.dataset.tab);
+});
+
+elements.createTaskButton.addEventListener('click', openCreateTaskModal);
+elements.cancelCreateTask.addEventListener('click', closeCreateTaskModal);
+elements.cancelCreateTaskTop.addEventListener('click', closeCreateTaskModal);
+elements.createTaskForm.addEventListener('submit', handleCreateTaskSubmit);
+elements.createTaskModal.addEventListener('click', function (event) {
+  if (event.target === elements.createTaskModal) {
+    closeCreateTaskModal();
+  }
 });
 
 elements.taskList.addEventListener('click', function (event) {

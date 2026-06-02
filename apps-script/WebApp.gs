@@ -203,6 +203,9 @@ function baFoxBuildRouteResponse_(route, parameters) {
     case 'taskAction':
       response = taskAction(parameters);
       break;
+    case 'createTask':
+      response = createTask(parameters);
+      break;
     default:
       response = baFoxError(
         'ROUTE_NOT_FOUND',
@@ -232,7 +235,7 @@ function doGet(event) {
     response = baFoxGetCachedResponse_(route, parameters);
     if (!response) {
       response = baFoxBuildRouteResponse_(route, parameters);
-      if (route !== 'taskAction') {
+      if (route !== 'taskAction' && route !== 'createTask') {
         baFoxPutCachedResponse_(route, parameters, response);
       }
     }
@@ -245,9 +248,7 @@ function doGet(event) {
 
 function doPost(event) {
   var body = event && event.postData && event.postData.contents;
-  return baFoxJsonOutput_(baFoxError(
-      'NOT_IMPLEMENTED',
-      'Stage V2.5 does not expose write endpoints.',
-      { receivedBody: Boolean(body) }
-    ));
+  var payload = baFoxNormalizeRequest(body);
+  var route = payload.route || 'scaffoldInfo';
+  return baFoxJsonOutput_(baFoxBuildRouteResponse_(route, payload));
 }
