@@ -1,0 +1,107 @@
+/* Stage 9.1.1 — safe dropdown UX fix
+   Keep action menus inside the task card so they do not overlap the next task. */
+
+.task-actions {
+  align-items: flex-start;
+  overflow: visible;
+}
+
+.action-menu {
+  flex: 1 1 170px;
+  min-width: 150px;
+  position: relative;
+}
+
+.action-menu > summary {
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  list-style: none;
+}
+
+.action-menu > summary::-webkit-details-marker {
+  display: none;
+}
+
+.action-menu > summary::after {
+  content: '▾';
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.action-menu[open] {
+  flex: 1 1 100%;
+  order: 10;
+  padding: 8px;
+  border: 1px solid #d2e7df;
+  border-radius: var(--radius);
+  background: #f7fbf9;
+}
+
+.action-menu[open] > summary {
+  border-color: transparent;
+  background: transparent;
+  padding: 0 0 7px;
+}
+
+.action-menu[open] > summary::after {
+  content: '▴';
+}
+
+.action-menu > div {
+  position: static !important;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+  width: 100%;
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.menu-action {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  padding: 7px 9px;
+  text-align: left;
+}
+
+.menu-action:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.menu-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.task-action.secondary {
+  flex: 1 1 150px;
+}
+
+@media (max-width: 720px) {
+  .action-menu,
+  .task-action.secondary {
+    flex-basis: 100%;
+  }
+}
