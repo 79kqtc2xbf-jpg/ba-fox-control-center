@@ -15,8 +15,9 @@
         <p class="hero-copy">Тихий обзор текущих задач и ожидаемых ответов.</p>
       </div>
       <div class="hero-status">
-        <span class="read-only-pill">Только просмотр</span>
+        <span class="read-only-pill" id="writeModePill">Только просмотр</span>
         <div class="date-pill" id="todayLabel">Время Бангкока</div>
+        <button class="create-task-button" type="button" id="createTaskButton" disabled>+ Новая задача</button>
       </div>
     </header>
 
@@ -49,6 +50,43 @@
       <div class="task-list" id="taskList" aria-live="polite"></div>
     </section>
   </main>
+
+  <div class="modal-backdrop" id="createTaskModal" hidden>
+    <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="createTaskTitle">
+      <form id="createTaskForm" novalidate>
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">BA Fox Web</p>
+            <h2 id="createTaskTitle">Новая задача</h2>
+          </div>
+          <button class="modal-close" type="button" id="cancelCreateTaskTop" aria-label="Закрыть">×</button>
+        </div>
+
+        <label class="form-field">
+          <span>Название задачи</span>
+          <input type="text" name="title" autocomplete="off" required />
+        </label>
+        <label class="form-field">
+          <span>Компания</span>
+          <input type="text" name="organization" autocomplete="organization" />
+        </label>
+        <label class="form-field">
+          <span>Следующее действие</span>
+          <textarea name="nextAction" rows="3" required></textarea>
+        </label>
+        <label class="form-field">
+          <span>Срок</span>
+          <input type="date" name="deadline" />
+        </label>
+
+        <div class="modal-message" id="createTaskMessage" role="status"></div>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" id="cancelCreateTask">Отмена</button>
+          <button class="primary-button" type="submit" id="submitCreateTask">Создать</button>
+        </div>
+      </form>
+    </section>
+  </div>
 
   <script src="config.runtime.js"></script>
   <script src="config.local.js"></script>

@@ -161,6 +161,141 @@ function baFoxCreateTask(request) {
   });
 }
 
+function baFoxCreateTaskAllowedKeys_() {
+  return ['route', 'callback', 'token', 'title', 'organization', 'nextAction', 'deadline'];
+}
+
+function baFoxRejectedCreateTaskKeys_(request) {
+  var allowed = baFoxCreateTaskAllowedKeys_();
+  return Object.keys(request || {}).filter(function(key) {
+    return allowed.indexOf(key) === -1 && baFoxSafeString(request[key]);
+  });
+}
+
+function baFoxValidateCreateTaskScalar_(request, fields) {
+  return fields.filter(function(field) {
+    var value = request[field];
+    return Array.isArray(value) || (value && typeof value === 'object');
+  });
+}
+
+function baFoxValidateCreateTaskDeadline_(deadline) {
+  var value = baFoxSafeString(deadline);
+  return !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function baFoxBuildSafeCreateTaskId_(now) {
+  var compactNow = baFoxSafeString(now).replace(/[^0-9]/g, '').slice(0, 14);
+  var suffix = Math.floor(Math.random() * 1000000).toString();
+  while (suffix.length < 6) {
+    suffix = '0' + suffix;
+  }
+  return 'BA-WEB-' + compactNow + '-' + suffix;
+}
+
+function baFoxSafeCreateTaskRow_(taskId, normalized, now) {
+  return [
+    taskId,
+    '',
+    '',
+    baFoxSafeString(normalized.organization),
+    baFoxSafeString(normalized.title),
+    baFoxSafeString(normalized.nextAction),
+    'BA Fox Web',
+    '',
+    baFoxSafeString(normalized.deadline),
+    '',
+    'В работе',
+    '',
+    '',
+    'Web',
+    'work',
+    'Lisa',
+    now,
+    now,
+    '',
+    'none',
+    '',
+    '',
+    'web',
+    '',
+    false
+  ];
+}
+
+function baFoxSafeCreateTask(request) {
+  var normalized = baFoxNormalizeRequest(request);
+  var rejectedKeys = baFoxRejectedCreateTaskKeys_(normalized);
+  if (rejectedKeys.length) {
+    return baFoxError('FIELDS_NOT_ALLOWED', 'Only safe create task fields are allowed.', {
+      rejectedFields: rejectedKeys
+    });
+  }
+
+  var objectFields = baFoxValidateCreateTaskScalar_(normalized, ['title', 'organization', 'nextAction', 'deadline']);
+  if (objectFields.length) {
+    return baFoxError('VALIDATION_ERROR', 'Create task fields must be simple text values.', {
+      fields: objectFields
+    });
+  }
+
+  var missing = baFoxRequired(normalized, ['title', 'nextAction']);
+  if (missing.length) {
+    return baFoxError('VALIDATION_ERROR', 'Missing required fields.', { missing: missing });
+  }
+
+  if (!baFoxValidateCreateTaskDeadline_(normalized.deadline)) {
+    return baFoxError('VALIDATION_ERROR', 'Deadline must use YYYY-MM-DD format.', {
+      deadline: normalized.deadline || ''
+    });
+  }
+
+  if (!baFoxActionTokenMatches_(normalized.token)) {
+    return baFoxUnauthorized_();
+  }
+
+  if (BA_FOX_CONFIG.SAFE_WRITE_MODE !== true) {
+    return baFoxError('SAFE_WRITES_DISABLED', 'Safe task creation is disabled.', {});
+  }
+
+  var now = baFoxIsoNow();
+  var taskId = baFoxBuildSafeCreateTaskId_(now);
+  var appendResponse = baFoxAppendSafeCreateTaskRow(baFoxSafeCreateTaskRow_(taskId, normalized, now));
+  if (!appendResponse.ok) {
+    baFoxAuditTaskAction({
+      timestamp: now,
+      actor: 'BA Fox Web',
+      taskId: taskId,
+      action: 'createTask',
+      routeAction: 'createTask',
+      source: 'web',
+      result: 'failed',
+      errorCode: appendResponse.error && appendResponse.error.code
+    });
+    return appendResponse;
+  }
+
+  var auditResult = baFoxAuditTaskAction({
+    timestamp: now,
+    actor: 'BA Fox Web',
+    taskId: taskId,
+    action: 'createTask',
+    routeAction: 'createTask',
+    source: 'web',
+    result: 'success',
+    errorCode: ''
+  });
+
+  return baFoxOk({
+    taskId: taskId,
+    status: 'В работе',
+    source: 'BA Fox Web',
+    createdAt: now,
+    appendResult: appendResponse.data,
+    auditResult: auditResult
+  });
+}
+
 function baFoxSetTaskStatus(request) {
   var normalized = baFoxNormalizeRequest(request);
   var missing = baFoxRequired(normalized, ['taskId', 'status']);

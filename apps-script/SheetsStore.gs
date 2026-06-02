@@ -128,6 +128,28 @@ function baFoxAppendTaskRow(rowValues) {
   };
 }
 
+function baFoxAppendSafeCreateTaskRow(rowValues) {
+  var sheet = baFoxGetSheetByName_(BA_FOX_CONFIG.SHEETS.TASKS);
+  if (!sheet) {
+    return baFoxError('TASKS_SHEET_MISSING', 'Tasks sheet is not available.', {});
+  }
+
+  try {
+    sheet.appendRow(rowValues);
+    return baFoxOk({
+      dryRun: false,
+      appended: true,
+      rowNumber: sheet.getLastRow()
+    });
+  } catch (err) {
+    return baFoxError(
+      'TASK_APPEND_FAILED',
+      err && err.message ? err.message : 'Task append failed.',
+      {}
+    );
+  }
+}
+
 function baFoxUpdateTaskRow(taskId, patch) {
   return {
     dryRun: true,
