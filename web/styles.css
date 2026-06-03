@@ -984,20 +984,22 @@ h1 {
 .tabs {
   display: flex;
   overflow-x: auto;
-  gap: 4px;
+  gap: 5px;
   margin-bottom: 10px;
   padding: 4px;
   border-color: transparent;
   background: rgba(255, 253, 248, 0.72);
   box-shadow: none;
+  scrollbar-width: thin;
 }
 
 .tab {
   flex: 0 0 auto;
-  min-height: 34px;
-  padding: 0 10px;
+  min-height: 32px;
+  padding: 0 11px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 11px;
+  font-weight: 850;
 }
 
 .dashboard-grid {
@@ -1067,18 +1069,19 @@ h1 {
 }
 
 .task-filters {
-  gap: 5px;
+  gap: 4px;
   margin-bottom: 0;
   padding-bottom: 2px;
   overflow-x: auto;
   flex-wrap: nowrap;
+  scrollbar-width: thin;
 }
 
 .task-filter {
   flex: 0 0 auto;
-  min-height: 30px;
-  padding: 5px 9px;
-  font-size: 11px;
+  min-height: 28px;
+  padding: 4px 8px;
+  font-size: 10px;
 }
 
 .workspace-controls {
@@ -1101,8 +1104,8 @@ h1 {
 
 .task-search input {
   width: 100%;
-  min-height: 34px;
-  padding: 7px 10px;
+  min-height: 32px;
+  padding: 6px 10px;
   border: 1px solid rgba(228, 222, 210, 0.95);
   border-radius: 8px;
   background: #fff;
@@ -1132,7 +1135,7 @@ h1 {
 
 .task-group-header h3 {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.2;
 }
 
@@ -1150,16 +1153,16 @@ h1 {
 
 .task-group-list {
   display: grid;
-  gap: 5px;
+  gap: 6px;
 }
 
 .task-card {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 132px;
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 126px;
+  gap: 10px;
   align-items: start;
-  padding: 9px 10px 9px 16px;
+  padding: 8px 9px 8px 15px;
   border: 1px solid rgba(228, 222, 210, 0.8);
   border-radius: 8px;
   background: var(--card);
@@ -1170,7 +1173,7 @@ h1 {
 .task-card:hover {
   border-color: rgba(39, 108, 87, 0.22);
   box-shadow: 0 9px 22px rgba(34, 39, 43, 0.08);
-  transform: translateY(-1px);
+  transform: translateY(-0.5px);
 }
 
 .task-card::before {
@@ -1210,7 +1213,7 @@ h1 {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin: 3px 0 0;
+  margin: 1px 0 0;
 }
 
 .task-chip,
@@ -1256,7 +1259,7 @@ h1 {
 }
 
 .task-title {
-  margin: 4px 0 3px;
+  margin: 3px 0 3px;
   overflow-wrap: anywhere;
   font-size: 14px;
   font-weight: 850;
@@ -1266,8 +1269,8 @@ h1 {
 .next-action {
   display: grid;
   gap: 2px;
-  margin: 6px 0 6px;
-  padding: 7px 8px;
+  margin: 5px 0;
+  padding: 6px 8px;
   border-radius: 6px;
   background: #f0f8f4;
   color: var(--text);
@@ -1313,9 +1316,9 @@ h1 {
 
 .task-actions {
   display: grid;
-  gap: 5px;
+  gap: 4px;
   align-items: start;
-  margin-top: 6px;
+  margin-top: 5px;
 }
 
 .task-chip-row {
@@ -1325,8 +1328,8 @@ h1 {
 }
 
 .task-action.chip {
-  min-height: 25px;
-  padding: 0 8px;
+  min-height: 24px;
+  padding: 0 7px;
   border: 1px solid var(--line);
   border-radius: 999px;
   background: #fff;
@@ -1346,6 +1349,18 @@ h1 {
   color: var(--accent);
 }
 
+.chip-row-label {
+  display: inline-grid;
+  place-items: center;
+  min-height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: #f2eee6;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 800;
+}
+
 .task-action.edit-chip {
   width: fit-content;
   color: var(--muted);
@@ -1360,17 +1375,25 @@ h1 {
   display: grid;
   place-items: center;
   width: 100%;
-  min-height: 54px;
-  padding: 10px 12px;
+  min-height: 50px;
+  padding: 9px 10px;
   border: 1px solid rgba(39, 108, 87, 0.35);
   border-radius: 8px;
   background: var(--accent);
   color: #fff;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 850;
   line-height: 1.15;
   white-space: nowrap;
+}
+
+.completed-card {
+  grid-template-columns: 1fr;
+}
+
+.completed-summary {
+  background: #faf8f2;
 }
 
 .task-action:hover:not(:disabled) {
@@ -1408,8 +1431,8 @@ h1 {
 
 .calendar-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(130px, 1fr));
-  gap: 7px;
+  grid-template-columns: repeat(5, minmax(118px, 1fr));
+  gap: 6px;
 }
 
 .calendar-section {
@@ -1444,7 +1467,7 @@ h1 {
 .calendar-task {
   display: grid;
   gap: 4px;
-  padding: 7px;
+  padding: 6px;
   border-left: 4px solid var(--accent);
   border-radius: 7px;
   background: #fff;
