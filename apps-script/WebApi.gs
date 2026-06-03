@@ -10,12 +10,20 @@ function getPushTasks(request) {
   return baFoxOk(baFoxListPushTasks(request));
 }
 
+function getCompletedTasks(request) {
+  return baFoxOk(baFoxListCompletedTasks(request));
+}
+
 function addTask(request) {
   return baFoxCreateTask(request);
 }
 
 function createTask(request) {
   return baFoxSafeCreateTask(request);
+}
+
+function editTask(request) {
+  return baFoxSafeEditTask(request);
 }
 
 function updateTaskStatus(request) {

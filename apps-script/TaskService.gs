@@ -107,6 +107,25 @@ function baFoxListPushTasks(request, storeResult) {
   };
 }
 
+function baFoxListCompletedTasks(request, storeResult) {
+  var normalized = baFoxNormalizeRequest(request);
+  var limit = Math.max(1, Math.min(Number(normalized.limit || 50), 100));
+  storeResult = storeResult || baFoxReadTasksRows();
+
+  return {
+    limit: limit,
+    dryRun: storeResult.dryRun,
+    readLive: storeResult.readLive,
+    warning: storeResult.warning,
+    tasks: storeResult.rows.map(baFoxNormalizeTaskRow).filter(function(task) {
+      return !task.archived && (baFoxStatusMatches_(task.status, BA_FOX_CONFIG.FINAL_STATUSES) || task.completedAt);
+    }).sort(function(left, right) {
+      return baFoxSafeString(right.completedAt || right.updatedAt || right.deadline)
+        .localeCompare(baFoxSafeString(left.completedAt || left.updatedAt || left.deadline));
+    }).slice(0, limit)
+  };
+}
+
 function baFoxCreateTask(request) {
   var normalized = baFoxNormalizeRequest(request);
   var missing = baFoxRequired(normalized, ['title', 'taskType']);
@@ -497,6 +516,241 @@ function baFoxTaskAction(request) {
     newStatus: actionConfig.snooze ? previous.status : actionConfig.status,
     previousNextReminder: previous.nextReminder,
     newNextReminder: actionConfig.snooze ? patch.NEXT_REMINDER : previous.nextReminder,
+    updateResult: updateResponse.data,
+    auditResult: auditResult
+  });
+}
+
+function baFoxEditTaskAllowedKeys_() {
+  return [
+    'route',
+    'callback',
+    'token',
+    'taskId',
+    'title',
+    'organization',
+    'nextAction',
+    'deadline',
+    'priority',
+    'category',
+    'taskType',
+    'comment',
+    'note'
+  ];
+}
+
+function baFoxRejectedEditTaskKeys_(request) {
+  var allowed = baFoxEditTaskAllowedKeys_();
+  return Object.keys(request || {}).filter(function(key) {
+    return allowed.indexOf(key) === -1 && baFoxSafeString(request[key]);
+  });
+}
+
+function baFoxValidateEditTaskScalar_(request, fields) {
+  return fields.filter(function(field) {
+    var value = request[field];
+    return Array.isArray(value) || (value && typeof value === 'object');
+  });
+}
+
+function baFoxLooksLikeFormula_(value) {
+  return /^[=+\-@]/.test(baFoxSafeString(value));
+}
+
+function baFoxValidateEditTaskDeadline_(deadline) {
+  var value = baFoxSafeString(deadline);
+  return !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function baFoxEditTaskFieldMap_() {
+  return {
+    title: 'TITLE',
+    organization: 'ORGANIZATION',
+    nextAction: 'STEPS',
+    deadline: 'DEADLINE',
+    priority: 'PRIORITY',
+    category: 'CATEGORY',
+    taskType: 'TASK_TYPE',
+    comment: 'COMMENT'
+  };
+}
+
+function baFoxEditTaskPreviousValue_(task, field) {
+  if (field === 'nextAction') return task.steps;
+  return task[field] || '';
+}
+
+function baFoxSafeJson_(value) {
+  try {
+    return JSON.stringify(value || {});
+  } catch (err) {
+    return '{}';
+  }
+}
+
+function baFoxTaskIdMatchCount_(sheet, taskId) {
+  var values = sheet.getDataRange().getValues();
+  var count = 0;
+  for (var index = 1; index < values.length; index += 1) {
+    if (baFoxSafeString(values[index][BA_FOX_CONFIG.TASK_COLUMNS.ID - 1]) === baFoxSafeString(taskId)) {
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function baFoxSafeEditTask(request) {
+  var normalized = baFoxNormalizeRequest(request);
+  var rejectedKeys = baFoxRejectedEditTaskKeys_(normalized);
+  if (rejectedKeys.length) {
+    return baFoxError('FIELDS_NOT_ALLOWED', 'Only safe edit task fields are allowed.', {
+      rejectedFields: rejectedKeys
+    });
+  }
+
+  var missing = baFoxRequired(normalized, ['taskId']);
+  if (missing.length) {
+    return baFoxError('VALIDATION_ERROR', 'Missing required fields.', { missing: missing });
+  }
+
+  if (!baFoxActionTokenMatches_(normalized.token)) {
+    return baFoxUnauthorized_();
+  }
+
+  if (BA_FOX_CONFIG.SAFE_WRITE_MODE !== true) {
+    return baFoxError('SAFE_WRITES_DISABLED', 'Safe task editing is disabled.', {});
+  }
+
+  if (baFoxSafeString(normalized.note) && !baFoxSafeString(normalized.comment)) {
+    normalized.comment = normalized.note;
+  }
+
+  var editableFields = ['title', 'organization', 'nextAction', 'deadline', 'priority', 'category', 'taskType', 'comment'];
+  var objectFields = baFoxValidateEditTaskScalar_(normalized, editableFields);
+  if (objectFields.length) {
+    return baFoxError('VALIDATION_ERROR', 'Edit task fields must be simple text values.', {
+      fields: objectFields
+    });
+  }
+
+  if (!baFoxValidateEditTaskDeadline_(normalized.deadline)) {
+    return baFoxError('VALIDATION_ERROR', 'Deadline must use YYYY-MM-DD format.', {
+      deadline: normalized.deadline || ''
+    });
+  }
+
+  if (baFoxSafeString(normalized.taskType) && !baFoxValidateTaskType(baFoxSafeString(normalized.taskType))) {
+    return baFoxError('VALIDATION_ERROR', 'Invalid task type.', { taskType: normalized.taskType });
+  }
+
+  var formulaFields = editableFields.filter(function(field) {
+    return baFoxSafeString(normalized[field]) && baFoxLooksLikeFormula_(normalized[field]);
+  });
+  if (formulaFields.length) {
+    return baFoxError('VALIDATION_ERROR', 'Formula-like values are not allowed.', {
+      fields: formulaFields
+    });
+  }
+
+  var match = baFoxFindTaskRow_(normalized.taskId);
+  if (!match.ok) {
+    baFoxAuditTaskAction({
+      timestamp: baFoxIsoNow(),
+      actor: 'BA Fox Web',
+      taskId: normalized.taskId,
+      action: 'editTask',
+      routeAction: 'editTask',
+      source: 'web',
+      result: 'failed',
+      errorCode: match.error.error && match.error.error.code
+    });
+    return match.error;
+  }
+
+  if (baFoxTaskIdMatchCount_(match.sheet, normalized.taskId) !== 1) {
+    baFoxAuditTaskAction({
+      timestamp: baFoxIsoNow(),
+      actor: 'BA Fox Web',
+      taskId: normalized.taskId,
+      action: 'editTask',
+      routeAction: 'editTask',
+      source: 'web',
+      result: 'failed',
+      errorCode: 'DUPLICATE_TASK_ID'
+    });
+    return baFoxError('DUPLICATE_TASK_ID', 'Task id must match exactly one row.', {
+      taskId: normalized.taskId
+    });
+  }
+
+  var previous = baFoxNormalizeTaskRow(match.row);
+  var fieldMap = baFoxEditTaskFieldMap_();
+  var patch = {
+    UPDATED_AT: baFoxIsoNow()
+  };
+  var changedFields = [];
+  var previousValues = {};
+  var newValues = {};
+
+  editableFields.forEach(function(field) {
+    if (!Object.prototype.hasOwnProperty.call(normalized, field)) {
+      return;
+    }
+    var newValue = baFoxSafeString(normalized[field]);
+    var previousValue = baFoxSafeString(baFoxEditTaskPreviousValue_(previous, field));
+    if (newValue === previousValue) {
+      return;
+    }
+    patch[fieldMap[field]] = newValue;
+    changedFields.push(field);
+    previousValues[field] = previousValue;
+    newValues[field] = newValue;
+  });
+
+  if (!changedFields.length) {
+    return baFoxError('NO_CHANGES', 'No editable fields changed.', {
+      taskId: normalized.taskId
+    });
+  }
+
+  var updateResponse = baFoxUpdateTaskActionRow(normalized.taskId, patch);
+  if (!updateResponse.ok) {
+    baFoxAuditTaskAction({
+      timestamp: patch.UPDATED_AT,
+      actor: 'BA Fox Web',
+      taskId: normalized.taskId,
+      action: 'editTask',
+      routeAction: 'editTask',
+      source: 'web',
+      result: 'failed',
+      errorCode: updateResponse.error && updateResponse.error.code,
+      changedFields: changedFields.join(','),
+      previousValues: baFoxSafeJson_(previousValues),
+      newValues: baFoxSafeJson_(newValues)
+    });
+    return updateResponse;
+  }
+
+  var auditResult = baFoxAuditTaskAction({
+    timestamp: patch.UPDATED_AT,
+    actor: 'BA Fox Web',
+    taskId: normalized.taskId,
+    action: 'editTask',
+    routeAction: 'editTask',
+    source: 'web',
+    result: 'success',
+    errorCode: '',
+    changedFields: changedFields.join(','),
+    previousValues: baFoxSafeJson_(previousValues),
+    newValues: baFoxSafeJson_(newValues)
+  });
+
+  return baFoxOk({
+    taskId: normalized.taskId,
+    changedFields: changedFields,
+    previousValues: previousValues,
+    newValues: newValues,
+    updatedAt: patch.UPDATED_AT,
     updateResult: updateResponse.data,
     auditResult: auditResult
   });

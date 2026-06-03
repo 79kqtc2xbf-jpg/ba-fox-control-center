@@ -4,6 +4,7 @@
     'today',
     'open',
     'pushes',
+    'completed',
     'dashboard',
     'fullDashboard',
     'cleanupAudit',
@@ -12,6 +13,7 @@
   const WRITE_ROUTES = Object.freeze([
     'taskAction',
     'createTask',
+    'editTask',
   ]);
   const TASK_ACTION_MESSAGES = Object.freeze({
     ACTION_NOT_ALLOWED: 'Это действие пока не включено для BA Fox Web.',
@@ -27,6 +29,16 @@
     TASK_APPEND_FAILED: 'Не удалось добавить задачу в Tasks.',
     UNAUTHORIZED: 'Нет доступа для создания задачи. Проверьте action token.',
     VALIDATION_ERROR: 'Заполните название задачи и следующее действие.',
+  });
+  const EDIT_TASK_MESSAGES = Object.freeze({
+    FIELDS_NOT_ALLOWED: 'Можно обновить только разрешённые поля задачи.',
+    DUPLICATE_TASK_ID: 'В таблице найдено несколько строк с этим ID. Обновление остановлено для безопасности.',
+    NO_CHANGES: 'Нет изменений для сохранения.',
+    SAFE_WRITES_DISABLED: 'Безопасная запись выключена. Обновление этапа недоступно.',
+    TASK_NOT_FOUND: 'Задача не найдена в таблице.',
+    TASKS_SHEET_MISSING: 'Лист Tasks недоступен.',
+    UNAUTHORIZED: 'Нет доступа для обновления задачи. Проверьте action token.',
+    VALIDATION_ERROR: 'Проверьте поля обновления этапа.',
   });
   const JSONP_TIMEOUT_MS = 10000;
   const RATE_LIMIT_MESSAGE = 'Google Sheets временно ограничил чтение. BA Fox повторит попытку позже.';
@@ -124,6 +136,9 @@
     validateReadSafety(data && data.today);
     validateReadSafety(data && data.open);
     validateReadSafety(data && data.pushes);
+    if (data && data.completed) {
+      validateReadSafety(data.completed);
+    }
     validateCleanupAudit(data && data.cleanupAudit);
   }
 
@@ -309,6 +324,9 @@
     getPushTasks: function (options) {
       return readRoute('pushes', options || {});
     },
+    getCompletedTasks: function (options) {
+      return readRoute('completed', options || {});
+    },
     getDashboard: function (options) {
       return readRoute('dashboard', options || {});
     },
@@ -359,6 +377,27 @@
       } catch (error) {
         if (error && error.code && CREATE_TASK_MESSAGES[error.code]) {
           error.message = CREATE_TASK_MESSAGES[error.code];
+        }
+        throw error;
+      }
+    },
+    editTask: async function (options) {
+      const config = global.BAFoxConfig.getConfig();
+      if (config.useMockData) {
+        throw new Error('Обновление задач отключено в demo mode.');
+      }
+      if (!config.actionToken) {
+        const missingTokenError = new Error('Action token не настроен для безопасного обновления задач.');
+        missingTokenError.code = 'UNAUTHORIZED';
+        throw missingTokenError;
+      }
+      try {
+        return await getJsonp('editTask', Object.assign({}, options || {}, {
+          token: config.actionToken,
+        }));
+      } catch (error) {
+        if (error && error.code && EDIT_TASK_MESSAGES[error.code]) {
+          error.message = EDIT_TASK_MESSAGES[error.code];
         }
         throw error;
       }

@@ -1,11 +1,11 @@
 const viewLabels = Object.freeze({
-  today: ['Сегодня', 'Задачи на сегодня'],
-  focus: ['Фокус', 'Главное для движения вперёд'],
-  communication: ['Коммуникация', 'Ответы, письма и касания'],
+  today: ['Сегодня', 'Фокус дня и рабочие секции'],
   documents: ['Документы', 'Документы, договоры и KYC'],
+  communication: ['Коммуникация', 'Ответы, письма и касания'],
   presentations: ['Презентации', 'Деки, офферы и материалы'],
-  waiting: ['Ожидания', 'Ответы, пуши и напоминания'],
-  completed: ['Выполненное', 'Закрытые задачи из загруженных данных'],
+  brokers: ['Брокеры', 'Брокеры, партнёры и внешние касания'],
+  reminders: ['Напомнить', 'Контрольные сроки и пуши'],
+  completed: ['Выполненное', 'Память для отчётов'],
   calendar: ['Календарь', 'Задачи по срокам и напоминаниям'],
   system: ['Система', 'Безопасный режим'],
 });
@@ -31,7 +31,10 @@ const elements = {
   cancelCreateTask: document.querySelector('#cancelCreateTask'),
   cancelCreateTaskTop: document.querySelector('#cancelCreateTaskTop'),
   editTaskModal: document.querySelector('#editTaskModal'),
+  editTaskForm: document.querySelector('#editTaskForm'),
   editTaskBody: document.querySelector('#editTaskBody'),
+  editTaskMessage: document.querySelector('#editTaskMessage'),
+  submitEditTask: document.querySelector('#submitEditTask'),
   closeEditTask: document.querySelector('#closeEditTask'),
   closeEditTaskTop: document.querySelector('#closeEditTaskTop'),
 };
@@ -117,6 +120,15 @@ const taskGroupLabels = Object.freeze({
   remaining: ['Остальные задачи', 'Остальная очередь'],
 });
 
+const todaySectionLabels = Object.freeze({
+  documents: 'Документы',
+  communication: 'Коммуникация',
+  presentations: 'Презентации',
+  brokers: 'Брокеры / партнёры',
+  reminders: 'Напомнить',
+  other: 'Остальное',
+});
+
 let activeTab = 'today';
 let activeTaskFilter = 'all';
 let taskSearchQuery = '';
@@ -126,6 +138,7 @@ let scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
 let cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
 let taskActionState = {};
 let createTaskState = { status: 'idle', message: '' };
+let editTaskState = { status: 'idle', message: '', taskId: '' };
 let flashMessage = '';
 
 function stateFromFullDashboard(fullState, route, data) {
@@ -345,6 +358,11 @@ function isUrgentTask(task) {
   return !isFinalTask(task) && (isHighPriority(task) || isBlockerTask(task));
 }
 
+function isManualFocusTask(task) {
+  const text = taskSearchText(task);
+  return text.includes('focus') || text.includes('фокус') || text.includes('главное');
+}
+
 function derivedTodayTasks() {
   const data = dashboardData();
   const backendToday = data.today && Array.isArray(data.today.tasks) ? data.today.tasks : [];
@@ -373,7 +391,7 @@ function waitListTasks() {
 }
 
 function focusTasks() {
-  const combined = derivedTodayTasks().concat(waitListTasks()).concat(taskRowsForBaseTab('pushes'));
+  const combined = derivedTodayTasks().concat(waitListTasks()).concat(taskRowsForBaseTab('pushes')).concat(allOpenTasks().filter(isManualFocusTask));
   const seen = {};
   return combined.filter(function (task) {
     const key = task.id || task.title;
@@ -384,6 +402,18 @@ function focusTasks() {
     return !isFinalTask(task);
   }).sort(function (left, right) {
     return taskScore(right) - taskScore(left);
+  });
+}
+
+function brokerTasks() {
+  return allOpenTasks().filter(function (task) {
+    return taskSectionKey(task) === 'brokers';
+  });
+}
+
+function reminderTasks() {
+  return allOpenTasks().filter(function (task) {
+    return taskSectionKey(task) === 'reminders';
   });
 }
 
@@ -410,6 +440,26 @@ function presentationTasks() {
 
 function completedTasks() {
   return allLoadedTasks().filter(isFinalTask);
+}
+
+function taskSectionKey(task) {
+  const text = taskSearchText(task);
+  if (textHasAny(text, ['document', 'documents', 'docs', 'kyc', 'onboarding', 'package', 'agreement', 'contract', 'документ', 'договор', 'пакет', 'онбординг'])) {
+    return 'documents';
+  }
+  if (textHasAny(text, ['presentation', 'deck', 'offer', 'slides', 'sber', 'sansiri', 'tri vananda', 'grusha', 'презентац', 'дек', 'оффер', 'слайды', 'сбер'])) {
+    return 'presentations';
+  }
+  if (textHasAny(text, ['broker', 'agent', 'partner', 'брокер', 'партнёр', 'партнер', 'агент'])) {
+    return 'brokers';
+  }
+  if (isPushTask(task) || task.nextReminder || textHasAny(text, ['reminder', 'напомнить', 'контроль', 'follow-up'])) {
+    return 'reminders';
+  }
+  if (textHasAny(text, ['communication', 'email', 'telegram', 'reply', 'message', 'follow-up', 'письм', 'ответ', 'сообщ', 'чат', 'телеграм', 'звон'])) {
+    return 'communication';
+  }
+  return 'other';
 }
 
 function taskScore(task) {
@@ -441,9 +491,6 @@ function taskRowsForTab() {
   if (activeTab === 'waiting') {
     return waitListTasks();
   }
-  if (activeTab === 'focus') {
-    return focusTasks().slice(0, 15);
-  }
   if (activeTab === 'communication') {
     return communicationTasks();
   }
@@ -452,6 +499,12 @@ function taskRowsForTab() {
   }
   if (activeTab === 'presentations') {
     return presentationTasks();
+  }
+  if (activeTab === 'brokers') {
+    return brokerTasks();
+  }
+  if (activeTab === 'reminders') {
+    return reminderTasks();
   }
   if (activeTab === 'completed') {
     return completedTasks();
@@ -556,7 +609,7 @@ function renderModeBanner() {
     : isMock
       ? '<strong>Демо-режим</strong><span>Без подключения к рабочей таблице и без изменений задач.</span>'
       : safeWritesEnabled()
-        ? '<strong>БЕЗОПАСНАЯ ЗАПИСЬ ВКЛЮЧЕНА</strong><span>Доступны только безопасное создание задач, статус и напоминание.</span>'
+        ? '<strong>БЕЗОПАСНАЯ ЗАПИСЬ ВКЛЮЧЕНА</strong><span>Доступны только безопасное создание, статус, напоминание и обновление этапа.</span>'
         : '<strong>ТОЛЬКО ЧТЕНИЕ</strong><span>Данные загружены только для просмотра. Безопасные действия отключены.</span>';
 }
 
@@ -612,7 +665,7 @@ function statusText() {
   return dashboardState.isMock
     ? 'Это демонстрационные задачи. Изменение статуса и отправка данных отключены.'
     : safeWritesEnabled()
-      ? 'Безопасные действия создают новую задачу или меняют только статус и напоминание.'
+      ? 'Безопасные действия создают задачу, меняют статус/напоминание и обновляют этап.'
       : 'Данные доступны только для чтения. Безопасные действия отключены.';
 }
 
@@ -752,7 +805,7 @@ function actionButtonsHtml(task) {
     '<div class="task-actions" aria-label="Действия задачи">',
     '<div class="task-chip-row" aria-label="Статус">' + moveButtons + '</div>',
     '<div class="task-chip-row reminder-row" aria-label="Напоминание"><span class="chip-row-label">Напомнить</span>' + reminderButtons + '</div>',
-    '<button class="task-action chip edit-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-edit="' + escapeHtml(task.id) + '">Редактировать</button>',
+    '<button class="task-action chip edit-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-edit="' + escapeHtml(task.id) + '">Обновить этап</button>',
     '</div>',
     message,
   ].join('');
@@ -821,6 +874,67 @@ function taskGroupsHtml(tasks) {
       '</section>',
     ].join('');
   }).join('');
+}
+
+function todaySectionGroups(tasks) {
+  return tasks.reduce(function (groups, task) {
+    const key = taskSectionKey(task);
+    groups[key] = groups[key] || [];
+    groups[key].push(task);
+    return groups;
+  }, {
+    documents: [],
+    communication: [],
+    presentations: [],
+    brokers: [],
+    reminders: [],
+    other: [],
+  });
+}
+
+function renderTodayWorkMode(tasks) {
+  const visibleTasks = tasks.filter(function (task) {
+    return taskMatchesFilter(task, activeTaskFilter) && taskMatchesSearch(task);
+  });
+  if (!visibleTasks.length) {
+    elements.taskList.innerHTML = [
+      '<article class="empty-state">',
+      '<strong>Ничего не найдено</strong>',
+      '<span>Измените поиск или выберите другой фильтр.</span>',
+      '</article>',
+    ].join('');
+    return;
+  }
+
+  const focus = focusTasks().filter(function (task) {
+    return visibleTasks.some(function (visibleTask) {
+      return visibleTask.id === task.id;
+    });
+  }).slice(0, 5);
+  const focusHtml = focus.length
+    ? focus.map(taskCardHtml).join('')
+    : '<article class="empty-state"><strong>Фокус дня пока пуст</strong><span>BA Fox покажет здесь срочные, просроченные, push и blocker задачи.</span></article>';
+  const groups = todaySectionGroups(visibleTasks);
+  const sectionsHtml = Object.keys(todaySectionLabels).map(function (key) {
+    const sectionTasks = groups[key].sort(compareTaskUrgency);
+    if (!sectionTasks.length) {
+      return '';
+    }
+    return [
+      '<section class="task-group today-section" data-section="' + escapeHtml(key) + '">',
+      '<div class="task-group-header"><div><h3>' + escapeHtml(todaySectionLabels[key]) + '</h3></div><strong>' + sectionTasks.length + '</strong></div>',
+      '<div class="task-group-list">' + sectionTasks.map(taskCardHtml).join('') + '</div>',
+      '</section>',
+    ].join('');
+  }).join('');
+
+  elements.taskList.innerHTML = [
+    '<section class="focus-day">',
+    '<div class="task-group-header"><div><h3>🎯 Фокус дня</h3><span>3–5 задач, которые сильнее всего двигают день</span></div><strong>' + focus.length + '</strong></div>',
+    '<div class="task-group-list focus-list">' + focusHtml + '</div>',
+    '</section>',
+    sectionsHtml || '<article class="empty-state"><strong>Рабочие секции пусты</strong><span>Сегодня нет задач по выбранным фильтрам.</span></article>',
+  ].join('');
 }
 
 function calendarBucket(task) {
@@ -906,6 +1020,10 @@ function renderTasks(options) {
     renderCalendar(tasks);
     return;
   }
+  if (activeTab === 'today') {
+    renderTodayWorkMode(tasks);
+    return;
+  }
   const visibleTasks = tasks.filter(function (task) {
     return taskMatchesFilter(task, activeTaskFilter) && taskMatchesSearch(task);
   });
@@ -914,7 +1032,7 @@ function renderTasks(options) {
       elements.taskList.innerHTML = [
         '<article class="empty-state">',
         '<strong>Выполненные задачи пока не загружаются из источника.</strong>',
-        '<span>Когда fullDashboard начнет отдавать закрытые задачи, они появятся здесь автоматически.</span>',
+        '<span>Этот раздел будет памятью для дневных и недельных отчётов. Когда fullDashboard отдаст закрытые задачи, они появятся здесь автоматически.</span>',
         '</article>',
       ].join('');
       return;
@@ -943,6 +1061,7 @@ function renderSystem() {
   const rows = [
     ['Источник', dashboardState.isMock ? 'Демо-данные' : 'API только для чтения'],
     ['Безопасная запись', info.safeWritesEnabled === true ? 'Включена' : 'Отключена'],
+    ['Обновление этапа', info.safeWritesEnabled === true ? 'editTask включён' : 'Отключено'],
     ['Живые данные Sheets', info.readLiveSheets === true ? 'Включены' : 'Отключены'],
     ['Автоматизация', info.liveAutomationEnabled === false ? 'Отключена' : 'Не подтверждено'],
     ['Триггеры', info.triggersEnabled === false ? 'Отключены' : 'Не подтверждено'],
@@ -1259,13 +1378,13 @@ function findLoadedTask(taskId) {
   });
 }
 
-function editTaskFieldHtml(label, value) {
-  return [
-    '<label class="form-field readonly-field">',
-    '<span>' + escapeHtml(label) + '</span>',
-    '<input type="text" value="' + escapeHtml(value || '') + '" disabled />',
-    '</label>',
-  ].join('');
+function renderEditTaskModal() {
+  const busy = editTaskState.status === 'loading';
+  elements.submitEditTask.disabled = busy || !safeWritesEnabled();
+  elements.closeEditTask.disabled = busy;
+  elements.closeEditTaskTop.disabled = busy;
+  elements.editTaskMessage.textContent = editTaskState.message || '';
+  elements.editTaskMessage.classList.toggle('error', editTaskState.status === 'error');
 }
 
 function openEditTaskModal(taskId) {
@@ -1273,20 +1392,125 @@ function openEditTaskModal(taskId) {
   if (!task) {
     return;
   }
+  editTaskState = { status: 'idle', message: '', taskId: taskId };
+  elements.editTaskForm.reset();
+  elements.editTaskForm.elements.taskId.value = taskId;
+  elements.editTaskForm.elements.comment.value = '';
+  elements.editTaskForm.elements.nextAction.value = nextActionText(task);
+  elements.editTaskForm.elements.deadline.value = isoDateFromValue(task.deadline);
+  elements.editTaskForm.elements.priority.value = task.priority || '';
+  elements.editTaskForm.elements.category.value = task.category || '';
   elements.editTaskBody.innerHTML = [
-    editTaskFieldHtml('Название задачи', removeIsoDateNoise(task.title)),
-    editTaskFieldHtml('Компания', task.organization),
-    editTaskFieldHtml('Следующее действие', nextActionText(task)),
-    editTaskFieldHtml('Срок', task.deadline),
-    editTaskFieldHtml('Приоритет', task.priority),
-    editTaskFieldHtml('ID задачи', task.id),
+    '<div class="edit-task-summary">',
+    '<strong>' + escapeHtml(removeIsoDateNoise(task.title)) + '</strong>',
+    '<span>' + escapeHtml(task.organization || 'Без компании') + ' · ID: ' + escapeHtml(task.id) + '</span>',
+    '</div>',
   ].join('');
   elements.editTaskModal.hidden = false;
+  renderEditTaskModal();
+  elements.editTaskForm.elements.comment.focus();
 }
 
 function closeEditTaskModal() {
+  if (editTaskState.status === 'loading') {
+    return;
+  }
   elements.editTaskModal.hidden = true;
   elements.editTaskBody.innerHTML = '';
+  editTaskState = { status: 'idle', message: '', taskId: '' };
+  renderEditTaskModal();
+}
+
+function editTaskPayloadFromForm() {
+  const formData = new FormData(elements.editTaskForm);
+  return {
+    taskId: String(formData.get('taskId') || '').trim(),
+    comment: String(formData.get('comment') || '').trim(),
+    nextAction: String(formData.get('nextAction') || '').trim(),
+    deadline: String(formData.get('deadline') || '').trim(),
+    priority: String(formData.get('priority') || '').trim(),
+    category: String(formData.get('category') || '').trim(),
+  };
+}
+
+function compactEditTaskPayload(payload) {
+  const task = findLoadedTask(payload.taskId) || {};
+  const compact = { taskId: payload.taskId };
+  [
+    ['comment', ''],
+    ['nextAction', nextActionText(task)],
+    ['deadline', isoDateFromValue(task.deadline)],
+    ['priority', task.priority || ''],
+    ['category', task.category || ''],
+  ].forEach(function (pair) {
+    const field = pair[0];
+    const previousValue = String(pair[1] || '').trim();
+    const value = String(payload[field] || '').trim();
+    if (field === 'comment') {
+      if (value) compact.comment = value;
+      return;
+    }
+    if (value !== previousValue) {
+      compact[field] = value;
+    }
+  });
+  return compact;
+}
+
+function validateEditTaskPayload(payload) {
+  const errors = [];
+  if (!payload.taskId) {
+    errors.push('не найдена задача');
+  }
+  if (!payload.nextAction && !payload.comment && !payload.deadline && !payload.priority && !payload.category) {
+    errors.push('добавьте новые данные или измените следующий шаг');
+  }
+  if (payload.deadline && !/^\d{4}-\d{2}-\d{2}$/.test(payload.deadline)) {
+    errors.push('срок контроля должен быть датой');
+  }
+  return errors;
+}
+
+async function handleEditTaskSubmit(event) {
+  event.preventDefault();
+  if (!safeWritesEnabled()) {
+    return;
+  }
+
+  const compactPayload = compactEditTaskPayload(editTaskPayloadFromForm());
+  const errors = validateEditTaskPayload(compactPayload);
+  if (errors.length) {
+    editTaskState = {
+      status: 'error',
+      message: 'Проверьте: ' + errors.join(', ') + '.',
+      taskId: compactPayload.taskId,
+    };
+    renderEditTaskModal();
+    return;
+  }
+
+  editTaskState = {
+    status: 'loading',
+    message: 'Сохраняю обновление этапа...',
+    taskId: compactPayload.taskId,
+  };
+  renderEditTaskModal();
+
+  try {
+    await BAFoxClient.editTask(compactPayload);
+    elements.editTaskModal.hidden = true;
+    editTaskState = { status: 'idle', message: '', taskId: '' };
+    await refreshDashboardAfterAction(compactPayload.taskId, 'Этап задачи обновлён.');
+    flashMessage = 'Этап задачи обновлён.';
+    render();
+  } catch (error) {
+    editTaskState = {
+      status: 'error',
+      message: error && error.message ? error.message : 'Не удалось обновить этап.',
+      taskId: compactPayload.taskId,
+    };
+    renderEditTaskModal();
+  }
 }
 
 function createTaskPayloadFromForm() {
@@ -1365,6 +1589,7 @@ async function loadDashboard() {
 async function refreshDashboardAfterAction(taskId, successMessage) {
   const previousTab = activeTab;
   const previousFilter = activeTaskFilter;
+  const previousSearch = taskSearchQuery;
   const fullDashboardState = await BAFoxClient.getFullDashboard();
   const data = fullDashboardState.data || {};
   dashboardState = stateFromFullDashboard(fullDashboardState, 'dashboard', data);
@@ -1372,6 +1597,7 @@ async function refreshDashboardAfterAction(taskId, successMessage) {
   cleanupAuditState = stateFromFullDashboard(fullDashboardState, 'cleanupAudit', data.cleanupAudit);
   activeTab = previousTab;
   activeTaskFilter = previousFilter;
+  taskSearchQuery = previousSearch;
   taskActionState[taskId] = {
     status: 'success',
     message: successMessage || 'Готово. Данные обновлены.',
@@ -1404,6 +1630,7 @@ elements.cancelCreateTaskTop.addEventListener('click', closeCreateTaskModal);
 elements.closeEditTask.addEventListener('click', closeEditTaskModal);
 elements.closeEditTaskTop.addEventListener('click', closeEditTaskModal);
 elements.createTaskForm.addEventListener('submit', handleCreateTaskSubmit);
+elements.editTaskForm.addEventListener('submit', handleEditTaskSubmit);
 elements.createTaskModal.addEventListener('click', function (event) {
   if (event.target === elements.createTaskModal) {
     closeCreateTaskModal();

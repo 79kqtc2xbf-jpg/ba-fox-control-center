@@ -273,6 +273,16 @@
     };
   }
 
+  function getCompletedData() {
+    return {
+      dryRun: true,
+      readLive: true,
+      tasks: tasks.filter(function (task) {
+        return task.status === 'Выполнено';
+      }),
+    };
+  }
+
   function getResponse(route, params) {
     const input = params || {};
 
@@ -285,12 +295,15 @@
         return success(clone(getOpenData(input.taskType)));
       case 'pushes':
         return success(clone(getPushData(input.dateRange)));
+      case 'completed':
+        return success(clone(getCompletedData()));
       case 'dashboard':
         return success({
           scaffoldInfo: clone(scaffoldInfo),
           today: clone(getTodayData(input.date)),
           open: clone(getOpenData(input.taskType)),
           pushes: clone(getPushData(input.dateRange)),
+          completed: clone(getCompletedData()),
         });
       case 'fullDashboard':
         return success({
@@ -298,6 +311,7 @@
           today: clone(getTodayData(input.date)),
           open: clone(getOpenData(input.taskType)),
           pushes: clone(getPushData(input.dateRange)),
+          completed: clone(getCompletedData()),
           cleanupAudit: clone(cleanupAudit),
         });
       case 'cleanupAudit':

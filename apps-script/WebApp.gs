@@ -30,7 +30,7 @@ function baFoxCacheTtlSeconds_() {
 
 function baFoxCacheKey_(route, parameters) {
   var keyParts = [route];
-  ['date', 'taskType', 'scope', 'dateRange'].forEach(function(name) {
+  ['date', 'taskType', 'scope', 'dateRange', 'limit', 'completedLimit'].forEach(function(name) {
     if (parameters[name]) {
       keyParts.push(name + '=' + parameters[name]);
     }
@@ -80,7 +80,8 @@ function baFoxBuildTaskViewsFromRows_(parameters, storeResult) {
     scaffoldInfo: baFoxScaffoldInfo().data,
     today: baFoxListTodayTasks({ date: parameters.date }, storeResult),
     open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
-    pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult)
+    pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult),
+    completed: baFoxListCompletedTasks({ limit: parameters.completedLimit || 50 }, storeResult)
   };
 }
 
@@ -188,6 +189,9 @@ function baFoxBuildRouteResponse_(route, parameters) {
     case 'pushes':
       response = getPushTasks({ dateRange: parameters.dateRange || 'today' });
       break;
+    case 'completed':
+      response = getCompletedTasks({ limit: parameters.limit || 50 });
+      break;
     case 'dashboard':
       response = baFoxGetDashboard_(parameters);
       break;
@@ -205,6 +209,9 @@ function baFoxBuildRouteResponse_(route, parameters) {
       break;
     case 'createTask':
       response = createTask(parameters);
+      break;
+    case 'editTask':
+      response = editTask(parameters);
       break;
     default:
       response = baFoxError(
