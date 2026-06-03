@@ -522,7 +522,7 @@ function groupedTasks(tasks) {
 }
 
 function summaryCount(sectionName) {
-  if (sectionName === 'waitList') {
+  if (sectionName === 'waiting') {
     return waitListTasks().length;
   }
   if (sectionName === 'focus') {
@@ -563,7 +563,7 @@ function renderModeBanner() {
 function renderCreateTaskButton() {
   const loading = dashboardState.status === 'loading' || scaffoldState.status === 'loading';
   elements.createTaskButton.disabled = loading || !safeWritesEnabled();
-  elements.writeModePill.textContent = safeWritesEnabled() ? 'Safe create' : 'Только просмотр';
+  elements.writeModePill.textContent = safeWritesEnabled() ? 'Безопасная запись' : 'Только просмотр';
   elements.createTaskButton.title = safeWritesEnabled()
     ? 'Создать новую задачу'
     : 'Создание доступно только при SAFE WRITE ENABLED и настроенном action token.';
@@ -704,7 +704,7 @@ function firstUsefulLine(value) {
 }
 
 function nextActionText(task) {
-  return removeIsoDateNoise(firstUsefulLine(task.steps) || firstUsefulLine(task.comment) || humanDate(task.nextReminder) || 'Определить следующий шаг');
+  return removeIsoDateNoise(firstUsefulLine(task.nextAction) || firstUsefulLine(task.steps) || firstUsefulLine(task.comment) || humanDate(task.nextReminder) || 'Определить следующий шаг');
 }
 
 function taskTone(task) {
@@ -751,7 +751,7 @@ function actionButtonsHtml(task) {
   return [
     '<div class="task-actions" aria-label="Действия задачи">',
     '<div class="task-chip-row" aria-label="Статус">' + moveButtons + '</div>',
-    '<div class="task-chip-row" aria-label="Напоминание">' + reminderButtons + '</div>',
+    '<div class="task-chip-row reminder-row" aria-label="Напоминание"><span class="chip-row-label">Напомнить</span>' + reminderButtons + '</div>',
     '<button class="task-action chip edit-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-edit="' + escapeHtml(task.id) + '">Редактировать</button>',
     '</div>',
     message,
@@ -779,6 +779,26 @@ function taskCardHtml(task) {
     '<aside class="task-primary">',
     '<button class="complete-task-button" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="markDone"' + (!safeWritesEnabled() || (taskActionState[task.id] || {}).status === 'loading' ? ' disabled' : '') + '>' + escapeHtml(((taskActionState[task.id] || {}).status === 'loading' && (taskActionState[task.id] || {}).action === 'markDone') ? '...' : '✓ Выполнено') + '</button>',
     '</aside>',
+    '</div>',
+    '</article>',
+  ].join('');
+}
+
+function completedTaskCardHtml(task) {
+  return [
+    '<article class="task-card completed-card" data-tone="' + escapeHtml(taskTone(task)) + '">',
+    '<div class="task-main">',
+    '<div class="task-topline">',
+    '<span class="task-chip">' + escapeHtml(task.status || 'Выполнено') + '</span>',
+    task.completedAt ? '<span class="priority-label">Закрыта: ' + escapeHtml(humanDate(task.completedAt)) + '</span>' : '',
+    '</div>',
+    '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title)) + '</div>',
+    '<div class="task-meta">' + [
+      task.organization || 'Без компании',
+      task.source || task.appSource || task.channel || '',
+      task.id ? 'ID: ' + task.id : '',
+    ].filter(Boolean).map(function (item) { return '<span>' + escapeHtml(item) + '</span>'; }).join('') + '</div>',
+    '<div class="next-action completed-summary"><strong>История / следующий след</strong><span>' + escapeHtml(nextActionText(task)) + '</span></div>',
     '</div>',
     '</article>',
   ].join('');
@@ -913,7 +933,9 @@ function renderTasks(options) {
     return;
   }
 
-  elements.taskList.innerHTML = taskGroupsHtml(visibleTasks);
+  elements.taskList.innerHTML = activeTab === 'completed'
+    ? '<div class="task-group-list">' + visibleTasks.map(completedTaskCardHtml).join('') + '</div>'
+    : taskGroupsHtml(visibleTasks);
 }
 
 function renderSystem() {
