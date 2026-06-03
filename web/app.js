@@ -1,10 +1,12 @@
 const viewLabels = Object.freeze({
   today: ['Сегодня', 'Задачи на сегодня'],
-  open: ['Открытые', 'Все открытые задачи'],
-  pushes: ['Пуши', 'Ожидают следующего шага'],
-  waitList: ['Ждут ответа', 'Ответы и пуши'],
-  focus: ['Фокус дня', 'Главное на сегодня'],
-  audit: ['Аудит данных', 'Отчёт проверки данных'],
+  focus: ['Фокус', 'Главное для движения вперёд'],
+  communication: ['Коммуникация', 'Ответы, письма и касания'],
+  documents: ['Документы', 'Документы, договоры и KYC'],
+  presentations: ['Презентации', 'Деки, офферы и материалы'],
+  waiting: ['Ожидания', 'Ответы, пуши и напоминания'],
+  completed: ['Выполненное', 'Закрытые задачи из загруженных данных'],
+  calendar: ['Календарь', 'Задачи по срокам и напоминаниям'],
   system: ['Система', 'Безопасный режим'],
 });
 
@@ -16,6 +18,7 @@ const elements = {
   panelTitle: document.querySelector('#panelTitle'),
   panelBadge: document.querySelector('#panelBadge'),
   statusMessage: document.querySelector('#statusMessage'),
+  workspaceControls: document.querySelector('#workspaceControls'),
   taskList: document.querySelector('#taskList'),
   todayLabel: document.querySelector('#todayLabel'),
   modeBanner: document.querySelector('#modeBanner'),
@@ -27,6 +30,10 @@ const elements = {
   submitCreateTask: document.querySelector('#submitCreateTask'),
   cancelCreateTask: document.querySelector('#cancelCreateTask'),
   cancelCreateTaskTop: document.querySelector('#cancelCreateTaskTop'),
+  editTaskModal: document.querySelector('#editTaskModal'),
+  editTaskBody: document.querySelector('#editTaskBody'),
+  closeEditTask: document.querySelector('#closeEditTask'),
+  closeEditTaskTop: document.querySelector('#closeEditTaskTop'),
 };
 
 const auditFilters = Object.freeze([
@@ -47,13 +54,14 @@ const severityRank = Object.freeze({
 
 const taskFilters = Object.freeze([
   { id: 'all', label: 'Все' },
+  { id: 'urgent', label: 'Срочно' },
   { id: 'high', label: 'Высокий приоритет' },
-  { id: 'blockers', label: 'Блокеры' },
-  { id: 'push', label: 'Пуши' },
+  { id: 'work', label: 'В работе' },
   { id: 'waiting', label: 'Ждут ответа' },
-  { id: 'documents', label: 'Документы' },
-  { id: 'communication', label: 'Коммуникации' },
-  { id: 'automation', label: 'Автоматизация' },
+  { id: 'push', label: 'Пуши' },
+  { id: 'blockers', label: 'Блокеры' },
+  { id: 'today', label: 'Сегодня' },
+  { id: 'overdue', label: 'Просрочено' },
 ]);
 
 const waitingStatuses = Object.freeze([
@@ -111,6 +119,7 @@ const taskGroupLabels = Object.freeze({
 
 let activeTab = 'today';
 let activeTaskFilter = 'all';
+let taskSearchQuery = '';
 let activeAuditFilter = 'all';
 let dashboardState = BAFoxClient.createLoadingState('dashboard');
 let scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
@@ -166,6 +175,33 @@ function cleanupAuditData() {
 function allOpenTasks() {
   const data = dashboardData();
   return data.open && Array.isArray(data.open.tasks) ? data.open.tasks : [];
+}
+
+function uniqueTasks(tasks) {
+  const seen = {};
+  return tasks.filter(function (task) {
+    const key = task.id || [task.title, task.organization, task.deadline].map(normalizeText).join('|');
+    if (seen[key]) {
+      return false;
+    }
+    seen[key] = true;
+    return true;
+  });
+}
+
+function sectionTasks(section) {
+  return section && Array.isArray(section.tasks) ? section.tasks : [];
+}
+
+function allLoadedTasks() {
+  const data = dashboardData();
+  return uniqueTasks([]
+    .concat(sectionTasks(data.today))
+    .concat(sectionTasks(data.open))
+    .concat(sectionTasks(data.pushes))
+    .concat(sectionTasks(data.completed))
+    .concat(sectionTasks(data.done))
+    .concat(sectionTasks(data.recentCompleted)));
 }
 
 function todayIsoBangkok() {
@@ -252,10 +288,36 @@ function isHighPriority(task) {
   });
 }
 
+function taskSearchText(task) {
+  return [
+    task.id,
+    task.title,
+    task.organization,
+    task.nextAction,
+    task.steps,
+    task.comment,
+    task.comments,
+    task.source,
+    task.appSource,
+    task.channel,
+    task.category,
+    task.taskType,
+    task.status,
+    task.priority,
+  ].map(normalizeText).join(' ');
+}
+
+function textHasAny(text, signals) {
+  return signals.some(function (signal) {
+    return text.includes(signal);
+  });
+}
+
 function isWaitingTask(task) {
   const status = normalizeText(task.status);
-  return ['ждём ответ', 'ждём подтверждение', 'ждём подписание', 'wait list', 'waiting'].some(function (signal) {
-    return status.includes(signal);
+  const text = taskSearchText(task);
+  return ['ждём ответ', 'ждем ответ', 'ждём подтверждение', 'ждём подписание', 'wait list', 'waiting', 'ожид'].some(function (signal) {
+    return status.includes(signal) || text.includes(signal);
   });
 }
 
@@ -325,6 +387,31 @@ function focusTasks() {
   });
 }
 
+function communicationTasks() {
+  return allOpenTasks().filter(function (task) {
+    const text = taskSearchText(task);
+    return textHasAny(text, ['communication', 'email', 'telegram', 'reply', 'message', 'follow-up', 'partner follow-up', 'письм', 'ответ', 'сообщ', 'чат', 'телеграм', 'звон']);
+  });
+}
+
+function documentTasks() {
+  return allOpenTasks().filter(function (task) {
+    const text = taskSearchText(task);
+    return textHasAny(text, ['document', 'documents', 'docs', 'kyc', 'onboarding', 'package', 'agreement', 'contract', 'документ', 'договор', 'пакет', 'онбординг']);
+  });
+}
+
+function presentationTasks() {
+  return allOpenTasks().filter(function (task) {
+    const text = taskSearchText(task);
+    return textHasAny(text, ['presentation', 'deck', 'offer', 'slides', 'sber', 'sansiri', 'tri vananda', 'grusha', 'презентац', 'дек', 'оффер', 'слайды', 'сбер']);
+  });
+}
+
+function completedTasks() {
+  return allLoadedTasks().filter(isFinalTask);
+}
+
 function taskScore(task) {
   let score = 0;
   const status = normalizeText(task.status);
@@ -351,13 +438,28 @@ function taskRowsForTab() {
   if (activeTab === 'today') {
     return derivedTodayTasks();
   }
-  if (activeTab === 'waitList') {
+  if (activeTab === 'waiting') {
     return waitListTasks();
   }
   if (activeTab === 'focus') {
     return focusTasks().slice(0, 15);
   }
-  return taskRowsForBaseTab(activeTab);
+  if (activeTab === 'communication') {
+    return communicationTasks();
+  }
+  if (activeTab === 'documents') {
+    return documentTasks();
+  }
+  if (activeTab === 'presentations') {
+    return presentationTasks();
+  }
+  if (activeTab === 'completed') {
+    return completedTasks();
+  }
+  if (activeTab === 'calendar') {
+    return allLoadedTasks();
+  }
+  return allOpenTasks();
 }
 
 function taskUrgencyBucket(task) {
@@ -524,26 +626,42 @@ function renderEmpty() {
 }
 
 function taskMeta(task) {
-  return [task.organization, task.deadline ? 'Срок: ' + humanDate(task.deadline) : '', task.nextReminder ? 'Напомнить: ' + humanDate(task.nextReminder) : '']
-    .filter(Boolean)
-    .join(' · ');
+  return [
+    task.organization || 'Без компании',
+    task.deadline ? 'Срок: ' + humanDate(task.deadline) : 'Без срока',
+    task.nextReminder ? 'Напомнить: ' + humanDate(task.nextReminder) : '',
+  ].filter(Boolean);
 }
 
 function taskMatchesFilter(task, filterId) {
-  const text = [task.status, task.priority, task.category, task.title, task.comment, task.source, task.channel].map(normalizeText).join(' ');
+  const text = taskSearchText(task);
+  const today = todayIsoBangkok();
   if (filterId === 'all') return true;
+  if (filterId === 'urgent') return isUrgentTask(task) || dateSignalIsDue(task.deadline, today);
   if (filterId === 'high') return isHighPriority(task);
-  if (filterId === 'blockers') return text.includes('блокер') || text.includes('blocked');
-  if (filterId === 'push') return text.includes('пуш') || text.includes('push');
-  if (filterId === 'waiting') return text.includes('ждём') || text.includes('ждем') || text.includes('waiting') || text.includes('wait list');
-  if (filterId === 'documents') return text.includes('документ') || text.includes('document') || text.includes('contract');
-  if (filterId === 'communication') return text.includes('письм') || text.includes('email') || text.includes('звон') || text.includes('call') || text.includes('чат');
-  if (filterId === 'automation') return text.includes('automation') || text.includes('автомат');
+  if (filterId === 'work') return normalizeText(task.status).includes('в работе');
+  if (filterId === 'waiting') return isWaitingTask(task);
+  if (filterId === 'push') return isPushTask(task);
+  if (filterId === 'blockers') return isBlockerTask(task);
+  if (filterId === 'today') return dateSignalIsDue(task.nextReminder, today) || dateSignalIsDue(task.deadline, today);
+  if (filterId === 'overdue') return isOverdueTask(task);
   return true;
 }
 
+function taskMatchesSearch(task) {
+  const query = normalizeText(taskSearchQuery);
+  if (!query) {
+    return true;
+  }
+  return taskSearchText(task).includes(query);
+}
+
+function shouldShowWorkspaceControls() {
+  return !['system', 'audit'].includes(activeTab);
+}
+
 function taskFilterHtml(tasks) {
-  if (!['open', 'pushes', 'waitList', 'focus'].includes(activeTab)) {
+  if (!shouldShowWorkspaceControls() || activeTab === 'calendar') {
     return '';
   }
   return '<div class="task-filters" aria-label="Фильтры задач">' + taskFilters.map(function (filter) {
@@ -551,6 +669,20 @@ function taskFilterHtml(tasks) {
     const activeClass = filter.id === activeTaskFilter ? ' active' : '';
     return '<button class="task-filter' + activeClass + '" type="button" data-task-filter="' + escapeHtml(filter.id) + '">' + escapeHtml(filter.label) + ' <span>' + count + '</span></button>';
   }).join('') + '</div>';
+}
+
+function renderWorkspaceControls(tasks) {
+  if (!shouldShowWorkspaceControls()) {
+    elements.workspaceControls.innerHTML = '';
+    return;
+  }
+  elements.workspaceControls.innerHTML = [
+    '<label class="task-search">',
+    '<span>Поиск задач</span>',
+    '<input type="search" id="taskSearchInput" placeholder="Поиск задач..." value="' + escapeHtml(taskSearchQuery) + '" autocomplete="off" />',
+    '</label>',
+    taskFilterHtml(tasks),
+  ].join('');
 }
 
 function taskDetailHtml(label, value) {
@@ -588,26 +720,26 @@ function actionButtonsHtml(task) {
   const state = taskActionState[task.id] || {};
   const busy = state.status === 'loading';
   const moveOptions = [
-    ['moveToWork', 'В работе', false],
-    ['moveToWaiting', 'Ждёт ответа', false],
-    ['moveToPush', 'Пуш', false],
-    ['moveToBlocker', 'Блокер', true],
+    ['moveToWork', 'В работе', 'status-chip', false],
+    ['moveToWaiting', 'Ждёт ответа', 'status-chip', false],
+    ['moveToPush', 'Пуш', 'status-chip', false],
+    ['moveToBlocker', 'Блокер', 'status-chip muted', true],
   ];
   const reminderOptions = [
     ['snoozeOneDay', 'Завтра'],
     ['snoozeThreeDays', '+3 дня'],
     ['snoozeNextWeek', 'Следующая неделя'],
   ];
-  const completeLabel = busy && state.action === 'markDone' ? '...' : '✓ Готово';
+  const completeLabel = busy && state.action === 'markDone' ? '...' : '✓ Выполнено';
   const moveButtons = moveOptions.map(function (option) {
     const action = option[0];
     const label = busy && state.action === action ? '...' : option[1];
-    return '<button class="menu-action" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="' + escapeHtml(action) + '"' + (disabled || busy || option[2] ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>';
+    return '<button class="task-action chip ' + escapeHtml(option[2]) + '" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="' + escapeHtml(action) + '"' + (disabled || busy || option[3] ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>';
   }).join('');
   const reminderButtons = reminderOptions.map(function (option) {
     const action = option[0];
     const label = busy && state.action === action ? '...' : option[1];
-    return '<button class="menu-action" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="' + escapeHtml(action) + '"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>';
+    return '<button class="task-action chip reminder-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="' + escapeHtml(action) + '"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(label) + '</button>';
   }).join('');
   const message = state.status === 'error'
     ? '<div class="task-error">' + escapeHtml(state.message || 'Действие не выполнено') + '</div>'
@@ -617,31 +749,36 @@ function actionButtonsHtml(task) {
         ? '<div class="task-notice">Безопасные действия отключены.</div>'
         : '';
   return [
-    '<div class="task-actions">',
-    '<details class="action-menu"><summary>Перевести в</summary><div>' + moveButtons + '</div></details>',
-    '<details class="action-menu"><summary>Напомнить</summary><div>' + reminderButtons + '</div></details>',
-    '<button class="task-action secondary" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="markDone"' + (disabled || busy ? ' disabled' : '') + '>' + escapeHtml(completeLabel) + '</button>',
+    '<div class="task-actions" aria-label="Действия задачи">',
+    '<div class="task-chip-row" aria-label="Статус">' + moveButtons + '</div>',
+    '<div class="task-chip-row" aria-label="Напоминание">' + reminderButtons + '</div>',
+    '<button class="task-action chip edit-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-edit="' + escapeHtml(task.id) + '">Редактировать</button>',
     '</div>',
     message,
   ].join('');
 }
 
 function taskCardHtml(task) {
+  const meta = taskMeta(task);
   return [
     '<article class="task-card" data-tone="' + escapeHtml(taskTone(task)) + '">',
-    '<div class="task-body">',
-    '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title)) + '</div>',
-    '<div class="next-action"><strong>👉 Следующее действие:</strong> <span>' + escapeHtml(nextActionText(task)) + '</span></div>',
-    '<div class="task-meta">' + escapeHtml(taskMeta(task)) + '</div>',
+    '<div class="task-main">',
     '<div class="task-topline">',
     '<span class="task-chip">' + escapeHtml(task.status || 'Без статуса') + '</span>',
     task.priority ? '<span class="priority-label">' + escapeHtml(task.priority) + '</span>' : '',
     '</div>',
+    '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title)) + '</div>',
+    '<div class="task-meta">' + meta.map(function (item) { return '<span>' + escapeHtml(item) + '</span>'; }).join('') + '</div>',
+    '<div class="next-action"><strong>Следующее действие</strong><span>' + escapeHtml(nextActionText(task)) + '</span></div>',
     '<div class="task-details">',
     taskDetailHtml('Источник', task.source || task.appSource || task.channel),
     taskDetailHtml('ID задачи', task.id),
     '</div>',
     actionButtonsHtml(task),
+    '</div>',
+    '<aside class="task-primary">',
+    '<button class="complete-task-button" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="markDone"' + (!safeWritesEnabled() || (taskActionState[task.id] || {}).status === 'loading' ? ' disabled' : '') + '>' + escapeHtml(((taskActionState[task.id] || {}).status === 'loading' && (taskActionState[task.id] || {}).action === 'markDone') ? '...' : '✓ Выполнено') + '</button>',
+    '</aside>',
     '</div>',
     '</article>',
   ].join('');
@@ -666,27 +803,117 @@ function taskGroupsHtml(tasks) {
   }).join('');
 }
 
-function renderTasks() {
+function calendarBucket(task) {
+  const today = todayIsoBangkok();
+  const tomorrow = addDaysIso(today, 1);
+  const weekEnd = addDaysIso(today, 7);
+  const date = isoDateFromValue(task.deadline) || isoDateFromValue(task.nextReminder);
+  if (!date) {
+    return 'none';
+  }
+  if (date <= today) {
+    return 'today';
+  }
+  if (date === tomorrow) {
+    return 'tomorrow';
+  }
+  if (date <= weekEnd) {
+    return 'week';
+  }
+  return 'later';
+}
+
+function calendarDateLabel(task) {
+  const date = task.deadline || task.nextReminder || '';
+  return date ? humanDate(date) : 'Без даты';
+}
+
+function calendarTaskHtml(task) {
+  return [
+    '<article class="calendar-task" data-tone="' + escapeHtml(taskTone(task)) + '">',
+    '<div>',
+    '<strong>' + escapeHtml(removeIsoDateNoise(task.title)) + '</strong>',
+    '<span>' + escapeHtml(task.status || 'Без статуса') + ' · ' + escapeHtml(calendarDateLabel(task)) + '</span>',
+    '</div>',
+    '<p>' + escapeHtml(nextActionText(task)) + '</p>',
+    '</article>',
+  ].join('');
+}
+
+function renderCalendar(tasks) {
+  const searchedTasks = tasks.filter(taskMatchesSearch);
+  const groups = {
+    today: [],
+    tomorrow: [],
+    week: [],
+    later: [],
+    none: [],
+  };
+  searchedTasks.forEach(function (task) {
+    groups[calendarBucket(task)].push(task);
+  });
+  const labels = {
+    today: 'Сегодня',
+    tomorrow: 'Завтра',
+    week: 'Эта неделя',
+    later: 'Позже',
+    none: 'Без даты',
+  };
+  const html = Object.keys(labels).map(function (bucket) {
+    const groupTasks = groups[bucket].sort(compareTaskUrgency);
+    return [
+      '<section class="calendar-section">',
+      '<div class="calendar-section-header"><h3>' + escapeHtml(labels[bucket]) + '</h3><strong>' + groupTasks.length + '</strong></div>',
+      groupTasks.length
+        ? '<div class="calendar-task-list">' + groupTasks.map(calendarTaskHtml).join('') + '</div>'
+        : '<div class="calendar-empty">Нет задач</div>',
+      '</section>',
+    ].join('');
+  }).join('');
+  elements.taskList.innerHTML = [
+    '<div class="calendar-note">Напоминания сейчас хранятся в Google Sheets. Интеграцию с календарём добавим следующим этапом.</div>',
+    '<div class="calendar-grid">' + html + '</div>',
+  ].join('');
+}
+
+function renderTasks(options) {
+  const skipControls = options && options.skipControls;
   const tasks = taskRowsForTab();
+  if (!skipControls) {
+    renderWorkspaceControls(tasks);
+  }
+  if (activeTab === 'calendar') {
+    renderCalendar(tasks);
+    return;
+  }
   const visibleTasks = tasks.filter(function (task) {
-    return taskMatchesFilter(task, activeTaskFilter);
+    return taskMatchesFilter(task, activeTaskFilter) && taskMatchesSearch(task);
   });
   if (!tasks.length) {
+    if (activeTab === 'completed') {
+      elements.taskList.innerHTML = [
+        '<article class="empty-state">',
+        '<strong>Выполненные задачи пока не загружаются из источника.</strong>',
+        '<span>Когда fullDashboard начнет отдавать закрытые задачи, они появятся здесь автоматически.</span>',
+        '</article>',
+      ].join('');
+      return;
+    }
     renderEmpty();
     return;
   }
 
   if (!visibleTasks.length) {
-    elements.taskList.innerHTML = taskFilterHtml(tasks) + [
+    elements.taskList.innerHTML = [
       '<article class="empty-state">',
-      '<strong>Для фильтра нет задач</strong>',
-      '<span>Выберите «Все» или другой фильтр.</span>',
+      '<strong>Ничего не найдено</strong>',
+      '<span>Измените поиск или выберите другой фильтр.</span>',
       '</article>',
     ].join('');
     return;
   }
 
-  elements.taskList.innerHTML = taskFilterHtml(tasks) + taskGroupsHtml(visibleTasks);
+  elements.taskList.innerHTML = taskGroupsHtml(visibleTasks);
 }
 
 function renderSystem() {
@@ -925,14 +1152,17 @@ function renderPanel() {
   elements.statusMessage.classList.toggle('error', dashboardState.status === 'error' || scaffoldState.status === 'error' || cleanupAuditState.status === 'error');
 
   if (dashboardState.status === 'loading' || (activeTab === 'audit' && cleanupAuditState.status === 'loading')) {
+    elements.workspaceControls.innerHTML = '';
     elements.taskList.innerHTML = '<article class="loading-state">Загружаю данные для просмотра...</article>';
     return;
   }
   if (activeTab === 'audit') {
+    elements.workspaceControls.innerHTML = '';
     renderAudit();
     return;
   }
   if (activeTab === 'system') {
+    elements.workspaceControls.innerHTML = '';
     renderSystem();
     return;
   }
@@ -962,6 +1192,7 @@ function setTab(tabName) {
   }
   activeTab = tabName;
   activeTaskFilter = 'all';
+  taskSearchQuery = '';
   flashMessage = '';
   elements.tabs.forEach(function (tab) {
     const isActive = tab.dataset.tab === tabName;
@@ -998,6 +1229,42 @@ function closeCreateTaskModal() {
   elements.createTaskModal.hidden = true;
   createTaskState = { status: 'idle', message: '' };
   renderCreateTaskModal();
+}
+
+function findLoadedTask(taskId) {
+  return allLoadedTasks().find(function (task) {
+    return task.id === taskId;
+  });
+}
+
+function editTaskFieldHtml(label, value) {
+  return [
+    '<label class="form-field readonly-field">',
+    '<span>' + escapeHtml(label) + '</span>',
+    '<input type="text" value="' + escapeHtml(value || '') + '" disabled />',
+    '</label>',
+  ].join('');
+}
+
+function openEditTaskModal(taskId) {
+  const task = findLoadedTask(taskId);
+  if (!task) {
+    return;
+  }
+  elements.editTaskBody.innerHTML = [
+    editTaskFieldHtml('Название задачи', removeIsoDateNoise(task.title)),
+    editTaskFieldHtml('Компания', task.organization),
+    editTaskFieldHtml('Следующее действие', nextActionText(task)),
+    editTaskFieldHtml('Срок', task.deadline),
+    editTaskFieldHtml('Приоритет', task.priority),
+    editTaskFieldHtml('ID задачи', task.id),
+  ].join('');
+  elements.editTaskModal.hidden = false;
+}
+
+function closeEditTaskModal() {
+  elements.editTaskModal.hidden = true;
+  elements.editTaskBody.innerHTML = '';
 }
 
 function createTaskPayloadFromForm() {
@@ -1112,10 +1379,32 @@ elements.tabBar.addEventListener('click', function (event) {
 elements.createTaskButton.addEventListener('click', openCreateTaskModal);
 elements.cancelCreateTask.addEventListener('click', closeCreateTaskModal);
 elements.cancelCreateTaskTop.addEventListener('click', closeCreateTaskModal);
+elements.closeEditTask.addEventListener('click', closeEditTaskModal);
+elements.closeEditTaskTop.addEventListener('click', closeEditTaskModal);
 elements.createTaskForm.addEventListener('submit', handleCreateTaskSubmit);
 elements.createTaskModal.addEventListener('click', function (event) {
   if (event.target === elements.createTaskModal) {
     closeCreateTaskModal();
+  }
+});
+elements.editTaskModal.addEventListener('click', function (event) {
+  if (event.target === elements.editTaskModal) {
+    closeEditTaskModal();
+  }
+});
+
+elements.workspaceControls.addEventListener('input', function (event) {
+  if (event.target && event.target.id === 'taskSearchInput') {
+    taskSearchQuery = event.target.value || '';
+    renderTasks({ skipControls: true });
+  }
+});
+
+elements.workspaceControls.addEventListener('click', function (event) {
+  const taskFilterButton = event.target.closest('[data-task-filter]');
+  if (taskFilterButton) {
+    activeTaskFilter = taskFilterButton.dataset.taskFilter || 'all';
+    renderTasks();
   }
 });
 
@@ -1127,10 +1416,9 @@ elements.taskList.addEventListener('click', function (event) {
     return;
   }
 
-  const taskFilterButton = event.target.closest('[data-task-filter]');
-  if (taskFilterButton) {
-    activeTaskFilter = taskFilterButton.dataset.taskFilter || 'all';
-    renderTasks();
+  const editButton = event.target.closest('[data-task-edit]');
+  if (editButton) {
+    openEditTaskModal(editButton.dataset.taskEdit);
     return;
   }
 
