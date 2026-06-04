@@ -38,6 +38,10 @@ function baFoxCacheKey_(route, parameters) {
   return 'baFoxRead:' + keyParts.join('|');
 }
 
+function baFoxIsWriteRoute_(route) {
+  return ['taskAction', 'createTask', 'editTask'].indexOf(route) !== -1;
+}
+
 function baFoxReadCache_() {
   if (typeof CacheService === 'undefined') {
     return null;
@@ -239,10 +243,12 @@ function doGet(event) {
   }
 
   try {
-    response = baFoxGetCachedResponse_(route, parameters);
-    if (!response) {
+    if (baFoxIsWriteRoute_(route)) {
       response = baFoxBuildRouteResponse_(route, parameters);
-      if (route !== 'taskAction' && route !== 'createTask') {
+    } else {
+      response = baFoxGetCachedResponse_(route, parameters);
+      if (!response) {
+        response = baFoxBuildRouteResponse_(route, parameters);
         baFoxPutCachedResponse_(route, parameters, response);
       }
     }
