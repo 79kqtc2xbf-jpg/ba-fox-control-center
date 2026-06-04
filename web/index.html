@@ -28,11 +28,11 @@
 
     <nav class="tabs" aria-label="Разделы BA Fox">
       <button class="tab active" type="button" data-tab="today" aria-selected="true">Сегодня</button>
-      <button class="tab" type="button" data-tab="focus" aria-selected="false">Фокус</button>
-      <button class="tab" type="button" data-tab="communication" aria-selected="false">Коммуникация</button>
       <button class="tab" type="button" data-tab="documents" aria-selected="false">Документы</button>
+      <button class="tab" type="button" data-tab="communication" aria-selected="false">Коммуникация</button>
       <button class="tab" type="button" data-tab="presentations" aria-selected="false">Презентации</button>
-      <button class="tab" type="button" data-tab="waiting" aria-selected="false">Ожидания</button>
+      <button class="tab" type="button" data-tab="brokers" aria-selected="false">Брокеры</button>
+      <button class="tab" type="button" data-tab="reminders" aria-selected="false">Напомнить</button>
       <button class="tab" type="button" data-tab="completed" aria-selected="false">Выполненное</button>
       <button class="tab" type="button" data-tab="calendar" aria-selected="false">Календарь</button>
       <button class="tab" type="button" data-tab="system" aria-selected="false">Система</button>
@@ -93,18 +93,58 @@
 
   <div class="modal-backdrop" id="editTaskModal" hidden>
     <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="editTaskTitle">
-      <div class="modal-header">
-        <div>
-          <p class="eyebrow">Stage 11.1 Safe Edit</p>
-          <h2 id="editTaskTitle">Редактирование задачи</h2>
+      <form id="editTaskForm" novalidate>
+        <div class="modal-header">
+          <div>
+            <p class="eyebrow">BA Fox Web</p>
+            <h2 id="editTaskTitle">Обновить этап</h2>
+          </div>
+          <button class="modal-close" type="button" id="closeEditTaskTop" aria-label="Закрыть">×</button>
         </div>
-        <button class="modal-close" type="button" id="closeEditTaskTop" aria-label="Закрыть">×</button>
-      </div>
-      <div class="edit-task-body" id="editTaskBody"></div>
-      <div class="modal-message">Редактирование будет доступно после Stage 11.1 Safe Edit.</div>
-      <div class="modal-actions">
-        <button class="secondary-button" type="button" id="closeEditTask">Закрыть</button>
-      </div>
+
+        <input type="hidden" name="taskId" />
+        <div class="edit-task-body" id="editTaskBody"></div>
+
+        <label class="form-field">
+          <span>Что изменилось / новые данные</span>
+          <textarea name="comment" rows="3" placeholder="Коротко: что стало известно, что поменялось, что важно помнить"></textarea>
+        </label>
+        <label class="form-field">
+          <span>Новый следующий шаг</span>
+          <textarea name="nextAction" rows="3" required></textarea>
+        </label>
+        <label class="form-field">
+          <span>Срок контроля</span>
+          <input type="date" name="deadline" />
+        </label>
+        <label class="form-field">
+          <span>Приоритет</span>
+          <select name="priority">
+            <option value="">Без изменения</option>
+            <option value="High">Высокий</option>
+            <option value="Medium">Средний</option>
+            <option value="Low">Низкий</option>
+          </select>
+        </label>
+        <label class="form-field">
+          <span>Раздел</span>
+          <select name="category">
+            <option value="">Без изменения</option>
+            <option value="Документы">Документы</option>
+            <option value="Коммуникация">Коммуникация</option>
+            <option value="Презентации">Презентации</option>
+            <option value="Брокеры">Брокеры</option>
+            <option value="Напомнить">Напомнить</option>
+            <option value="Другое">Другое</option>
+          </select>
+        </label>
+
+        <div class="modal-message" id="editTaskMessage" role="status"></div>
+        <div class="modal-actions">
+          <button class="secondary-button" type="button" id="closeEditTask">Отмена</button>
+          <button class="primary-button" type="submit" id="submitEditTask">Сохранить</button>
+        </div>
+      </form>
     </section>
   </div>
 

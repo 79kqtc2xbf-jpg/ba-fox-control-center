@@ -30,12 +30,16 @@ function baFoxCacheTtlSeconds_() {
 
 function baFoxCacheKey_(route, parameters) {
   var keyParts = [route];
-  ['date', 'taskType', 'scope', 'dateRange'].forEach(function(name) {
+  ['date', 'taskType', 'scope', 'dateRange', 'limit', 'completedLimit'].forEach(function(name) {
     if (parameters[name]) {
       keyParts.push(name + '=' + parameters[name]);
     }
   });
   return 'baFoxRead:' + keyParts.join('|');
+}
+
+function baFoxIsWriteRoute_(route) {
+  return ['taskAction', 'createTask', 'editTask'].indexOf(route) !== -1;
 }
 
 function baFoxReadCache_() {
@@ -80,7 +84,8 @@ function baFoxBuildTaskViewsFromRows_(parameters, storeResult) {
     scaffoldInfo: baFoxScaffoldInfo().data,
     today: baFoxListTodayTasks({ date: parameters.date }, storeResult),
     open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
-    pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult)
+    pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult),
+    completed: baFoxListCompletedTasks({ limit: parameters.completedLimit || 50 }, storeResult)
   };
 }
 
@@ -188,6 +193,9 @@ function baFoxBuildRouteResponse_(route, parameters) {
     case 'pushes':
       response = getPushTasks({ dateRange: parameters.dateRange || 'today' });
       break;
+    case 'completed':
+      response = getCompletedTasks({ limit: parameters.limit || 50 });
+      break;
     case 'dashboard':
       response = baFoxGetDashboard_(parameters);
       break;
@@ -205,6 +213,9 @@ function baFoxBuildRouteResponse_(route, parameters) {
       break;
     case 'createTask':
       response = createTask(parameters);
+      break;
+    case 'editTask':
+      response = editTask(parameters);
       break;
     default:
       response = baFoxError(
@@ -232,10 +243,12 @@ function doGet(event) {
   }
 
   try {
-    response = baFoxGetCachedResponse_(route, parameters);
-    if (!response) {
+    if (baFoxIsWriteRoute_(route)) {
       response = baFoxBuildRouteResponse_(route, parameters);
-      if (route !== 'taskAction' && route !== 'createTask') {
+    } else {
+      response = baFoxGetCachedResponse_(route, parameters);
+      if (!response) {
+        response = baFoxBuildRouteResponse_(route, parameters);
         baFoxPutCachedResponse_(route, parameters, response);
       }
     }

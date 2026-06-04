@@ -43,6 +43,10 @@ function baFoxAuditTaskAction(details) {
       if (key === 'previousnextreminder') return details.previousNextReminder || '';
       if (key === 'newnextreminder') return details.newNextReminder || '';
       if (key === 'route/action' || key === 'routeaction' || key === 'route') return details.routeAction || 'taskAction/' + (details.action || '');
+      if (key === 'changedfields' || key === 'changed fields') return details.changedFields || '';
+      if (key === 'previousvalues' || key === 'previous values') return details.previousValues || '';
+      if (key === 'newvalues' || key === 'new values') return details.newValues || '';
+      if (key === 'notes' || key === 'details') return details.notes || details.details || '';
       if (key === 'source') return details.source || 'web';
       if (key === 'result') return details.result || '';
       if (key === 'errorcode') return details.errorCode || '';
