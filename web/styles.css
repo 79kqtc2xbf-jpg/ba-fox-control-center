@@ -2399,3 +2399,223 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+/* Stage 13: executive assistant information architecture */
+.workspace-layout {
+  display: grid;
+  grid-template-columns: 248px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.workspace-main {
+  min-width: 0;
+}
+
+.sidebar-shell {
+  position: sticky;
+  top: 96px;
+  z-index: 8;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(10, 15, 30, 0.82);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(16px);
+}
+
+.sidebar-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 4px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sidebar-title span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.sidebar-title strong {
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.workspace-layout .tabs {
+  position: static;
+  display: grid;
+  grid-template-columns: 1fr;
+  overflow: visible;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.workspace-layout .tab {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 0 10px;
+  text-align: left;
+}
+
+.workspace-layout .tab span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-layout .tab strong {
+  min-width: 26px;
+  min-height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 79, 216, 0.3);
+  border-radius: 999px;
+  background: rgba(255, 79, 216, 0.12);
+  color: #ff9beb;
+  font-size: 12px;
+}
+
+.dashboard-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.summary-card.total,
+.summary-card.today,
+.summary-card.focus,
+.summary-card.completed,
+.summary-card.blocker {
+  background: linear-gradient(180deg, rgba(139, 92, 255, 0.1), rgba(255, 255, 255, 0.025));
+}
+
+.inbox-guide,
+.report-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.inbox-guide article,
+.report-summary-grid article {
+  padding: 13px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.inbox-guide strong,
+.inbox-guide span,
+.report-summary-grid strong,
+.report-summary-grid span {
+  display: block;
+}
+
+.inbox-guide strong,
+.report-summary-grid strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.inbox-guide span,
+.report-summary-grid span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.report-summary-grid strong {
+  color: var(--accent);
+  font-size: 28px;
+}
+
+.today-rule-note {
+  border-color: rgba(255, 202, 102, 0.22);
+  background: rgba(255, 202, 102, 0.08);
+}
+
+.task-group[data-group="blockers"] {
+  border-color: rgba(255, 77, 109, 0.28);
+}
+
+.task-group[data-group="urgent"] {
+  border-color: rgba(255, 202, 102, 0.28);
+}
+
+.task-group[data-group="review"] {
+  border-color: rgba(158, 173, 210, 0.18);
+  opacity: 0.92;
+}
+
+.task-action.focus-chip {
+  border-color: rgba(255, 79, 216, 0.34);
+  background: rgba(255, 79, 216, 0.1);
+  color: #ff9beb;
+}
+
+.chip-row-label.muted {
+  color: var(--muted);
+}
+
+.reports-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.report-preview {
+  min-height: 360px;
+  overflow: auto;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #050816;
+  color: var(--muted-strong);
+  font: 14px/1.55 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 1080px) {
+  .workspace-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar-shell {
+    position: static;
+  }
+
+  .workspace-layout .tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .workspace-layout .tabs,
+  .inbox-guide,
+  .report-summary-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
