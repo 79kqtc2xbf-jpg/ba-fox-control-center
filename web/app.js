@@ -170,6 +170,7 @@ let reportPreview = { type: '', text: '' };
 let dashboardState = BAFoxClient.createLoadingState('dashboard');
 let scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
 let cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
+cleanupAuditState.status = 'idle';
 let taskActionState = {};
 let createTaskState = { status: 'idle', message: '' };
 let editTaskState = { status: 'idle', message: '', taskId: '' };
@@ -243,6 +244,8 @@ function sectionTasks(section) {
 function allLoadedTasks() {
   const data = dashboardData();
   return uniqueTasks([]
+    .concat(sectionTasks(data.inbox))
+    .concat(sectionTasks(data.focus))
     .concat(sectionTasks(data.today))
     .concat(sectionTasks(data.open))
     .concat(sectionTasks(data.pushes))
@@ -439,7 +442,7 @@ function isUrgentTask(task) {
 
 function isManualFocusTask(task) {
   const text = taskSearchText(task);
-  return manualFocusTaskIds[task.id] === true || text.includes('focus') || text.includes('фокус') || text.includes('главное');
+  return task.focus === true || manualFocusTaskIds[task.id] === true || text.includes('focus') || text.includes('фокус') || text.includes('главное');
 }
 
 function derivedTodayTasks() {
@@ -447,6 +450,10 @@ function derivedTodayTasks() {
 }
 
 function inboxTasks() {
+  const data = dashboardData();
+  if (data.inbox && Array.isArray(data.inbox.tasks)) {
+    return data.inbox.tasks;
+  }
   return allOpenTasks().filter(function (task) {
     if (isFinalTask(task) || isTodayRelevantTask(task)) {
       return false;
@@ -473,6 +480,10 @@ function waitListTasks() {
 }
 
 function focusTasks() {
+  const data = dashboardData();
+  if (data.focus && Array.isArray(data.focus.tasks)) {
+    return data.focus.tasks.slice(0, 5);
+  }
   const combined = allOpenTasks().filter(function (task) {
     return !isFinalTask(task) && (
       isManualFocusTask(task)
@@ -1000,7 +1011,7 @@ function actionButtonsHtml(task) {
     '<div class="task-actions" aria-label="Действия задачи">',
     '<div class="task-chip-row" aria-label="Статус">' + moveButtons + '</div>',
     '<div class="task-chip-row reminder-row" aria-label="Контрольная дата"><span class="chip-row-label">Control date</span>' + reminderButtons + '<span class="chip-row-label muted">Pick date через обновление этапа</span></div>',
-    '<button class="task-action chip focus-chip" type="button" data-task-focus="' + escapeHtml(task.id) + '">' + (manualFocusTaskIds[task.id] ? '✓ В фокусе' : 'Mark as Focus') + '</button>',
+    '<button class="task-action chip focus-chip" type="button" data-task-focus="' + escapeHtml(task.id) + '">' + (isManualFocusTask(task) ? '✓ В фокусе' : 'Mark as Focus') + '</button>',
     '<button class="task-action chip edit-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-edit="' + escapeHtml(task.id) + '">Обновить этап</button>',
     '</div>',
     message,
@@ -1313,7 +1324,7 @@ function renderTasks(options) {
       elements.taskList.innerHTML = [
         '<article class="empty-state">',
         '<strong>Выполненные задачи пока не загружаются из источника.</strong>',
-        '<span>Этот раздел будет памятью для дневных и недельных отчётов. Когда fullDashboard отдаст закрытые задачи, они появятся здесь автоматически.</span>',
+        '<span>Этот раздел будет памятью для дневных и недельных отчётов. BA Fox загружает архив отдельно от рабочей панели.</span>',
         '</article>',
       ].join('');
       return;
@@ -1623,6 +1634,7 @@ function setTab(tabName) {
     tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
   renderPanel();
+  loadLazyTabData(tabName);
 }
 
 function renderCreateTaskModal() {
@@ -1680,6 +1692,7 @@ function openEditTaskModal(taskId) {
   elements.editTaskForm.elements.comment.value = '';
   elements.editTaskForm.elements.nextAction.value = nextActionText(task);
   elements.editTaskForm.elements.deadline.value = isoDateFromValue(task.deadline);
+  elements.editTaskForm.elements.controlDate.value = taskControlDate(task);
   elements.editTaskForm.elements.priority.value = task.priority || '';
   elements.editTaskForm.elements.category.value = task.category || '';
   elements.editTaskBody.innerHTML = [
@@ -1710,6 +1723,7 @@ function editTaskPayloadFromForm() {
     comment: String(formData.get('comment') || '').trim(),
     nextAction: String(formData.get('nextAction') || '').trim(),
     deadline: String(formData.get('deadline') || '').trim(),
+    controlDate: String(formData.get('controlDate') || '').trim(),
     priority: String(formData.get('priority') || '').trim(),
     category: String(formData.get('category') || '').trim(),
   };
@@ -1722,6 +1736,7 @@ function compactEditTaskPayload(payload) {
     ['comment', ''],
     ['nextAction', nextActionText(task)],
     ['deadline', isoDateFromValue(task.deadline)],
+    ['controlDate', taskControlDate(task)],
     ['priority', task.priority || ''],
     ['category', task.category || ''],
   ].forEach(function (pair) {
@@ -1744,11 +1759,14 @@ function validateEditTaskPayload(payload) {
   if (!payload.taskId) {
     errors.push('не найдена задача');
   }
-  if (!payload.nextAction && !payload.comment && !payload.deadline && !payload.priority && !payload.category) {
+  if (!payload.nextAction && !payload.comment && !payload.deadline && !payload.controlDate && !payload.priority && !payload.category) {
     errors.push('добавьте новые данные или измените следующий шаг');
   }
   if (payload.deadline && !/^\d{4}-\d{2}-\d{2}$/.test(payload.deadline)) {
-    errors.push('срок контроля должен быть датой');
+    errors.push('срок должен быть датой');
+  }
+  if (payload.controlDate && !/^\d{4}-\d{2}-\d{2}$/.test(payload.controlDate)) {
+    errors.push('контрольная дата должна быть датой');
   }
   return errors;
 }
@@ -1856,15 +1874,13 @@ async function handleCreateTaskSubmit(event) {
 }
 
 async function loadDashboard() {
-  dashboardState = BAFoxClient.createLoadingState('fullDashboard');
+  dashboardState = BAFoxClient.createLoadingState('dashboard');
   scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
-  cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
   render();
-  const fullDashboardState = await BAFoxClient.getFullDashboard();
-  const data = fullDashboardState.data || {};
-  dashboardState = stateFromFullDashboard(fullDashboardState, 'dashboard', data);
-  scaffoldState = stateFromFullDashboard(fullDashboardState, 'scaffoldInfo', data.scaffoldInfo);
-  cleanupAuditState = stateFromFullDashboard(fullDashboardState, 'cleanupAudit', data.cleanupAudit);
+  const workspaceState = await BAFoxClient.getDashboard();
+  const data = workspaceState.data || {};
+  dashboardState = stateFromFullDashboard(workspaceState, 'dashboard', data);
+  scaffoldState = stateFromFullDashboard(workspaceState, 'scaffoldInfo', data.scaffoldInfo);
   render();
 }
 
@@ -1872,11 +1888,14 @@ async function refreshDashboardAfterAction(taskId, successMessage) {
   const previousTab = activeTab;
   const previousFilter = activeTaskFilter;
   const previousSearch = taskSearchQuery;
-  const fullDashboardState = await BAFoxClient.getFullDashboard();
-  const data = fullDashboardState.data || {};
-  dashboardState = stateFromFullDashboard(fullDashboardState, 'dashboard', data);
-  scaffoldState = stateFromFullDashboard(fullDashboardState, 'scaffoldInfo', data.scaffoldInfo);
-  cleanupAuditState = stateFromFullDashboard(fullDashboardState, 'cleanupAudit', data.cleanupAudit);
+  const previousCompleted = dashboardData().completed;
+  const workspaceState = await BAFoxClient.getDashboard();
+  const data = Object.assign({}, workspaceState.data || {});
+  if (previousCompleted && !data.completed) {
+    data.completed = previousCompleted;
+  }
+  dashboardState = stateFromFullDashboard(workspaceState, 'dashboard', data);
+  scaffoldState = stateFromFullDashboard(workspaceState, 'scaffoldInfo', data.scaffoldInfo);
   activeTab = previousTab;
   activeTaskFilter = previousFilter;
   taskSearchQuery = previousSearch;
@@ -1885,6 +1904,48 @@ async function refreshDashboardAfterAction(taskId, successMessage) {
     message: successMessage || 'Готово. Данные обновлены.',
   };
   render();
+}
+
+async function loadCompletedIfNeeded() {
+  const data = dashboardData();
+  if ((data.completed && Array.isArray(data.completed.tasks)) || dashboardState.status === 'loading') {
+    return;
+  }
+  const completedState = await BAFoxClient.getCompletedTasks({ limit: 100 });
+  if (completedState.status !== 'success' && completedState.status !== 'empty') {
+    return;
+  }
+  dashboardState = Object.assign({}, dashboardState, {
+    data: Object.assign({}, dashboardData(), {
+      completed: completedState.data,
+    }),
+  });
+  if (activeTab === 'reports' && reportPreview.type) {
+    reportPreview = {
+      type: reportPreview.type,
+      text: buildReport(reportPreview.type),
+    };
+  }
+  render();
+}
+
+async function loadCleanupAuditIfNeeded() {
+  if (cleanupAuditState.status === 'success' || cleanupAuditState.status === 'loading') {
+    return;
+  }
+  cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
+  renderPanel();
+  cleanupAuditState = await BAFoxClient.getCleanupAudit();
+  renderPanel();
+}
+
+function loadLazyTabData(tabName) {
+  if (tabName === 'completed' || tabName === 'reports' || tabName === 'calendar') {
+    loadCompletedIfNeeded();
+  }
+  if (tabName === 'audit') {
+    loadCleanupAuditIfNeeded();
+  }
 }
 
 function loadOptionalLocalConfig() {
@@ -1965,12 +2026,7 @@ elements.taskList.addEventListener('click', function (event) {
 
   const focusButton = event.target.closest('[data-task-focus]');
   if (focusButton) {
-    const taskId = focusButton.dataset.taskFocus;
-    manualFocusTaskIds[taskId] = !manualFocusTaskIds[taskId];
-    if (!manualFocusTaskIds[taskId]) {
-      delete manualFocusTaskIds[taskId];
-    }
-    render();
+    handleFocusToggle(focusButton.dataset.taskFocus);
     return;
   }
 
@@ -2032,6 +2088,48 @@ function findTaskForAction(taskId) {
     }
   }
   return null;
+}
+
+async function handleFocusToggle(taskId) {
+  if (!taskId) {
+    return;
+  }
+  const task = findLoadedTask(taskId) || {};
+  const nextFocus = !isManualFocusTask(task);
+  manualFocusTaskIds[taskId] = nextFocus;
+  if (!nextFocus) {
+    delete manualFocusTaskIds[taskId];
+  }
+  render();
+  if (!safeWritesEnabled()) {
+    return;
+  }
+
+  try {
+    await BAFoxClient.editTask({
+      taskId: taskId,
+      focus: nextFocus ? 'true' : 'false',
+    });
+    await refreshDashboardAfterAction(taskId, nextFocus ? 'Задача добавлена в Focus.' : 'Задача убрана из Focus.');
+  } catch (error) {
+    if (error && error.code === 'SCHEMA_FIELD_MISSING') {
+      taskActionState[taskId] = {
+        status: 'success',
+        message: 'Focus сохранён локально. Для постоянной отметки нужна колонка focus в Tasks.',
+      };
+      renderPanel();
+      return;
+    }
+    manualFocusTaskIds[taskId] = !nextFocus;
+    if (nextFocus) {
+      delete manualFocusTaskIds[taskId];
+    }
+    taskActionState[taskId] = {
+      status: 'error',
+      message: error && error.message ? error.message : 'Не удалось сохранить Focus.',
+    };
+    renderPanel();
+  }
 }
 
 function taskBelongsInPushes(task) {

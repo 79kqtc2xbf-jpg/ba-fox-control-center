@@ -2,6 +2,14 @@ function getTodayTasks(request) {
   return baFoxOk(baFoxListTodayTasks(request));
 }
 
+function getInboxTasks(request) {
+  return baFoxOk(baFoxListInboxTasks(request));
+}
+
+function getFocusTasks(request) {
+  return baFoxOk(baFoxListFocusTasks(request));
+}
+
 function getOpenTasks(request) {
   return baFoxOk(baFoxListOpenTasks(request));
 }

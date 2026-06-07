@@ -1,4 +1,16 @@
-function baFoxNormalizeTaskRow(row) {
+function baFoxTaskOptionalValue_(row, headers, field) {
+  var column = baFoxFindHeaderColumn_(headers || [], baFoxOptionalTaskFieldNames_(field));
+  return column ? row[column - 1] : '';
+}
+
+function baFoxNormalizeTaskRows_(storeResult) {
+  return (storeResult.rows || []).map(function(row) {
+    return baFoxNormalizeTaskRow(row, storeResult.headers || []);
+  });
+}
+
+function baFoxNormalizeTaskRow(row, headers) {
+  var nextReminder = row[BA_FOX_CONFIG.TASK_COLUMNS.NEXT_REMINDER - 1] || '';
   return {
     id: row[BA_FOX_CONFIG.TASK_COLUMNS.ID - 1] || '',
     date: baFoxTaskDateValue(row[BA_FOX_CONFIG.TASK_COLUMNS.DATE - 1]),
@@ -11,7 +23,8 @@ function baFoxNormalizeTaskRow(row) {
     deadline: baFoxTaskDateValue(row[BA_FOX_CONFIG.TASK_COLUMNS.DEADLINE - 1]),
     reminderMode: row[BA_FOX_CONFIG.TASK_COLUMNS.REMINDER_MODE - 1] || '',
     status: row[BA_FOX_CONFIG.TASK_COLUMNS.STATUS - 1] || '',
-    nextReminder: row[BA_FOX_CONFIG.TASK_COLUMNS.NEXT_REMINDER - 1] || '',
+    nextReminder: nextReminder,
+    controlDate: baFoxTaskOptionalValue_(row, headers, 'CONTROL_DATE') || nextReminder,
     comment: row[BA_FOX_CONFIG.TASK_COLUMNS.COMMENT - 1] || '',
     channel: row[BA_FOX_CONFIG.TASK_COLUMNS.CHANNEL - 1] || '',
     taskType: row[BA_FOX_CONFIG.TASK_COLUMNS.TASK_TYPE - 1] || 'work',
@@ -24,7 +37,8 @@ function baFoxNormalizeTaskRow(row) {
     notificationStatus: row[BA_FOX_CONFIG.TASK_COLUMNS.NOTIFICATION_STATUS - 1] || '',
     appSource: row[BA_FOX_CONFIG.TASK_COLUMNS.APP_SOURCE - 1] || '',
     externalRef: row[BA_FOX_CONFIG.TASK_COLUMNS.EXTERNAL_REF - 1] || '',
-    archived: baFoxIsTrueValue_(row[BA_FOX_CONFIG.TASK_COLUMNS.ARCHIVED - 1])
+    archived: baFoxIsTrueValue_(row[BA_FOX_CONFIG.TASK_COLUMNS.ARCHIVED - 1]),
+    focus: baFoxIsTrueValue_(baFoxTaskOptionalValue_(row, headers, 'FOCUS'))
   };
 }
 
@@ -55,6 +69,85 @@ function baFoxTaskNeedsControl_(task) {
   });
 }
 
+function baFoxTaskDateIso_(value) {
+  var match = baFoxSafeString(value).match(/\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : '';
+}
+
+function baFoxTaskIsFinal_(task) {
+  return task.archived || baFoxStatusMatches_(task.status, BA_FOX_CONFIG.FINAL_STATUSES);
+}
+
+function baFoxTaskIsOverdue_(task, date) {
+  var deadline = baFoxTaskDateIso_(task.deadline);
+  var controlDate = baFoxTaskDateIso_(task.controlDate || task.nextReminder);
+  return (deadline && deadline < date) || (controlDate && controlDate < date);
+}
+
+function baFoxTaskIsTodayRelevant_(task, date) {
+  var deadline = baFoxTaskDateIso_(task.deadline);
+  var controlDate = baFoxTaskDateIso_(task.controlDate || task.nextReminder);
+  return !baFoxTaskIsFinal_(task) && (
+    baFoxTaskIsOverdue_(task, date)
+    || deadline === date
+    || controlDate === date
+    || baFoxNormalizeMatchValue_(task.nextReminder).indexOf('сегодня') !== -1
+  );
+}
+
+function baFoxTaskIsHighPriority_(task) {
+  var priority = baFoxNormalizeMatchValue_(task.priority);
+  return priority.indexOf('high') !== -1
+    || priority.indexOf('высок') !== -1
+    || priority.indexOf('важно') !== -1;
+}
+
+function baFoxTaskIsFocusCandidate_(task, date) {
+  var text = [
+    task.status,
+    task.category,
+    task.reminderMode,
+    task.comment,
+    task.title
+  ].map(baFoxNormalizeMatchValue_).join(' ');
+  return !baFoxTaskIsFinal_(task) && (
+    task.focus === true
+    || baFoxTaskIsTodayRelevant_(task, date)
+    || baFoxTaskIsHighPriority_(task)
+    || text.indexOf('фокус') !== -1
+    || text.indexOf('focus') !== -1
+    || text.indexOf('пуш') !== -1
+    || text.indexOf('push') !== -1
+    || text.indexOf('блокер') !== -1
+    || text.indexOf('blocker') !== -1
+  );
+}
+
+function baFoxTaskPriorityScore_(task, date) {
+  var score = 0;
+  if (task.focus === true) score += 100;
+  if (baFoxTaskIsOverdue_(task, date)) score += 80;
+  if (baFoxTaskIsTodayRelevant_(task, date)) score += 60;
+  if (baFoxTaskIsHighPriority_(task)) score += 35;
+  if (baFoxTaskNeedsControl_(task)) score += 20;
+  return score;
+}
+
+function baFoxTaskLooksLikeInbox_(task) {
+  var source = baFoxNormalizeMatchValue_([task.source, task.appSource, task.channel].join(' '));
+  var category = baFoxNormalizeMatchValue_(task.category);
+  var nextAction = baFoxNormalizeMatchValue_(task.steps);
+  return !baFoxTaskIsFinal_(task) && (
+    source.indexOf('ba fox web') !== -1
+    || source.indexOf('telegram') !== -1
+    || source.indexOf('chatgpt') !== -1
+    || source.indexOf('gmail') !== -1
+    || !category
+    || !nextAction
+    || nextAction === 'определить следующий шаг'
+  );
+}
+
 function baFoxListTodayTasks(request, storeResult) {
   var normalized = baFoxNormalizeRequest(request);
   var date = baFoxDateOrToday(normalized.date);
@@ -65,9 +158,8 @@ function baFoxListTodayTasks(request, storeResult) {
     dryRun: storeResult.dryRun,
     readLive: storeResult.readLive,
     warning: storeResult.warning,
-    tasks: storeResult.rows.map(baFoxNormalizeTaskRow).filter(function(task) {
-      var taskDate = baFoxNormalizeMatchValue_(task.date);
-      return !task.archived && (task.date === date || taskDate === 'сегодня');
+    tasks: baFoxNormalizeTaskRows_(storeResult).filter(function(task) {
+      return baFoxTaskIsTodayRelevant_(task, date);
     })
   };
 }
@@ -82,11 +174,45 @@ function baFoxListOpenTasks(request, storeResult) {
     dryRun: storeResult.dryRun,
     readLive: storeResult.readLive,
     warning: storeResult.warning,
-    tasks: storeResult.rows.map(baFoxNormalizeTaskRow).filter(function(task) {
-      var finalStatus = baFoxStatusMatches_(task.status, BA_FOX_CONFIG.FINAL_STATUSES);
+    tasks: baFoxNormalizeTaskRows_(storeResult).filter(function(task) {
       var typeMatches = taskType === 'all' || task.taskType === taskType;
-      return !task.archived && !finalStatus && typeMatches;
+      return !baFoxTaskIsFinal_(task) && typeMatches;
     })
+  };
+}
+
+function baFoxListInboxTasks(request, storeResult) {
+  var normalized = baFoxNormalizeRequest(request);
+  var date = baFoxDateOrToday(normalized.date);
+  storeResult = storeResult || baFoxReadTasksRows();
+
+  return {
+    date: date,
+    dryRun: storeResult.dryRun,
+    readLive: storeResult.readLive,
+    warning: storeResult.warning,
+    tasks: baFoxNormalizeTaskRows_(storeResult).filter(function(task) {
+      return baFoxTaskLooksLikeInbox_(task) && !baFoxTaskIsTodayRelevant_(task, date);
+    })
+  };
+}
+
+function baFoxListFocusTasks(request, storeResult) {
+  var normalized = baFoxNormalizeRequest(request);
+  var date = baFoxDateOrToday(normalized.date);
+  storeResult = storeResult || baFoxReadTasksRows();
+
+  return {
+    date: date,
+    limit: 5,
+    dryRun: storeResult.dryRun,
+    readLive: storeResult.readLive,
+    warning: storeResult.warning,
+    tasks: baFoxNormalizeTaskRows_(storeResult).filter(function(task) {
+      return baFoxTaskIsFocusCandidate_(task, date);
+    }).sort(function(left, right) {
+      return baFoxTaskPriorityScore_(right, date) - baFoxTaskPriorityScore_(left, date);
+    }).slice(0, 5)
   };
 }
 
@@ -100,9 +226,8 @@ function baFoxListPushTasks(request, storeResult) {
     dryRun: storeResult.dryRun,
     readLive: storeResult.readLive,
     warning: storeResult.warning,
-    tasks: storeResult.rows.map(baFoxNormalizeTaskRow).filter(function(task) {
-      var finalStatus = baFoxStatusMatches_(task.status, BA_FOX_CONFIG.FINAL_STATUSES);
-      return !task.archived && !finalStatus && baFoxTaskNeedsControl_(task);
+    tasks: baFoxNormalizeTaskRows_(storeResult).filter(function(task) {
+      return !baFoxTaskIsFinal_(task) && baFoxTaskNeedsControl_(task);
     })
   };
 }
@@ -117,7 +242,7 @@ function baFoxListCompletedTasks(request, storeResult) {
     dryRun: storeResult.dryRun,
     readLive: storeResult.readLive,
     warning: storeResult.warning,
-    tasks: storeResult.rows.map(baFoxNormalizeTaskRow).filter(function(task) {
+    tasks: baFoxNormalizeTaskRows_(storeResult).filter(function(task) {
       return !task.archived && (baFoxStatusMatches_(task.status, BA_FOX_CONFIG.FINAL_STATUSES) || task.completedAt);
     }).sort(function(left, right) {
       return baFoxSafeString(right.completedAt || right.updatedAt || right.deadline)
@@ -459,7 +584,7 @@ function baFoxTaskAction(request) {
     return match.error;
   }
 
-  var previous = baFoxNormalizeTaskRow(match.row);
+  var previous = baFoxNormalizeTaskRow(match.row, match.headers);
   var now = baFoxIsoNow();
   var patch = {
     UPDATED_AT: now
@@ -467,6 +592,7 @@ function baFoxTaskAction(request) {
 
   if (actionConfig.snooze) {
     patch.NEXT_REMINDER = baFoxSafeString(normalized.nextReminder);
+    patch.CONTROL_DATE = baFoxTaskDateIso_(normalized.nextReminder);
   } else {
     patch.STATUS = actionConfig.status;
     if (normalized.action === 'markDone') {
@@ -535,7 +661,9 @@ function baFoxEditTaskAllowedKeys_() {
     'category',
     'taskType',
     'comment',
-    'note'
+    'note',
+    'controlDate',
+    'focus'
   ];
 }
 
@@ -562,6 +690,16 @@ function baFoxValidateEditTaskDeadline_(deadline) {
   return !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function baFoxValidateEditTaskBoolean_(value) {
+  var normalized = baFoxNormalizeMatchValue_(value);
+  return !normalized || ['true', 'false', '1', '0', 'yes', 'no', 'да', 'нет'].indexOf(normalized) !== -1;
+}
+
+function baFoxParseEditTaskBoolean_(value) {
+  var normalized = baFoxNormalizeMatchValue_(value);
+  return ['true', '1', 'yes', 'да'].indexOf(normalized) !== -1;
+}
+
 function baFoxEditTaskFieldMap_() {
   return {
     title: 'TITLE',
@@ -571,12 +709,15 @@ function baFoxEditTaskFieldMap_() {
     priority: 'PRIORITY',
     category: 'CATEGORY',
     taskType: 'TASK_TYPE',
-    comment: 'COMMENT'
+    comment: 'COMMENT',
+    controlDate: 'CONTROL_DATE',
+    focus: 'FOCUS'
   };
 }
 
 function baFoxEditTaskPreviousValue_(task, field) {
   if (field === 'nextAction') return task.steps;
+  if (field === 'focus') return task.focus === true ? 'true' : 'false';
   return task[field] || '';
 }
 
@@ -625,7 +766,7 @@ function baFoxSafeEditTask(request) {
     normalized.comment = normalized.note;
   }
 
-  var editableFields = ['title', 'organization', 'nextAction', 'deadline', 'priority', 'category', 'taskType', 'comment'];
+  var editableFields = ['title', 'organization', 'nextAction', 'deadline', 'priority', 'category', 'taskType', 'comment', 'controlDate', 'focus'];
   var objectFields = baFoxValidateEditTaskScalar_(normalized, editableFields);
   if (objectFields.length) {
     return baFoxError('VALIDATION_ERROR', 'Edit task fields must be simple text values.', {
@@ -636,6 +777,18 @@ function baFoxSafeEditTask(request) {
   if (!baFoxValidateEditTaskDeadline_(normalized.deadline)) {
     return baFoxError('VALIDATION_ERROR', 'Deadline must use YYYY-MM-DD format.', {
       deadline: normalized.deadline || ''
+    });
+  }
+
+  if (!baFoxValidateEditTaskDeadline_(normalized.controlDate)) {
+    return baFoxError('VALIDATION_ERROR', 'Control date must use YYYY-MM-DD format.', {
+      controlDate: normalized.controlDate || ''
+    });
+  }
+
+  if (!baFoxValidateEditTaskBoolean_(normalized.focus)) {
+    return baFoxError('VALIDATION_ERROR', 'Focus must be true or false.', {
+      focus: normalized.focus || ''
     });
   }
 
@@ -683,7 +836,7 @@ function baFoxSafeEditTask(request) {
     });
   }
 
-  var previous = baFoxNormalizeTaskRow(match.row);
+  var previous = baFoxNormalizeTaskRow(match.row, match.headers);
   var fieldMap = baFoxEditTaskFieldMap_();
   var patch = {
     UPDATED_AT: baFoxIsoNow()
@@ -691,23 +844,39 @@ function baFoxSafeEditTask(request) {
   var changedFields = [];
   var previousValues = {};
   var newValues = {};
+  var unsupportedFields = [];
 
   editableFields.forEach(function(field) {
     if (!Object.prototype.hasOwnProperty.call(normalized, field)) {
       return;
     }
-    var newValue = baFoxSafeString(normalized[field]);
+    var newValue = field === 'focus'
+      ? (baFoxParseEditTaskBoolean_(normalized[field]) ? 'true' : 'false')
+      : baFoxSafeString(normalized[field]);
     var previousValue = baFoxSafeString(baFoxEditTaskPreviousValue_(previous, field));
     if (newValue === previousValue) {
       return;
     }
-    patch[fieldMap[field]] = newValue;
+    if (field === 'focus' && !baFoxTaskColumnForField_(match.sheet, match.headers, 'FOCUS')) {
+      unsupportedFields.push(field);
+      return;
+    }
+    patch[fieldMap[field]] = field === 'focus' ? baFoxParseEditTaskBoolean_(normalized[field]) : newValue;
+    if (field === 'controlDate') {
+      patch.NEXT_REMINDER = newValue;
+    }
     changedFields.push(field);
     previousValues[field] = previousValue;
     newValues[field] = newValue;
   });
 
   if (!changedFields.length) {
+    if (unsupportedFields.length) {
+      return baFoxError('SCHEMA_FIELD_MISSING', 'Requested field is not available in Tasks schema.', {
+        taskId: normalized.taskId,
+        fields: unsupportedFields
+      });
+    }
     return baFoxError('NO_CHANGES', 'No editable fields changed.', {
       taskId: normalized.taskId
     });

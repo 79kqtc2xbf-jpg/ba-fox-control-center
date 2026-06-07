@@ -37,6 +37,7 @@ function baFoxReadTasksRows() {
   return {
     dryRun: BA_FOX_CONFIG.DRY_RUN,
     readLive: true,
+    headers: values[0].map(function(header) { return baFoxSafeString(header); }),
     rows: values.slice(1),
     warning: null
   };
@@ -61,6 +62,22 @@ function baFoxFindHeaderColumn_(headers, names) {
     }
   }
   return 0;
+}
+
+function baFoxOptionalTaskFieldNames_(field) {
+  var names = {
+    CONTROL_DATE: ['controlDate', 'control_date', 'Control Date', 'Контрольная дата', 'Дата контроля'],
+    FOCUS: ['focus', 'isFocus', 'manualFocus', 'Focus', 'Фокус']
+  };
+  return names[field] || [];
+}
+
+function baFoxTaskColumnForField_(sheet, headers, field) {
+  var fixedColumn = BA_FOX_CONFIG.TASK_COLUMNS[field];
+  if (fixedColumn && fixedColumn <= sheet.getLastColumn()) {
+    return fixedColumn;
+  }
+  return baFoxFindHeaderColumn_(headers || [], baFoxOptionalTaskFieldNames_(field));
 }
 
 function baFoxFindTaskRow_(taskId) {
@@ -99,13 +116,17 @@ function baFoxUpdateTaskActionRow(taskId, patch) {
 
   var sheet = match.sheet;
   var updates = [];
+  var skippedFields = [];
   Object.keys(patch).forEach(function(field) {
-    var column = BA_FOX_CONFIG.TASK_COLUMNS[field];
+    var column = baFoxTaskColumnForField_(sheet, match.headers, field);
     if (column && column <= sheet.getLastColumn()) {
       updates.push({
+        field: field,
         column: column,
         value: patch[field]
       });
+    } else {
+      skippedFields.push(field);
     }
   });
 
@@ -116,7 +137,9 @@ function baFoxUpdateTaskActionRow(taskId, patch) {
   return baFoxOk({
     taskId: taskId,
     rowNumber: match.rowNumber,
-    updatedFields: updates.map(function(update) { return update.column; })
+    updatedFields: updates.map(function(update) { return update.field; }),
+    updatedColumns: updates.map(function(update) { return update.column; }),
+    skippedFields: skippedFields
   });
 }
 

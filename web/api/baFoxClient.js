@@ -1,11 +1,14 @@
 (function (global) {
   const READ_ONLY_ROUTES = Object.freeze([
     'scaffoldInfo',
+    'inbox',
+    'focus',
     'today',
     'open',
     'pushes',
     'completed',
     'dashboard',
+    'workspaceDashboard',
     'fullDashboard',
     'cleanupAudit',
     'safetyStatus',
@@ -34,6 +37,7 @@
     FIELDS_NOT_ALLOWED: 'Можно обновить только разрешённые поля задачи.',
     DUPLICATE_TASK_ID: 'В таблице найдено несколько строк с этим ID. Обновление остановлено для безопасности.',
     NO_CHANGES: 'Нет изменений для сохранения.',
+    SCHEMA_FIELD_MISSING: 'Это поле ещё не добавлено в схему Tasks.',
     SAFE_WRITES_DISABLED: 'Безопасная запись выключена. Обновление этапа недоступно.',
     TASK_NOT_FOUND: 'Задача не найдена в таблице.',
     TASKS_SHEET_MISSING: 'Лист Tasks недоступен.',
@@ -133,6 +137,12 @@
 
   function validateFullDashboard(data) {
     validateScaffoldSafety(data && data.scaffoldInfo);
+    if (data && data.inbox) {
+      validateReadSafety(data.inbox);
+    }
+    if (data && data.focus) {
+      validateReadSafety(data.focus);
+    }
     validateReadSafety(data && data.today);
     validateReadSafety(data && data.open);
     validateReadSafety(data && data.pushes);
@@ -140,6 +150,15 @@
       validateReadSafety(data.completed);
     }
     validateCleanupAudit(data && data.cleanupAudit);
+  }
+
+  function validateWorkspaceDashboard(data) {
+    validateScaffoldSafety(data && data.scaffoldInfo);
+    validateReadSafety(data && data.inbox);
+    validateReadSafety(data && data.focus);
+    validateReadSafety(data && data.today);
+    validateReadSafety(data && data.open);
+    validateReadSafety(data && data.pushes);
   }
 
   function isRateLimitError(error) {
@@ -228,9 +247,24 @@
     if (route === 'dashboard') {
       const dashboard = await getJsonp(route, params);
       validateScaffoldSafety(dashboard.scaffoldInfo);
+      if (dashboard.inbox) {
+        validateReadSafety(dashboard.inbox);
+      }
+      if (dashboard.focus) {
+        validateReadSafety(dashboard.focus);
+      }
       validateReadSafety(dashboard.today);
       validateReadSafety(dashboard.open);
       validateReadSafety(dashboard.pushes);
+      if (dashboard.completed) {
+        validateReadSafety(dashboard.completed);
+      }
+      return dashboard;
+    }
+
+    if (route === 'workspaceDashboard') {
+      const dashboard = await getJsonp(route, params);
+      validateWorkspaceDashboard(dashboard);
       return dashboard;
     }
 
@@ -318,6 +352,12 @@
     getTodayTasks: function (options) {
       return readRoute('today', options || {});
     },
+    getInboxTasks: function (options) {
+      return readRoute('inbox', options || {});
+    },
+    getFocusTasks: function (options) {
+      return readRoute('focus', options || {});
+    },
     getOpenTasks: function (options) {
       return readRoute('open', options || {});
     },
@@ -329,6 +369,9 @@
     },
     getDashboard: function (options) {
       return readRoute('dashboard', options || {});
+    },
+    getWorkspaceDashboard: function (options) {
+      return readRoute('workspaceDashboard', options || {});
     },
     getFullDashboard: function (options) {
       return readRoute('fullDashboard', options || {});

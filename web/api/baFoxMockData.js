@@ -19,6 +19,8 @@
       taskType: 'work',
       deadline: '2026-05-25',
       nextReminder: '',
+      controlDate: '',
+      focus: true,
       comment: 'Mock data only',
       archived: false,
     },
@@ -31,6 +33,8 @@
       taskType: 'work',
       deadline: '2026-05-25',
       nextReminder: '2026-05-25',
+      controlDate: '2026-05-25',
+      focus: false,
       comment: 'Mock data only',
       archived: false,
     },
@@ -43,6 +47,8 @@
       taskType: 'work',
       deadline: '2026-05-25',
       nextReminder: '2026-05-25',
+      controlDate: '2026-05-25',
+      focus: false,
       comment: 'Mock data only',
       archived: false,
     },
@@ -55,6 +61,8 @@
       taskType: 'work',
       deadline: '2026-05-26',
       nextReminder: '',
+      controlDate: '',
+      focus: false,
       comment: 'Mock data only',
       archived: false,
     },
@@ -67,6 +75,8 @@
       taskType: 'work',
       deadline: '2026-05-26',
       nextReminder: '',
+      controlDate: '',
+      focus: false,
       comment: 'Mock data only',
       archived: false,
     },
@@ -79,6 +89,8 @@
       taskType: 'work',
       deadline: '2026-05-24',
       nextReminder: '',
+      controlDate: '',
+      focus: false,
       comment: 'Mock data only',
       archived: false,
     },
@@ -249,6 +261,25 @@
     };
   }
 
+  function getInboxData(date) {
+    return {
+      date: date || '2026-05-25',
+      dryRun: true,
+      readLive: true,
+      tasks: tasks.slice(4, 5),
+    };
+  }
+
+  function getFocusData(date) {
+    return {
+      date: date || '2026-05-25',
+      limit: 5,
+      dryRun: true,
+      readLive: true,
+      tasks: tasks.slice(0, 4),
+    };
+  }
+
   function getOpenData(taskType) {
     return {
       taskType: taskType || 'all',
@@ -291,6 +322,10 @@
         return success(clone(scaffoldInfo));
       case 'today':
         return success(clone(getTodayData(input.date)));
+      case 'inbox':
+        return success(clone(getInboxData(input.date)));
+      case 'focus':
+        return success(clone(getFocusData(input.date)));
       case 'open':
         return success(clone(getOpenData(input.taskType)));
       case 'pushes':
@@ -298,16 +333,20 @@
       case 'completed':
         return success(clone(getCompletedData()));
       case 'dashboard':
+      case 'workspaceDashboard':
         return success({
           scaffoldInfo: clone(scaffoldInfo),
+          inbox: clone(getInboxData(input.date)),
+          focus: clone(getFocusData(input.date)),
           today: clone(getTodayData(input.date)),
           open: clone(getOpenData(input.taskType)),
           pushes: clone(getPushData(input.dateRange)),
-          completed: clone(getCompletedData()),
         });
       case 'fullDashboard':
         return success({
           scaffoldInfo: clone(scaffoldInfo),
+          inbox: clone(getInboxData(input.date)),
+          focus: clone(getFocusData(input.date)),
           today: clone(getTodayData(input.date)),
           open: clone(getOpenData(input.taskType)),
           pushes: clone(getPushData(input.dateRange)),
