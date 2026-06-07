@@ -27,32 +27,46 @@
       <span>Без подключения к рабочей таблице и без изменений задач.</span>
     </div>
 
-    <nav class="tabs" aria-label="Разделы BA Fox">
-      <button class="tab active" type="button" data-tab="today" aria-selected="true">Сегодня</button>
-      <button class="tab" type="button" data-tab="documents" aria-selected="false">Документы</button>
-      <button class="tab" type="button" data-tab="communication" aria-selected="false">Коммуникация</button>
-      <button class="tab" type="button" data-tab="presentations" aria-selected="false">Презентации</button>
-      <button class="tab" type="button" data-tab="brokers" aria-selected="false">Брокеры</button>
-      <button class="tab" type="button" data-tab="reminders" aria-selected="false">Напомнить</button>
-      <button class="tab" type="button" data-tab="completed" aria-selected="false">Выполненное</button>
-      <button class="tab" type="button" data-tab="calendar" aria-selected="false">Календарь</button>
-      <button class="tab" type="button" data-tab="system" aria-selected="false">Система</button>
-    </nav>
-
-    <section class="dashboard-grid" id="summaryCards" aria-label="Краткая сводка"></section>
-
-    <section class="content-panel">
-      <div class="panel-header">
-        <div>
-          <p class="eyebrow" id="panelEyebrow">Сегодня</p>
-          <h2 id="panelTitle">Задачи на сегодня</h2>
+    <div class="workspace-layout">
+      <aside class="sidebar-shell" aria-label="Рабочее пространство BA Fox">
+        <div class="sidebar-title">
+          <span>Workspace</span>
+          <strong>EA OS</strong>
         </div>
-        <span class="panel-badge" id="panelBadge">Read-only</span>
-      </div>
-      <div class="focus-note" id="statusMessage" role="status"></div>
-      <div class="workspace-controls" id="workspaceControls"></div>
-      <div class="task-list" id="taskList" aria-live="polite"></div>
-    </section>
+        <nav class="tabs" aria-label="Разделы BA Fox">
+          <button class="tab active" type="button" data-tab="inbox" aria-selected="true">Inbox</button>
+          <button class="tab" type="button" data-tab="focus" aria-selected="false">Focus</button>
+          <button class="tab" type="button" data-tab="today" aria-selected="false">Today</button>
+          <button class="tab" type="button" data-tab="documents" aria-selected="false">Documents</button>
+          <button class="tab" type="button" data-tab="communication" aria-selected="false">Communication</button>
+          <button class="tab" type="button" data-tab="presentations" aria-selected="false">Presentations</button>
+          <button class="tab" type="button" data-tab="brokers" aria-selected="false">Brokers</button>
+          <button class="tab" type="button" data-tab="waiting" aria-selected="false">Waiting</button>
+          <button class="tab" type="button" data-tab="all" aria-selected="false">All Tasks</button>
+          <button class="tab" type="button" data-tab="completed" aria-selected="false">Completed</button>
+          <button class="tab" type="button" data-tab="calendar" aria-selected="false">Calendar</button>
+          <button class="tab" type="button" data-tab="reports" aria-selected="false">Reports</button>
+          <button class="tab" type="button" data-tab="system" aria-selected="false">System</button>
+        </nav>
+      </aside>
+
+      <section class="workspace-main">
+        <section class="dashboard-grid" id="summaryCards" aria-label="Краткая сводка"></section>
+
+        <section class="content-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow" id="panelEyebrow">Inbox</p>
+              <h2 id="panelTitle">Новые задачи и входящий поток</h2>
+            </div>
+            <span class="panel-badge" id="panelBadge">Read-only</span>
+          </div>
+          <div class="focus-note" id="statusMessage" role="status"></div>
+          <div class="workspace-controls" id="workspaceControls"></div>
+          <div class="task-list" id="taskList" aria-live="polite"></div>
+        </section>
+      </section>
+    </div>
   </main>
 
   <div class="modal-backdrop" id="createTaskModal" hidden>
@@ -79,7 +93,7 @@
           <textarea name="nextAction" rows="3" required></textarea>
         </label>
         <label class="form-field">
-          <span>Срок</span>
+          <span>Срок / контрольная дата</span>
           <input type="date" name="deadline" />
         </label>
 
@@ -115,7 +129,7 @@
           <textarea name="nextAction" rows="3" required></textarea>
         </label>
         <label class="form-field">
-          <span>Срок контроля</span>
+          <span>Срок / контрольная дата</span>
           <input type="date" name="deadline" />
         </label>
         <label class="form-field">

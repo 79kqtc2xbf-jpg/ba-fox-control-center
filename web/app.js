@@ -1,12 +1,16 @@
 const viewLabels = Object.freeze({
-  today: ['Сегодня', 'Фокус дня и рабочие секции'],
+  inbox: ['📥 Inbox', 'Новые задачи и входящий поток'],
+  focus: ['🎯 Focus', '3–5 задач, которые двигают день'],
+  today: ['🔥 Today', 'Сроки, контроль и напоминания на сегодня'],
   documents: ['Документы', 'Документы, договоры и KYC'],
   communication: ['Коммуникация', 'Ответы, письма и касания'],
   presentations: ['Презентации', 'Деки, офферы и материалы'],
   brokers: ['Брокеры', 'Брокеры, партнёры и внешние касания'],
-  reminders: ['Напомнить', 'Контрольные сроки и пуши'],
-  completed: ['Выполненное', 'Память для отчётов'],
+  waiting: ['⏰ Waiting', 'Ожидания, контрольные даты и пуши'],
+  all: ['📋 All Tasks', 'Поиск, фильтры и обслуживание очереди'],
+  completed: ['Completed', 'Архив, история и память для отчётов'],
   calendar: ['Календарь', 'Задачи по срокам и напоминаниям'],
+  reports: ['📈 Reports', 'Дневной и недельный отчёт'],
   system: ['Система', 'Безопасный режим'],
 });
 
@@ -57,14 +61,17 @@ const severityRank = Object.freeze({
 
 const taskFilters = Object.freeze([
   { id: 'all', label: 'Все' },
+  { id: 'inbox', label: 'Inbox' },
+  { id: 'focus', label: 'Focus' },
   { id: 'urgent', label: 'Срочно' },
   { id: 'high', label: 'Высокий приоритет' },
-  { id: 'work', label: 'В работе' },
+  { id: 'active', label: 'Active' },
   { id: 'waiting', label: 'Ждут ответа' },
   { id: 'push', label: 'Пуши' },
   { id: 'blockers', label: 'Блокеры' },
   { id: 'today', label: 'Сегодня' },
   { id: 'overdue', label: 'Просрочено' },
+  { id: 'cleanup', label: 'Review' },
 ]);
 
 const waitingStatuses = Object.freeze([
@@ -102,6 +109,31 @@ const actionStatusUpdates = Object.freeze({
   markDone: 'Выполнено',
 });
 
+const sidebarOrder = Object.freeze([
+  'inbox',
+  'focus',
+  'today',
+  'documents',
+  'communication',
+  'presentations',
+  'brokers',
+  'waiting',
+  'all',
+  'completed',
+  'calendar',
+  'reports',
+  'system',
+]);
+
+const workflowGroupLabels = Object.freeze({
+  urgent: ['Urgent', 'Просрочено, сегодня, высокий приоритет'],
+  active: ['In Progress', 'Активная операционная работа'],
+  waiting: ['Waiting', 'Нужен ответ или подтверждение'],
+  pushes: ['Pushes', 'Нужно следующее касание'],
+  blockers: ['Blockers', 'Нужна разблокировка'],
+  review: ['Needs Review', 'Требуется разбор или очистка'],
+});
+
 const actionSuccessMessages = Object.freeze({
   moveToWork: 'Задача переведена в работу.',
   moveToPush: 'Задача переведена в пуши.',
@@ -129,10 +161,12 @@ const todaySectionLabels = Object.freeze({
   other: 'Остальное',
 });
 
-let activeTab = 'today';
+let activeTab = 'inbox';
 let activeTaskFilter = 'all';
 let taskSearchQuery = '';
 let activeAuditFilter = 'all';
+let manualFocusTaskIds = {};
+let reportPreview = { type: '', text: '' };
 let dashboardState = BAFoxClient.createLoadingState('dashboard');
 let scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
 let cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
@@ -268,8 +302,51 @@ function removeIsoDateNoise(value) {
   });
 }
 
+function canonicalStatus(task) {
+  const status = normalizeText(task.status);
+  if (['выполнено', 'done', 'completed', 'complete'].some(function (signal) { return status.includes(signal); })) return 'completed';
+  if (['cancelled', 'canceled', 'отмен', 'cancel'].some(function (signal) { return status.includes(signal); })) return 'cancelled';
+  if (['duplicate', 'дубликат', 'дубль'].some(function (signal) { return status.includes(signal); })) return 'duplicate';
+  if (['not relevant', 'irrelevant', 'неакту', 'не акту'].some(function (signal) { return status.includes(signal); })) return 'notRelevant';
+  if (isBlockerTask(task)) return 'blocker';
+  if (isPushTask(task)) return 'push';
+  if (isWaitingTask(task)) return 'waiting';
+  return 'active';
+}
+
+function isCompletedStatus(task) {
+  return canonicalStatus(task) === 'completed';
+}
+
+function isNonReportableFinal(task) {
+  return ['cancelled', 'duplicate', 'notRelevant'].includes(canonicalStatus(task));
+}
+
 function isFinalTask(task) {
-  return ['выполнено', 'done', 'cancelled', 'archived', 'архив'].includes(normalizeText(task.status)) || task.archived === true;
+  return ['completed', 'cancelled', 'duplicate', 'notRelevant'].includes(canonicalStatus(task)) || task.archived === true;
+}
+
+function taskControlDate(task) {
+  return isoDateFromValue(task.controlDate || task.control_date || task.nextReminder || task.next_reminder || '');
+}
+
+function taskDueDate(task) {
+  return isoDateFromValue(task.deadline || task.dueDate || task.due_date || '');
+}
+
+function taskReportDate(task) {
+  return isoDateFromValue(task.completedAt || task.updatedAt || task.deadline || taskControlDate(task));
+}
+
+function isTodayRelevantTask(task) {
+  if (isFinalTask(task)) return false;
+  const today = todayIsoBangkok();
+  const dueDate = taskDueDate(task);
+  const controlDate = taskControlDate(task);
+  return isOverdueTask(task)
+    || dueDate === today
+    || controlDate === today
+    || dateSignalIsDue(task.nextReminder, today);
 }
 
 function dateSignalIsDue(value, today) {
@@ -349,8 +426,10 @@ function isBlockerTask(task) {
 function isOverdueTask(task) {
   const today = todayIsoBangkok();
   const status = normalizeText(task.status);
+  const dueDate = taskDueDate(task);
+  const controlDate = taskControlDate(task);
   return !isFinalTask(task) && (
-    status.includes('просроч') || status.includes('overdue') || dateSignalIsOverdue(task.deadline, today)
+    status.includes('просроч') || status.includes('overdue') || (dueDate && dueDate < today) || (controlDate && controlDate < today)
   );
 }
 
@@ -360,26 +439,29 @@ function isUrgentTask(task) {
 
 function isManualFocusTask(task) {
   const text = taskSearchText(task);
-  return text.includes('focus') || text.includes('фокус') || text.includes('главное');
+  return manualFocusTaskIds[task.id] === true || text.includes('focus') || text.includes('фокус') || text.includes('главное');
 }
 
 function derivedTodayTasks() {
-  const data = dashboardData();
-  const backendToday = data.today && Array.isArray(data.today.tasks) ? data.today.tasks : [];
-  if (backendToday.length) {
-    return backendToday;
-  }
-  const today = todayIsoBangkok();
-  const priorityStatuses = ['пуш', 'блокер', 'ждём ответ', 'ждём подтверждение', 'ждём подписание'];
+  return allOpenTasks().filter(isTodayRelevantTask).sort(compareTaskUrgency);
+}
+
+function inboxTasks() {
   return allOpenTasks().filter(function (task) {
-    const status = normalizeText(task.status);
-    return !isFinalTask(task) && (
-      dateSignalIsDue(task.nextReminder, today)
-      || dateSignalIsDue(task.deadline, today)
-      || isHighPriority(task)
-      || priorityStatuses.includes(status)
-    );
-  });
+    if (isFinalTask(task) || isTodayRelevantTask(task)) {
+      return false;
+    }
+    const source = normalizeText([task.source, task.appSource, task.channel].join(' '));
+    const category = normalizeText(task.category);
+    const nextAction = normalizeText(nextActionText(task));
+    return source.includes('ba fox web')
+      || source.includes('telegram')
+      || source.includes('chatgpt')
+      || source.includes('gmail')
+      || !category
+      || !nextAction
+      || nextAction === 'определить следующий шаг';
+  }).sort(compareTaskUrgency);
 }
 
 function waitListTasks() {
@@ -391,7 +473,16 @@ function waitListTasks() {
 }
 
 function focusTasks() {
-  const combined = derivedTodayTasks().concat(waitListTasks()).concat(taskRowsForBaseTab('pushes')).concat(allOpenTasks().filter(isManualFocusTask));
+  const combined = allOpenTasks().filter(function (task) {
+    return !isFinalTask(task) && (
+      isManualFocusTask(task)
+      || isOverdueTask(task)
+      || isTodayRelevantTask(task)
+      || isHighPriority(task)
+      || isBlockerTask(task)
+      || isPushTask(task)
+    );
+  });
   const seen = {};
   return combined.filter(function (task) {
     const key = task.id || task.title;
@@ -402,7 +493,7 @@ function focusTasks() {
     return !isFinalTask(task);
   }).sort(function (left, right) {
     return taskScore(right) - taskScore(left);
-  });
+  }).slice(0, 5);
 }
 
 function brokerTasks() {
@@ -442,6 +533,43 @@ function completedTasks() {
   return allLoadedTasks().filter(isFinalTask);
 }
 
+function reportableCompletedTasks() {
+  return completedTasks().filter(function (task) {
+    return isCompletedStatus(task) && !isNonReportableFinal(task);
+  });
+}
+
+function completedThisWeekTasks() {
+  const today = todayIsoBangkok();
+  const weekStart = addDaysIso(today, -6);
+  return reportableCompletedTasks().filter(function (task) {
+    const date = taskReportDate(task);
+    return date && date >= weekStart && date <= today;
+  });
+}
+
+function navCountForTab(tabName) {
+  if (dashboardState.status === 'loading') {
+    return '...';
+  }
+  const counts = {
+    inbox: inboxTasks().length,
+    focus: focusTasks().length,
+    today: derivedTodayTasks().length,
+    documents: documentTasks().length,
+    communication: communicationTasks().length,
+    presentations: presentationTasks().length,
+    brokers: brokerTasks().length,
+    waiting: waitListTasks().length,
+    all: allOpenTasks().length,
+    completed: completedTasks().length,
+    calendar: allLoadedTasks().length,
+    reports: completedThisWeekTasks().length,
+    system: '',
+  };
+  return counts[tabName];
+}
+
 function taskSectionKey(task) {
   const text = taskSearchText(task);
   if (textHasAny(text, ['document', 'documents', 'docs', 'kyc', 'onboarding', 'package', 'agreement', 'contract', 'документ', 'договор', 'пакет', 'онбординг'])) {
@@ -465,12 +593,15 @@ function taskSectionKey(task) {
 function taskScore(task) {
   let score = 0;
   const status = normalizeText(task.status);
+  if (isManualFocusTask(task)) score += 8;
+  if (isOverdueTask(task)) score += 7;
+  if (isTodayRelevantTask(task)) score += 6;
   if (isHighPriority(task)) score += 5;
-  if (status === 'блокер') score += 5;
-  if (status === 'пуш') score += 4;
+  if (status === 'блокер' || isBlockerTask(task)) score += 5;
+  if (status === 'пуш' || isPushTask(task)) score += 4;
   if (status.includes('ждём') || status.includes('wait')) score += 3;
-  if (dateSignalIsDue(task.deadline, todayIsoBangkok())) score += 4;
-  if (dateSignalIsDue(task.nextReminder, todayIsoBangkok())) score += 3;
+  if (taskDueDate(task) === todayIsoBangkok()) score += 4;
+  if (taskControlDate(task) === todayIsoBangkok()) score += 4;
   return score;
 }
 
@@ -485,6 +616,12 @@ function taskRowsForBaseTab(tabName) {
 }
 
 function taskRowsForTab() {
+  if (activeTab === 'inbox') {
+    return inboxTasks();
+  }
+  if (activeTab === 'focus') {
+    return focusTasks();
+  }
   if (activeTab === 'today') {
     return derivedTodayTasks();
   }
@@ -503,13 +640,16 @@ function taskRowsForTab() {
   if (activeTab === 'brokers') {
     return brokerTasks();
   }
-  if (activeTab === 'reminders') {
-    return reminderTasks();
+  if (activeTab === 'all') {
+    return allOpenTasks();
   }
   if (activeTab === 'completed') {
     return completedTasks();
   }
   if (activeTab === 'calendar') {
+    return allLoadedTasks();
+  }
+  if (activeTab === 'reports') {
     return allLoadedTasks();
   }
   return allOpenTasks();
@@ -518,7 +658,7 @@ function taskRowsForTab() {
 function taskUrgencyBucket(task) {
   const today = todayIsoBangkok();
   const tomorrow = addDaysIso(today, 1);
-  const relevantDate = isoDateFromValue(task.deadline) || isoDateFromValue(task.nextReminder);
+  const relevantDate = taskDueDate(task) || taskControlDate(task);
   const text = normalizeText([task.deadline, task.nextReminder, task.status].join(' '));
   if (isOverdueTask(task) || (relevantDate && relevantDate < today)) {
     return 0;
@@ -564,6 +704,39 @@ function groupedTasks(tasks) {
       groups.overdue.push(task);
     } else {
       groups.remaining.push(task);
+    }
+  });
+
+  Object.keys(groups).forEach(function (key) {
+    groups[key].sort(compareTaskUrgency);
+  });
+
+  return groups;
+}
+
+function workflowGroupedTasks(tasks) {
+  const groups = {
+    urgent: [],
+    active: [],
+    waiting: [],
+    pushes: [],
+    blockers: [],
+    review: [],
+  };
+
+  tasks.forEach(function (task) {
+    if (isNonReportableFinal(task) || !task.id || !nextActionText(task)) {
+      groups.review.push(task);
+    } else if (isBlockerTask(task)) {
+      groups.blockers.push(task);
+    } else if (isOverdueTask(task) || isTodayRelevantTask(task) || isHighPriority(task)) {
+      groups.urgent.push(task);
+    } else if (isWaitingTask(task)) {
+      groups.waiting.push(task);
+    } else if (isPushTask(task)) {
+      groups.pushes.push(task);
+    } else {
+      groups.active.push(task);
     }
   });
 
@@ -624,7 +797,7 @@ function renderCreateTaskButton() {
 
 function renderSummary() {
   if (dashboardState.status === 'loading') {
-    elements.summaryCards.innerHTML = ['Срочно', 'Ждут ответа', 'Пуши', 'Просрочено'].map(function (label) {
+    elements.summaryCards.innerHTML = ['Total', 'Today', 'Focus', 'Overdue'].map(function (label) {
       return '<article class="summary-card loading"><strong>...</strong><span>' + label + '</span></article>';
     }).join('');
     return;
@@ -632,9 +805,13 @@ function renderSummary() {
 
   const openTasks = allOpenTasks();
   const cards = [
-    { value: openTasks.filter(isUrgentTask).length, label: 'Срочно', tone: 'urgent' },
-    { value: openTasks.filter(isWaitingTask).length, label: 'Ждут ответа', tone: 'waiting' },
-    { value: openTasks.filter(isPushTask).length, label: 'Пуши', tone: 'push' },
+    { value: openTasks.length, label: 'Total tasks', tone: 'total' },
+    { value: derivedTodayTasks().length, label: 'Today', tone: 'today' },
+    { value: focusTasks().length, label: 'Focus', tone: 'focus' },
+    { value: openTasks.filter(isWaitingTask).length, label: 'Waiting', tone: 'waiting' },
+    { value: openTasks.filter(isPushTask).length, label: 'Pushes', tone: 'push' },
+    { value: openTasks.filter(isBlockerTask).length, label: 'Blockers', tone: 'blocker' },
+    { value: completedThisWeekTasks().length, label: 'Completed this week', tone: 'completed' },
     { value: openTasks.filter(isOverdueTask).length, label: 'Просрочено', tone: 'overdue' },
   ];
 
@@ -655,6 +832,21 @@ function statusText() {
   }
   if (activeTab === 'system') {
     return 'Этот экран показывает состояние live read, safe writes и отключенной автоматизации.';
+  }
+  if (activeTab === 'inbox') {
+    return 'Inbox собирает новые и неразобранные задачи. Они не попадают в Today, пока не появится срок или контрольная дата.';
+  }
+  if (activeTab === 'focus') {
+    return 'Focus показывает максимум 5 задач: просрочено, сегодня, высокий приоритет, blocker/push или ручная отметка.';
+  }
+  if (activeTab === 'today') {
+    return 'Today показывает только просроченные, due today, control date today и reminder today задачи.';
+  }
+  if (activeTab === 'all') {
+    return 'All Tasks — место для поиска, фильтров, статус-ревью и будущей очистки дублей.';
+  }
+  if (activeTab === 'reports') {
+    return 'Reports генерирует структурированный текст из активных и выполненных задач. PDF и запись в Sheets не выполняются.';
   }
   if (activeTab === 'audit') {
     if (cleanupAuditState.status === 'error') {
@@ -681,8 +873,8 @@ function renderEmpty() {
 function taskMeta(task) {
   return [
     task.organization || 'Без компании',
-    task.deadline ? 'Срок: ' + humanDate(task.deadline) : 'Без срока',
-    task.nextReminder ? 'Напомнить: ' + humanDate(task.nextReminder) : '',
+    taskDueDate(task) ? 'Срок: ' + humanDate(taskDueDate(task)) : 'Без срока',
+    taskControlDate(task) ? 'Контроль: ' + humanDate(taskControlDate(task)) : '',
   ].filter(Boolean);
 }
 
@@ -690,14 +882,17 @@ function taskMatchesFilter(task, filterId) {
   const text = taskSearchText(task);
   const today = todayIsoBangkok();
   if (filterId === 'all') return true;
+  if (filterId === 'inbox') return inboxTasks().some(function (inboxTask) { return inboxTask.id === task.id; });
+  if (filterId === 'focus') return focusTasks().some(function (focusTask) { return focusTask.id === task.id; });
   if (filterId === 'urgent') return isUrgentTask(task) || dateSignalIsDue(task.deadline, today);
   if (filterId === 'high') return isHighPriority(task);
-  if (filterId === 'work') return normalizeText(task.status).includes('в работе');
+  if (filterId === 'active') return canonicalStatus(task) === 'active';
   if (filterId === 'waiting') return isWaitingTask(task);
   if (filterId === 'push') return isPushTask(task);
   if (filterId === 'blockers') return isBlockerTask(task);
-  if (filterId === 'today') return dateSignalIsDue(task.nextReminder, today) || dateSignalIsDue(task.deadline, today);
+  if (filterId === 'today') return isTodayRelevantTask(task);
   if (filterId === 'overdue') return isOverdueTask(task);
+  if (filterId === 'cleanup') return isNonReportableFinal(task) || !task.category || !task.id || nextActionText(task) === 'Определить следующий шаг';
   return true;
 }
 
@@ -710,7 +905,7 @@ function taskMatchesSearch(task) {
 }
 
 function shouldShowWorkspaceControls() {
-  return !['system', 'audit'].includes(activeTab);
+  return !['system', 'audit', 'reports'].includes(activeTab);
 }
 
 function taskFilterHtml(tasks) {
@@ -779,9 +974,9 @@ function actionButtonsHtml(task) {
     ['moveToBlocker', 'Блокер', 'status-chip muted', true],
   ];
   const reminderOptions = [
-    ['snoozeOneDay', 'Завтра'],
-    ['snoozeThreeDays', '+3 дня'],
-    ['snoozeNextWeek', 'Следующая неделя'],
+    ['snoozeOneDay', 'Tomorrow'],
+    ['snoozeThreeDays', '+3 days'],
+    ['snoozeNextWeek', '+7 days'],
   ];
   const completeLabel = busy && state.action === 'markDone' ? '...' : '✓ Выполнено';
   const moveButtons = moveOptions.map(function (option) {
@@ -804,7 +999,8 @@ function actionButtonsHtml(task) {
   return [
     '<div class="task-actions" aria-label="Действия задачи">',
     '<div class="task-chip-row" aria-label="Статус">' + moveButtons + '</div>',
-    '<div class="task-chip-row reminder-row" aria-label="Напоминание"><span class="chip-row-label">Напомнить</span>' + reminderButtons + '</div>',
+    '<div class="task-chip-row reminder-row" aria-label="Контрольная дата"><span class="chip-row-label">Control date</span>' + reminderButtons + '<span class="chip-row-label muted">Pick date через обновление этапа</span></div>',
+    '<button class="task-action chip focus-chip" type="button" data-task-focus="' + escapeHtml(task.id) + '">' + (manualFocusTaskIds[task.id] ? '✓ В фокусе' : 'Mark as Focus') + '</button>',
     '<button class="task-action chip edit-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-edit="' + escapeHtml(task.id) + '">Обновить этап</button>',
     '</div>',
     message,
@@ -843,6 +1039,7 @@ function completedTaskCardHtml(task) {
     '<div class="task-main">',
     '<div class="task-topline">',
     '<span class="task-chip">' + escapeHtml(task.status || 'Выполнено') + '</span>',
+    isNonReportableFinal(task) ? '<span class="priority-label">Не для отчётов</span>' : '<span class="priority-label">Для отчётов</span>',
     task.completedAt ? '<span class="priority-label">Закрыта: ' + escapeHtml(humanDate(task.completedAt)) + '</span>' : '',
     '</div>',
     '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title)) + '</div>',
@@ -858,13 +1055,13 @@ function completedTaskCardHtml(task) {
 }
 
 function taskGroupsHtml(tasks) {
-  const groups = groupedTasks(tasks);
-  return Object.keys(taskGroupLabels).map(function (groupId) {
+  const groups = workflowGroupedTasks(tasks);
+  return Object.keys(workflowGroupLabels).map(function (groupId) {
     const groupTasks = groups[groupId];
     if (!groupTasks.length) {
       return '';
     }
-    const label = taskGroupLabels[groupId];
+    const label = workflowGroupLabels[groupId];
     return [
       '<section class="task-group" data-group="' + escapeHtml(groupId) + '">',
       '<div class="task-group-header"><div><h3>' + escapeHtml(label[0]) + '</h3><span>' + escapeHtml(label[1]) + '</span></div><strong>' + groupTasks.length + '</strong></div>',
@@ -906,14 +1103,6 @@ function renderTodayWorkMode(tasks) {
     return;
   }
 
-  const focus = focusTasks().filter(function (task) {
-    return visibleTasks.some(function (visibleTask) {
-      return visibleTask.id === task.id;
-    });
-  }).slice(0, 5);
-  const focusHtml = focus.length
-    ? focus.map(taskCardHtml).join('')
-    : '<article class="empty-state"><strong>Фокус дня пока пуст</strong><span>BA Fox покажет здесь срочные, просроченные, push и blocker задачи.</span></article>';
   const groups = todaySectionGroups(visibleTasks);
   const sectionsHtml = Object.keys(todaySectionLabels).map(function (key) {
     const sectionTasks = groups[key].sort(compareTaskUrgency);
@@ -929,11 +1118,37 @@ function renderTodayWorkMode(tasks) {
   }).join('');
 
   elements.taskList.innerHTML = [
+    '<section class="task-group today-section today-rule-note"><div class="task-group-header"><div><h3>Today queue</h3><span>Только overdue, due today, control date today и reminder today. Не вся активная очередь.</span></div><strong>' + visibleTasks.length + '</strong></div></section>',
+    sectionsHtml || '<article class="empty-state"><strong>Рабочие секции пусты</strong><span>Сегодня нет задач по выбранным фильтрам.</span></article>',
+  ].join('');
+}
+
+function renderInbox(tasks) {
+  const visibleTasks = tasks.filter(function (task) {
+    return taskMatchesFilter(task, activeTaskFilter) && taskMatchesSearch(task);
+  });
+  const intro = [
+    '<section class="inbox-guide">',
+    '<article><strong>1. Разобрать</strong><span>Проверить источник, компанию и смысл задачи.</span></article>',
+    '<article><strong>2. Назначить</strong><span>Категория, следующий шаг, контрольная дата.</span></article>',
+    '<article><strong>3. В работу</strong><span>После triage задача уходит в профильный раздел.</span></article>',
+    '</section>',
+  ].join('');
+  elements.taskList.innerHTML = intro + (visibleTasks.length
+    ? '<div class="task-group-list">' + visibleTasks.map(taskCardHtml).join('') + '</div>'
+    : '<article class="empty-state"><strong>Inbox пуст</strong><span>Новые задачи из BA Fox, Telegram, ChatGPT и Gmail будут появляться здесь для triage.</span></article>');
+}
+
+function renderFocus(tasks) {
+  const visibleTasks = tasks.filter(taskMatchesSearch).slice(0, 5);
+  const focusHtml = visibleTasks.length
+    ? visibleTasks.map(taskCardHtml).join('')
+    : '<article class="empty-state"><strong>Фокус пока пуст</strong><span>Отметьте задачу как Focus или дождитесь срочных сигналов.</span></article>';
+  elements.taskList.innerHTML = [
     '<section class="focus-day">',
-    '<div class="task-group-header"><div><h3>🎯 Фокус дня</h3><span>3–5 задач, которые сильнее всего двигают день</span></div><strong>' + focus.length + '</strong></div>',
+    '<div class="task-group-header"><div><h3>🎯 Фокус</h3><span>Максимум 5 задач: overdue, today, high priority, blocker/push или ручная отметка.</span></div><strong>' + visibleTasks.length + '/5</strong></div>',
     '<div class="task-group-list focus-list">' + focusHtml + '</div>',
     '</section>',
-    sectionsHtml || '<article class="empty-state"><strong>Рабочие секции пусты</strong><span>Сегодня нет задач по выбранным фильтрам.</span></article>',
   ].join('');
 }
 
@@ -941,7 +1156,7 @@ function calendarBucket(task) {
   const today = todayIsoBangkok();
   const tomorrow = addDaysIso(today, 1);
   const weekEnd = addDaysIso(today, 7);
-  const date = isoDateFromValue(task.deadline) || isoDateFromValue(task.nextReminder);
+  const date = taskDueDate(task) || taskControlDate(task);
   if (!date) {
     return 'none';
   }
@@ -958,8 +1173,12 @@ function calendarBucket(task) {
 }
 
 function calendarDateLabel(task) {
-  const date = task.deadline || task.nextReminder || '';
-  return date ? humanDate(date) : 'Без даты';
+  const dueDate = taskDueDate(task);
+  const controlDate = taskControlDate(task);
+  if (dueDate && controlDate && dueDate !== controlDate) {
+    return 'Срок: ' + humanDate(dueDate) + ' · Контроль: ' + humanDate(controlDate);
+  }
+  return dueDate ? 'Срок: ' + humanDate(dueDate) : controlDate ? 'Контроль: ' + humanDate(controlDate) : 'Без даты';
 }
 
 function calendarTaskHtml(task) {
@@ -1005,8 +1224,58 @@ function renderCalendar(tasks) {
     ].join('');
   }).join('');
   elements.taskList.innerHTML = [
-    '<div class="calendar-note">Напоминания сейчас хранятся в Google Sheets. Интеграцию с календарём добавим следующим этапом.</div>',
+    '<div class="calendar-note">Календарь использует deadline и controlDate/nextReminder из Google Sheets. Интеграцию с Google Calendar добавим отдельно.</div>',
     '<div class="calendar-grid">' + html + '</div>',
+  ].join('');
+}
+
+function reportSection(title, tasks, mapper) {
+  const rows = tasks.slice(0, 12).map(mapper || function (task) {
+    return '- ' + removeIsoDateNoise(task.title) + (task.organization ? ' / ' + task.organization : '');
+  });
+  return title + '\n' + (rows.length ? rows.join('\n') : '- Нет задач');
+}
+
+function buildReport(type) {
+  const active = allOpenTasks().filter(function (task) { return !isFinalTask(task); });
+  const done = reportableCompletedTasks();
+  const today = derivedTodayTasks();
+  const waiting = active.filter(isWaitingTask);
+  const blockers = active.filter(isBlockerTask);
+  const tomorrowFocus = focusTasks().slice(0, 5);
+  const title = type === 'weekly' ? 'Weekly Report' : 'Daily Report';
+  return [
+    title + ' · ' + todayIsoBangkok(),
+    '',
+    reportSection('✅ Done', done, function (task) {
+      return '- ' + removeIsoDateNoise(task.title) + (task.organization ? ' / ' + task.organization : '');
+    }),
+    '',
+    reportSection('🔄 In Progress', active.filter(function (task) { return canonicalStatus(task) === 'active'; })),
+    '',
+    reportSection('⏳ Waiting', waiting),
+    '',
+    reportSection('⚠️ Blockers', blockers),
+    '',
+    reportSection('🎯 Tomorrow Focus', tomorrowFocus),
+  ].join('\n');
+}
+
+function renderReports() {
+  const preview = reportPreview.text || buildReport('daily');
+  elements.taskList.innerHTML = [
+    '<section class="reports-panel">',
+    '<div class="report-actions">',
+    '<button class="primary-button" type="button" data-report-action="daily">Generate Daily Report</button>',
+    '<button class="secondary-button" type="button" data-report-action="weekly">Generate Weekly Report</button>',
+    '</div>',
+    '<div class="report-summary-grid">',
+    '<article><strong>' + escapeHtml(reportableCompletedTasks().length) + '</strong><span>Done source</span></article>',
+    '<article><strong>' + escapeHtml(allOpenTasks().length) + '</strong><span>Active source</span></article>',
+    '<article><strong>' + escapeHtml(focusTasks().length) + '</strong><span>Tomorrow focus</span></article>',
+    '</div>',
+    '<pre class="report-preview">' + escapeHtml(preview) + '</pre>',
+    '</section>',
   ].join('');
 }
 
@@ -1018,6 +1287,18 @@ function renderTasks(options) {
   }
   if (activeTab === 'calendar') {
     renderCalendar(tasks);
+    return;
+  }
+  if (activeTab === 'reports') {
+    renderReports();
+    return;
+  }
+  if (activeTab === 'inbox') {
+    renderInbox(tasks);
+    return;
+  }
+  if (activeTab === 'focus') {
+    renderFocus(tasks);
     return;
   }
   if (activeTab === 'today') {
@@ -1322,7 +1603,8 @@ function localizeStaticLabels() {
   elements.tabs.forEach(function (tab) {
     const label = viewLabels[tab.dataset.tab];
     if (label) {
-      tab.textContent = label[0];
+      const count = navCountForTab(tab.dataset.tab);
+      tab.innerHTML = '<span>' + escapeHtml(label[0]) + '</span>' + (count === '' || count == null ? '' : '<strong>' + escapeHtml(count) + '</strong>');
     }
   });
 }
@@ -1658,6 +1940,16 @@ elements.workspaceControls.addEventListener('click', function (event) {
 });
 
 elements.taskList.addEventListener('click', function (event) {
+  const reportButton = event.target.closest('[data-report-action]');
+  if (reportButton) {
+    reportPreview = {
+      type: reportButton.dataset.reportAction || 'daily',
+      text: buildReport(reportButton.dataset.reportAction || 'daily'),
+    };
+    renderReports();
+    return;
+  }
+
   const filterButton = event.target.closest('[data-audit-filter]');
   if (filterButton) {
     activeAuditFilter = filterButton.dataset.auditFilter || 'all';
@@ -1668,6 +1960,17 @@ elements.taskList.addEventListener('click', function (event) {
   const editButton = event.target.closest('[data-task-edit]');
   if (editButton) {
     openEditTaskModal(editButton.dataset.taskEdit);
+    return;
+  }
+
+  const focusButton = event.target.closest('[data-task-focus]');
+  if (focusButton) {
+    const taskId = focusButton.dataset.taskFocus;
+    manualFocusTaskIds[taskId] = !manualFocusTaskIds[taskId];
+    if (!manualFocusTaskIds[taskId]) {
+      delete manualFocusTaskIds[taskId];
+    }
+    render();
     return;
   }
 
