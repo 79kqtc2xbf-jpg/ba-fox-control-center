@@ -1,5 +1,5 @@
 var BA_FOX_CONFIG = {
-  VERSION: 'v2.7.5-safe-real-actions',
+  VERSION: 'v2.8.0-stage-14-performance-schema',
   DRY_RUN: true,
   READ_LIVE_SHEETS: true,
   SAFE_WRITE_MODE: true,
@@ -40,7 +40,7 @@ var BA_FOX_CONFIG = {
     EXTERNAL_REF: 24,
     ARCHIVED: 25
   },
-  FINAL_STATUSES: ['Done', 'Cancelled', 'Archived', 'Выполнено', 'Архив'],
+  FINAL_STATUSES: ['Done', 'Completed', 'Cancelled', 'Canceled', 'Archived', 'Duplicate', 'Not Relevant', 'Выполнено', 'Архив', 'Отменено', 'Дубликат', 'Не актуально'],
   OPEN_STATUSES: [
     'Not started',
     'In progress',

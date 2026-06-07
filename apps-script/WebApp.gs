@@ -82,6 +82,8 @@ function baFoxPutCachedResponse_(route, parameters, response) {
 function baFoxBuildTaskViewsFromRows_(parameters, storeResult) {
   return {
     scaffoldInfo: baFoxScaffoldInfo().data,
+    inbox: baFoxListInboxTasks({ date: parameters.date }, storeResult),
+    focus: baFoxListFocusTasks({ date: parameters.date }, storeResult),
     today: baFoxListTodayTasks({ date: parameters.date }, storeResult),
     open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult),
@@ -89,9 +91,25 @@ function baFoxBuildTaskViewsFromRows_(parameters, storeResult) {
   };
 }
 
+function baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult) {
+  return {
+    scaffoldInfo: baFoxScaffoldInfo().data,
+    inbox: baFoxListInboxTasks({ date: parameters.date }, storeResult),
+    focus: baFoxListFocusTasks({ date: parameters.date }, storeResult),
+    today: baFoxListTodayTasks({ date: parameters.date }, storeResult),
+    open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
+    pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult)
+  };
+}
+
 function baFoxGetDashboard_(parameters) {
   var storeResult = baFoxReadTasksRows();
-  return baFoxOk(baFoxBuildTaskViewsFromRows_(parameters, storeResult));
+  return baFoxOk(baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult));
+}
+
+function baFoxGetWorkspaceDashboard_(parameters) {
+  var storeResult = baFoxReadTasksRows();
+  return baFoxOk(baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult));
 }
 
 function baFoxGetFullDashboard_(parameters) {
@@ -187,6 +205,12 @@ function baFoxBuildRouteResponse_(route, parameters) {
     case 'today':
       response = getTodayTasks({ date: parameters.date });
       break;
+    case 'inbox':
+      response = getInboxTasks({ date: parameters.date });
+      break;
+    case 'focus':
+      response = getFocusTasks({ date: parameters.date });
+      break;
     case 'open':
       response = getOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' });
       break;
@@ -198,6 +222,9 @@ function baFoxBuildRouteResponse_(route, parameters) {
       break;
     case 'dashboard':
       response = baFoxGetDashboard_(parameters);
+      break;
+    case 'workspaceDashboard':
+      response = baFoxGetWorkspaceDashboard_(parameters);
       break;
     case 'fullDashboard':
       response = baFoxGetFullDashboard_(parameters);
