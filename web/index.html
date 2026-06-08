@@ -4,16 +4,20 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#070b1a" />
-  <title>BA Fox - Control Center</title>
+  <title>EA FOX - Control Center</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <main class="app-shell">
     <header class="hero-card">
+      <button class="sidebar-toggle" type="button" id="sidebarToggle" aria-controls="sidebarShell" aria-expanded="false">
+        <span aria-hidden="true">☰</span>
+        <span>Меню</span>
+      </button>
       <div>
-        <p class="eyebrow">BA Fox / Executive Fox</p>
-        <h1>BA Fox Control Center</h1>
-        <p class="hero-copy">Тихий обзор текущих задач и ожидаемых ответов.</p>
+        <p class="eyebrow">EA FOX</p>
+        <h1>EA FOX Control Center</h1>
+        <p class="hero-copy">Фокус, задачи и контроль — в одном рабочем центре.</p>
       </div>
       <div class="hero-status">
         <span class="read-only-pill" id="writeModePill">Только просмотр</span>
@@ -28,12 +32,13 @@
     </div>
 
     <div class="workspace-layout">
-      <aside class="sidebar-shell" aria-label="Рабочее пространство BA Fox">
+      <button class="sidebar-backdrop" type="button" id="sidebarBackdrop" aria-label="Закрыть меню" hidden></button>
+      <aside class="sidebar-shell" id="sidebarShell" aria-label="Рабочее пространство EA FOX" aria-hidden="true">
         <div class="sidebar-title">
           <span>Workspace</span>
           <strong>EA OS</strong>
         </div>
-        <nav class="tabs" aria-label="Разделы BA Fox">
+        <nav class="tabs" aria-label="Разделы EA FOX">
           <button class="tab active" type="button" data-tab="inbox" aria-selected="true">Inbox</button>
           <button class="tab" type="button" data-tab="focus" aria-selected="false">Focus</button>
           <button class="tab" type="button" data-tab="today" aria-selected="false">Today</button>
@@ -46,6 +51,8 @@
           <button class="tab" type="button" data-tab="completed" aria-selected="false">Completed</button>
           <button class="tab" type="button" data-tab="calendar" aria-selected="false">Calendar</button>
           <button class="tab" type="button" data-tab="reports" aria-selected="false">Reports</button>
+          <button class="tab" type="button" data-tab="mail" aria-selected="false">Mail</button>
+          <button class="tab" type="button" data-tab="telegram" aria-selected="false">Telegram</button>
           <button class="tab" type="button" data-tab="system" aria-selected="false">System</button>
         </nav>
       </aside>
@@ -74,7 +81,7 @@
       <form id="createTaskForm" novalidate>
         <div class="modal-header">
           <div>
-            <p class="eyebrow">BA Fox Web</p>
+            <p class="eyebrow">EA FOX Web</p>
             <h2 id="createTaskTitle">Новая задача</h2>
           </div>
           <button class="modal-close" type="button" id="cancelCreateTaskTop" aria-label="Закрыть">×</button>
@@ -111,7 +118,7 @@
       <form id="editTaskForm" novalidate>
         <div class="modal-header">
           <div>
-            <p class="eyebrow">BA Fox Web</p>
+            <p class="eyebrow">EA FOX Web</p>
             <h2 id="editTaskTitle">Обновить этап</h2>
           </div>
           <button class="modal-close" type="button" id="closeEditTaskTop" aria-label="Закрыть">×</button>

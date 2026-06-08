@@ -19,7 +19,7 @@
     'editTask',
   ]);
   const TASK_ACTION_MESSAGES = Object.freeze({
-    ACTION_NOT_ALLOWED: 'Это действие пока не включено для BA Fox Web.',
+    ACTION_NOT_ALLOWED: 'Это действие пока не включено для EA FOX Web.',
     SAFE_WRITES_DISABLED: 'Безопасная запись выключена. Действия доступны только для просмотра.',
     TASK_NOT_FOUND: 'Задача не найдена в таблице.',
     VALIDATION_ERROR: 'Не хватает данных для безопасного действия.',
@@ -45,7 +45,7 @@
     VALIDATION_ERROR: 'Проверьте поля обновления этапа.',
   });
   const JSONP_TIMEOUT_MS = 10000;
-  const RATE_LIMIT_MESSAGE = 'Google Sheets временно ограничил чтение. BA Fox повторит попытку позже.';
+  const RATE_LIMIT_MESSAGE = 'Google Sheets временно ограничил чтение. EA FOX повторит попытку позже.';
   let jsonpRequestSequence = 0;
 
   function assertRoute(route) {
