@@ -11,10 +11,15 @@ const viewLabels = Object.freeze({
   completed: ['Completed', 'Архив, история и память для отчётов'],
   calendar: ['Календарь', 'Задачи по срокам и напоминаниям'],
   reports: ['📈 Reports', 'Дневной и недельный отчёт'],
+  mail: ['Почта', 'Сверка писем и follow-up'],
+  telegram: ['Telegram', 'Быстрые действия и уведомления'],
   system: ['Система', 'Безопасный режим'],
 });
 
 const elements = {
+  sidebarToggle: document.querySelector('#sidebarToggle'),
+  sidebarShell: document.querySelector('#sidebarShell'),
+  sidebarBackdrop: document.querySelector('#sidebarBackdrop'),
   tabBar: document.querySelector('.tabs'),
   tabs: document.querySelectorAll('.tab'),
   summaryCards: document.querySelector('#summaryCards'),
@@ -122,7 +127,43 @@ const sidebarOrder = Object.freeze([
   'completed',
   'calendar',
   'reports',
+  'mail',
+  'telegram',
   'system',
+]);
+
+const reportTypes = Object.freeze({
+  daySummary: {
+    title: 'Итог дня',
+    button: 'Создать отчёт',
+  },
+  dayPlan: {
+    title: 'План дня',
+    button: 'План дня',
+  },
+  weekly: {
+    title: 'Weekly Summary',
+    button: 'Weekly summary',
+  },
+  telegram: {
+    title: 'Telegram-ready',
+    button: 'Telegram-ready',
+  },
+});
+
+const gmailReconciliationFields = Object.freeze([
+  ['actionOwner', 'Кто следующий владелец действия'],
+  ['recommendedStatus', 'Рекомендуемый статус задачи'],
+  ['nextAction', 'Следующий шаг после письма'],
+  ['followUpDraft', 'Черновик follow-up без автоотправки'],
+  ['confidence', 'Уверенность рекомендации'],
+]);
+
+const telegramPlannedActions = Object.freeze([
+  ['openToday', 'Открыть задачи на сегодня', 'Планируется'],
+  ['sendReportPreview', 'Отправить preview отчёта в Telegram', 'Только после подтверждения'],
+  ['pushReminders', 'Пушить напоминания', 'Планируется'],
+  ['taskStatusSync', 'Синхронизировать статусы задач', 'Планируется'],
 ]);
 
 const workflowGroupLabels = Object.freeze({
@@ -165,8 +206,9 @@ let activeTab = 'inbox';
 let activeTaskFilter = 'all';
 let taskSearchQuery = '';
 let activeAuditFilter = 'all';
+let sidebarOpen = false;
 let manualFocusTaskIds = {};
-let reportPreview = { type: '', text: '' };
+let reportPreview = { type: 'daySummary', text: '' };
 let dashboardState = BAFoxClient.createLoadingState('dashboard');
 let scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
 let cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
@@ -462,6 +504,7 @@ function inboxTasks() {
     const category = normalizeText(task.category);
     const nextAction = normalizeText(nextActionText(task));
     return source.includes('ba fox web')
+      || source.includes('ea fox web')
       || source.includes('telegram')
       || source.includes('chatgpt')
       || source.includes('gmail')
@@ -576,6 +619,8 @@ function navCountForTab(tabName) {
     completed: completedTasks().length,
     calendar: allLoadedTasks().length,
     reports: completedThisWeekTasks().length,
+    mail: '',
+    telegram: '',
     system: '',
   };
   return counts[tabName];
@@ -857,7 +902,13 @@ function statusText() {
     return 'All Tasks — место для поиска, фильтров, статус-ревью и будущей очистки дублей.';
   }
   if (activeTab === 'reports') {
-    return 'Reports генерирует структурированный текст из активных и выполненных задач. PDF и запись в Sheets не выполняются.';
+    return 'Reports генерирует локальный preview. PDF, Sheets-запись и отправка выполняются только отдельным подтверждённым шагом.';
+  }
+  if (activeTab === 'mail') {
+    return 'Сверка почты пока запускается через ChatGPT. После анализа можно обновить задачи и follow-up.';
+  }
+  if (activeTab === 'telegram') {
+    return 'Telegram-интеграции подготовлены как план. Автоотправки и bot token здесь не добавляются.';
   }
   if (activeTab === 'audit') {
     if (cleanupAuditState.status === 'error') {
@@ -916,7 +967,7 @@ function taskMatchesSearch(task) {
 }
 
 function shouldShowWorkspaceControls() {
-  return !['system', 'audit', 'reports'].includes(activeTab);
+  return !['system', 'audit', 'reports', 'mail', 'telegram'].includes(activeTab);
 }
 
 function taskFilterHtml(tasks) {
@@ -1147,7 +1198,7 @@ function renderInbox(tasks) {
   ].join('');
   elements.taskList.innerHTML = intro + (visibleTasks.length
     ? '<div class="task-group-list">' + visibleTasks.map(taskCardHtml).join('') + '</div>'
-    : '<article class="empty-state"><strong>Inbox пуст</strong><span>Новые задачи из BA Fox, Telegram, ChatGPT и Gmail будут появляться здесь для triage.</span></article>');
+    : '<article class="empty-state"><strong>Inbox пуст</strong><span>Новые задачи из EA FOX, Telegram, ChatGPT и Gmail будут появляться здесь для triage.</span></article>');
 }
 
 function renderFocus(tasks) {
@@ -1247,6 +1298,12 @@ function reportSection(title, tasks, mapper) {
   return title + '\n' + (rows.length ? rows.join('\n') : '- Нет задач');
 }
 
+function reportLine(task) {
+  return '- ' + removeIsoDateNoise(task.title)
+    + (task.organization ? ' / ' + task.organization : '')
+    + (nextActionText(task) ? ' — ' + removeIsoDateNoise(nextActionText(task)) : '');
+}
+
 function buildReport(type) {
   const active = allOpenTasks().filter(function (task) { return !isFinalTask(task); });
   const done = reportableCompletedTasks();
@@ -1254,13 +1311,41 @@ function buildReport(type) {
   const waiting = active.filter(isWaitingTask);
   const blockers = active.filter(isBlockerTask);
   const tomorrowFocus = focusTasks().slice(0, 5);
-  const title = type === 'weekly' ? 'Weekly Report' : 'Daily Report';
+  const pushes = active.filter(isPushTask);
+  const title = (reportTypes[type] || reportTypes.daySummary).title;
+
+  if (type === 'dayPlan') {
+    return [
+      title + ' · ' + todayIsoBangkok(),
+      '',
+      reportSection('🎯 Фокус дня', tomorrowFocus, reportLine),
+      '',
+      reportSection('🔥 Сегодня', today, reportLine),
+      '',
+      reportSection('⏳ Ждут ответа', waiting, reportLine),
+      '',
+      reportSection('⚠️ Блокеры', blockers, reportLine),
+    ].join('\n');
+  }
+
+  if (type === 'telegram') {
+    return [
+      'EA FOX · ' + title + ' · ' + todayIsoBangkok(),
+      '',
+      reportSection('✅ Готово', done, reportLine),
+      '',
+      reportSection('🎯 Фокус', tomorrowFocus, reportLine),
+      '',
+      reportSection('⏳ Ждём / пуши', waiting.concat(pushes), reportLine),
+      '',
+      'Отправка в Telegram не выполняется автоматически. Это только preview.',
+    ].join('\n');
+  }
+
   return [
     title + ' · ' + todayIsoBangkok(),
     '',
-    reportSection('✅ Done', done, function (task) {
-      return '- ' + removeIsoDateNoise(task.title) + (task.organization ? ' / ' + task.organization : '');
-    }),
+    reportSection(type === 'weekly' ? '✅ Done this week' : '✅ Итог дня', done, reportLine),
     '',
     reportSection('🔄 In Progress', active.filter(function (task) { return canonicalStatus(task) === 'active'; })),
     '',
@@ -1273,12 +1358,20 @@ function buildReport(type) {
 }
 
 function renderReports() {
-  const preview = reportPreview.text || buildReport('daily');
+  const preview = reportPreview.text || buildReport('daySummary');
+  const activeType = reportPreview.type || 'daySummary';
+  const typeButtons = Object.keys(reportTypes).map(function (type) {
+    const config = reportTypes[type];
+    const buttonClass = type === activeType ? 'primary-button' : 'secondary-button';
+    return '<button class="' + buttonClass + '" type="button" data-report-action="' + escapeHtml(type) + '">' + escapeHtml(config.button) + '</button>';
+  }).join('');
   elements.taskList.innerHTML = [
     '<section class="reports-panel">',
+    '<div class="integration-hero">',
+    '<div><strong>Создать отчёт</strong><span>Локальный preview из задач, статусов и архива. Ничего не отправляется и не записывается без отдельного подтверждения.</span></div>',
+    '</div>',
     '<div class="report-actions">',
-    '<button class="primary-button" type="button" data-report-action="daily">Generate Daily Report</button>',
-    '<button class="secondary-button" type="button" data-report-action="weekly">Generate Weekly Report</button>',
+    typeButtons,
     '</div>',
     '<div class="report-summary-grid">',
     '<article><strong>' + escapeHtml(reportableCompletedTasks().length) + '</strong><span>Done source</span></article>',
@@ -1286,6 +1379,56 @@ function renderReports() {
     '<article><strong>' + escapeHtml(focusTasks().length) + '</strong><span>Tomorrow focus</span></article>',
     '</div>',
     '<pre class="report-preview">' + escapeHtml(preview) + '</pre>',
+    '</section>',
+  ].join('');
+}
+
+function renderMailWorkflow() {
+  const schemaHtml = gmailReconciliationFields.map(function (field) {
+    return '<article><strong>' + escapeHtml(field[0]) + '</strong><span>' + escapeHtml(field[1]) + '</span></article>';
+  }).join('');
+  elements.taskList.innerHTML = [
+    '<section class="integration-panel">',
+    '<div class="integration-hero">',
+    '<div>',
+    '<strong>Сверить почту</strong>',
+    '<span>Сверка почты пока запускается через ChatGPT. После анализа можно обновить задачи и follow-up.</span>',
+    '</div>',
+    '<button class="primary-button" type="button" disabled>Сверить почту</button>',
+    '</div>',
+    '<div class="integration-grid">',
+    '<article><strong>Без автоотправки</strong><span>EA FOX не отправляет письма и не добавляет Gmail secrets.</span></article>',
+    '<article><strong>Результаты как draft</strong><span>Follow-up остается черновиком до подтверждения Lisa.</span></article>',
+    '<article><strong>Обновление задач</strong><span>После анализа можно вручную обновить этап через editTask.</span></article>',
+    '</div>',
+    '<div class="integration-schema">',
+    '<h3>Будущая структура reconciliation result</h3>',
+    '<div class="integration-grid">' + schemaHtml + '</div>',
+    '</div>',
+    '</section>',
+  ].join('');
+}
+
+function renderTelegramWorkflow() {
+  const actionsHtml = telegramPlannedActions.map(function (action) {
+    return [
+      '<article>',
+      '<strong>' + escapeHtml(action[1]) + '</strong>',
+      '<span>' + escapeHtml(action[2]) + '</span>',
+      '</article>',
+    ].join('');
+  }).join('');
+  elements.taskList.innerHTML = [
+    '<section class="integration-panel">',
+    '<div class="integration-hero">',
+    '<div>',
+    '<strong>Telegram workflow</strong>',
+    '<span>Интеграция подготовлена как план. Bot token, backend routes и автоотправка в этом stage не добавляются.</span>',
+    '</div>',
+    '<button class="secondary-button" type="button" disabled>Telegram отключён</button>',
+    '</div>',
+    '<div class="integration-grid">' + actionsHtml + '</div>',
+    '<p class="integration-note">Telegram-ready отчёт можно сформировать в Reports как preview. Отправка будет отдельным подтверждённым действием в будущем stage.</p>',
     '</section>',
   ].join('');
 }
@@ -1302,6 +1445,14 @@ function renderTasks(options) {
   }
   if (activeTab === 'reports') {
     renderReports();
+    return;
+  }
+  if (activeTab === 'mail') {
+    renderMailWorkflow();
+    return;
+  }
+  if (activeTab === 'telegram') {
+    renderTelegramWorkflow();
     return;
   }
   if (activeTab === 'inbox') {
@@ -1324,7 +1475,7 @@ function renderTasks(options) {
       elements.taskList.innerHTML = [
         '<article class="empty-state">',
         '<strong>Выполненные задачи пока не загружаются из источника.</strong>',
-        '<span>Этот раздел будет памятью для дневных и недельных отчётов. BA Fox загружает архив отдельно от рабочей панели.</span>',
+        '<span>Этот раздел будет памятью для дневных и недельных отчётов. EA FOX загружает архив отдельно от рабочей панели.</span>',
         '</article>',
       ].join('');
       return;
@@ -1490,7 +1641,7 @@ function renderAudit() {
       '<section class="audit-section">',
       '<article class="loading-state">',
       '<strong>Загружаю audit-only отчет...</strong>',
-      '<span>Это только чтение. BA Fox ничего не меняет в таблице.</span>',
+      '<span>Это только чтение. EA FOX ничего не меняет в таблице.</span>',
       '</article>',
       '</section>',
     ].join('');
@@ -1528,7 +1679,7 @@ function renderAudit() {
   ].map(function (row) {
     return '<article class="audit-compact-card ' + escapeHtml(row[2]) + '"><strong>' + escapeHtml(row[1]) + '</strong><span>' + escapeHtml(row[0]) + '</span></article>';
   }).join('');
-  const explanation = '<p class="audit-explainer">Это только аудит. BA Fox ничего не меняет в таблице.</p>';
+  const explanation = '<p class="audit-explainer">Это только аудит. EA FOX ничего не меняет в таблице.</p>';
 
   if (!items.length) {
     elements.taskList.innerHTML = [
@@ -1604,10 +1755,26 @@ function renderPanel() {
 
 function render() {
   localizeStaticLabels();
+  renderSidebarState();
   renderModeBanner();
   renderCreateTaskButton();
   renderSummary();
   renderPanel();
+}
+
+function renderSidebarState() {
+  if (!elements.sidebarShell || !elements.sidebarToggle || !elements.sidebarBackdrop) {
+    return;
+  }
+  document.body.classList.toggle('sidebar-open', sidebarOpen);
+  elements.sidebarShell.setAttribute('aria-hidden', sidebarOpen ? 'false' : 'true');
+  elements.sidebarToggle.setAttribute('aria-expanded', sidebarOpen ? 'true' : 'false');
+  elements.sidebarBackdrop.hidden = !sidebarOpen;
+}
+
+function setSidebarOpen(open) {
+  sidebarOpen = open === true;
+  renderSidebarState();
 }
 
 function localizeStaticLabels() {
@@ -1633,6 +1800,7 @@ function setTab(tabName) {
     tab.classList.toggle('active', isActive);
     tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
   });
+  setSidebarOpen(false);
   renderPanel();
   loadLazyTabData(tabName);
 }
@@ -1958,6 +2126,20 @@ function loadOptionalLocalConfig() {
   });
 }
 
+elements.sidebarToggle.addEventListener('click', function () {
+  setSidebarOpen(!sidebarOpen);
+});
+
+elements.sidebarBackdrop.addEventListener('click', function () {
+  setSidebarOpen(false);
+});
+
+document.addEventListener('keydown', function (event) {
+  if (event.key === 'Escape' && sidebarOpen) {
+    setSidebarOpen(false);
+  }
+});
+
 elements.tabBar.addEventListener('click', function (event) {
   const tab = event.target.closest('[data-tab]');
   if (!tab || !elements.tabBar.contains(tab)) {
@@ -2003,9 +2185,10 @@ elements.workspaceControls.addEventListener('click', function (event) {
 elements.taskList.addEventListener('click', function (event) {
   const reportButton = event.target.closest('[data-report-action]');
   if (reportButton) {
+    const reportType = reportButton.dataset.reportAction || 'daySummary';
     reportPreview = {
-      type: reportButton.dataset.reportAction || 'daily',
-      text: buildReport(reportButton.dataset.reportAction || 'daily'),
+      type: reportType,
+      text: buildReport(reportType),
     };
     renderReports();
     return;

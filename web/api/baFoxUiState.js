@@ -3,7 +3,7 @@
     return {
       status: 'loading',
       route: route,
-      message: 'Загружаю задачи BA Fox...',
+      message: 'Загружаю задачи EA FOX...',
       data: null,
       error: null,
       isMock: false,
@@ -39,7 +39,7 @@
     return {
       status: 'error',
       route: route,
-      message: settings.message || 'Не удалось загрузить read-only данные BA Fox.',
+      message: settings.message || 'Не удалось загрузить read-only данные EA FOX.',
       data: settings.fallbackData || null,
       error: clientError,
       isMock: Boolean(settings.isMock),
