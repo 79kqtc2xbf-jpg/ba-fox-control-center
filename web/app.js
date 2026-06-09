@@ -7,13 +7,13 @@ const viewLabels = Object.freeze({
   presentations: ['Презентации', 'Деки, офферы и материалы'],
   brokers: ['Брокеры', 'Брокеры, партнёры и внешние касания'],
   waiting: ['⏰ Waiting', 'Ожидания, контрольные даты и пуши'],
-  all: ['📋 All Tasks', 'Поиск, фильтры и обслуживание очереди'],
+  all: ['📋 All Tasks', 'Фокус, очередь и быстрые действия'],
   completed: ['Completed', 'Архив, история и память для отчётов'],
   calendar: ['Календарь', 'Задачи по срокам и напоминаниям'],
   reports: ['📈 Reports', 'Дневной и недельный отчёт'],
-  mail: ['Почта', 'Сверка писем и follow-up'],
+  mail: ['📬 Mail', 'Сверка писем и follow-up'],
   telegram: ['Telegram', 'Быстрые действия и уведомления'],
-  system: ['Система', 'Безопасный режим'],
+  system: ['⚙️ Settings', 'Безопасный режим'],
 });
 
 const elements = {
@@ -65,18 +65,13 @@ const severityRank = Object.freeze({
 });
 
 const taskFilters = Object.freeze([
-  { id: 'all', label: 'Все' },
-  { id: 'inbox', label: 'Inbox' },
-  { id: 'focus', label: 'Focus' },
-  { id: 'urgent', label: 'Срочно' },
-  { id: 'high', label: 'Высокий приоритет' },
-  { id: 'active', label: 'Active' },
-  { id: 'waiting', label: 'Ждут ответа' },
-  { id: 'push', label: 'Пуши' },
-  { id: 'blockers', label: 'Блокеры' },
-  { id: 'today', label: 'Сегодня' },
-  { id: 'overdue', label: 'Просрочено' },
-  { id: 'cleanup', label: 'Review' },
+  { id: 'all', label: 'All' },
+  { id: 'documents', label: 'Documents' },
+  { id: 'communication', label: 'Communication' },
+  { id: 'presentations', label: 'Presentations' },
+  { id: 'brokers', label: 'Brokers' },
+  { id: 'waiting', label: 'Waiting' },
+  { id: 'completed', label: 'Completed' },
 ]);
 
 const waitingStatuses = Object.freeze([
@@ -115,20 +110,10 @@ const actionStatusUpdates = Object.freeze({
 });
 
 const sidebarOrder = Object.freeze([
-  'inbox',
-  'focus',
-  'today',
-  'documents',
-  'communication',
-  'presentations',
-  'brokers',
-  'waiting',
   'all',
-  'completed',
-  'calendar',
-  'reports',
+  'focus',
   'mail',
-  'telegram',
+  'reports',
   'system',
 ]);
 
@@ -202,7 +187,7 @@ const todaySectionLabels = Object.freeze({
   other: 'Остальное',
 });
 
-let activeTab = 'inbox';
+let activeTab = 'all';
 let activeTaskFilter = 'all';
 let taskSearchQuery = '';
 let activeAuditFilter = 'all';
@@ -615,7 +600,7 @@ function navCountForTab(tabName) {
     presentations: presentationTasks().length,
     brokers: brokerTasks().length,
     waiting: waitListTasks().length,
-    all: allOpenTasks().length,
+    all: allLoadedTasks().length,
     completed: completedTasks().length,
     calendar: allLoadedTasks().length,
     reports: completedThisWeekTasks().length,
@@ -627,6 +612,22 @@ function navCountForTab(tabName) {
 }
 
 function taskSectionKey(task) {
+  const category = normalizeText(task.category || task.taskType);
+  if (textHasAny(category, ['documents', 'document', 'документы', 'документ'])) {
+    return 'documents';
+  }
+  if (textHasAny(category, ['communication', 'mail', 'email', 'коммуникация', 'почта'])) {
+    return 'communication';
+  }
+  if (textHasAny(category, ['presentations', 'presentation', 'презентации', 'презентация'])) {
+    return 'presentations';
+  }
+  if (textHasAny(category, ['brokers', 'broker', 'брокеры', 'брокер'])) {
+    return 'brokers';
+  }
+  if (textHasAny(category, ['waiting', 'reminder', 'reminders', 'waiting reply', 'ожидание', 'напомнить'])) {
+    return 'waiting';
+  }
   const text = taskSearchText(task);
   if (textHasAny(text, ['document', 'documents', 'docs', 'kyc', 'onboarding', 'package', 'agreement', 'contract', 'документ', 'договор', 'пакет', 'онбординг'])) {
     return 'documents';
@@ -638,7 +639,7 @@ function taskSectionKey(task) {
     return 'brokers';
   }
   if (isPushTask(task) || task.nextReminder || textHasAny(text, ['reminder', 'напомнить', 'контроль', 'follow-up'])) {
-    return 'reminders';
+    return 'waiting';
   }
   if (textHasAny(text, ['communication', 'email', 'telegram', 'reply', 'message', 'follow-up', 'письм', 'ответ', 'сообщ', 'чат', 'телеграм', 'звон'])) {
     return 'communication';
@@ -697,7 +698,7 @@ function taskRowsForTab() {
     return brokerTasks();
   }
   if (activeTab === 'all') {
-    return allOpenTasks();
+    return allLoadedTasks();
   }
   if (activeTab === 'completed') {
     return completedTasks();
@@ -887,7 +888,7 @@ function statusText() {
     return dashboardState.message || 'Ошибка чтения: рабочие данные не открыты, ниже показан demo-набор.';
   }
   if (activeTab === 'system') {
-    return 'Этот экран показывает состояние live read, safe writes и отключенной автоматизации.';
+    return 'Settings показывает состояние live read, safe writes и отключенной автоматизации.';
   }
   if (activeTab === 'inbox') {
     return 'Inbox собирает новые и неразобранные задачи. Они не попадают в Today, пока не появится срок или контрольная дата.';
@@ -899,7 +900,7 @@ function statusText() {
     return 'Today показывает только просроченные, due today, control date today и reminder today задачи.';
   }
   if (activeTab === 'all') {
-    return 'All Tasks — место для поиска, фильтров, статус-ревью и будущей очистки дублей.';
+    return 'All Tasks — главный рабочий экран: фокус дня, быстрые действия, поиск и фильтры категорий.';
   }
   if (activeTab === 'reports') {
     return 'Reports генерирует локальный preview. PDF, Sheets-запись и отправка выполняются только отдельным подтверждённым шагом.';
@@ -941,20 +942,13 @@ function taskMeta(task) {
 }
 
 function taskMatchesFilter(task, filterId) {
-  const text = taskSearchText(task);
-  const today = todayIsoBangkok();
   if (filterId === 'all') return true;
-  if (filterId === 'inbox') return inboxTasks().some(function (inboxTask) { return inboxTask.id === task.id; });
-  if (filterId === 'focus') return focusTasks().some(function (focusTask) { return focusTask.id === task.id; });
-  if (filterId === 'urgent') return isUrgentTask(task) || dateSignalIsDue(task.deadline, today);
-  if (filterId === 'high') return isHighPriority(task);
-  if (filterId === 'active') return canonicalStatus(task) === 'active';
-  if (filterId === 'waiting') return isWaitingTask(task);
-  if (filterId === 'push') return isPushTask(task);
-  if (filterId === 'blockers') return isBlockerTask(task);
-  if (filterId === 'today') return isTodayRelevantTask(task);
-  if (filterId === 'overdue') return isOverdueTask(task);
-  if (filterId === 'cleanup') return isNonReportableFinal(task) || !task.category || !task.id || nextActionText(task) === 'Определить следующий шаг';
+  if (filterId === 'documents') return taskSectionKey(task) === 'documents';
+  if (filterId === 'communication') return taskSectionKey(task) === 'communication';
+  if (filterId === 'presentations') return taskSectionKey(task) === 'presentations';
+  if (filterId === 'brokers') return taskSectionKey(task) === 'brokers';
+  if (filterId === 'waiting') return isWaitingTask(task) || taskSectionKey(task) === 'waiting';
+  if (filterId === 'completed') return isFinalTask(task);
   return true;
 }
 
@@ -967,7 +961,7 @@ function taskMatchesSearch(task) {
 }
 
 function shouldShowWorkspaceControls() {
-  return !['system', 'audit', 'reports', 'mail', 'telegram'].includes(activeTab);
+  return activeTab === 'all';
 }
 
 function taskFilterHtml(tasks) {
@@ -1210,6 +1204,50 @@ function renderFocus(tasks) {
     '<section class="focus-day">',
     '<div class="task-group-header"><div><h3>🎯 Фокус</h3><span>Максимум 5 задач: overdue, today, high priority, blocker/push или ручная отметка.</span></div><strong>' + visibleTasks.length + '/5</strong></div>',
     '<div class="task-group-list focus-list">' + focusHtml + '</div>',
+    '</section>',
+  ].join('');
+}
+
+function homeQuickActionsHtml() {
+  return [
+    '<section class="home-actions" aria-label="Быстрые действия">',
+    '<button class="home-action primary" type="button" data-quick-action="newTask"><strong>New Task</strong><span>Добавить задачу</span></button>',
+    '<button class="home-action" type="button" data-quick-action="createReport"><strong>Create Report</strong><span>Собрать preview</span></button>',
+    '<button class="home-action" type="button" data-quick-action="checkMail"><strong>Check Mail</strong><span>Сверить письма</span></button>',
+    '</section>',
+  ].join('');
+}
+
+function focusOfDayHtml() {
+  const items = focusTasks().slice(0, 5);
+  const tasksHtml = items.length
+    ? items.map(taskCardHtml).join('')
+    : '<article class="empty-state"><strong>Фокус дня пуст</strong><span>EA FOX покажет здесь до пяти главных задач.</span></article>';
+  return [
+    '<section class="focus-day home-focus">',
+    '<div class="task-group-header"><div><h3>🎯 Focus of the Day</h3><span>Максимум 5 задач для управляемого дня.</span></div><strong>' + items.length + '/5</strong></div>',
+    '<div class="task-group-list focus-list">' + tasksHtml + '</div>',
+    '</section>',
+  ].join('');
+}
+
+function renderAllTasks(visibleTasks) {
+  const queueHtml = visibleTasks.length
+    ? activeTaskFilter === 'completed'
+      ? '<div class="task-group-list">' + visibleTasks.map(completedTaskCardHtml).join('') + '</div>'
+      : taskGroupsHtml(visibleTasks)
+    : [
+      '<article class="empty-state">',
+      '<strong>Ничего не найдено</strong>',
+      '<span>Измените поиск или выберите другой фильтр.</span>',
+      '</article>',
+    ].join('');
+  elements.taskList.innerHTML = [
+    focusOfDayHtml(),
+    homeQuickActionsHtml(),
+    '<section class="all-task-queue">',
+    '<div class="task-group-header"><div><h3>Task Queue</h3><span>Категории работают как фильтры, а не отдельные разделы.</span></div><strong>' + visibleTasks.length + '</strong></div>',
+    queueHtml,
     '</section>',
   ].join('');
 }
@@ -1485,12 +1523,21 @@ function renderTasks(options) {
   }
 
   if (!visibleTasks.length) {
+    if (activeTab === 'all') {
+      renderAllTasks(visibleTasks);
+      return;
+    }
     elements.taskList.innerHTML = [
       '<article class="empty-state">',
       '<strong>Ничего не найдено</strong>',
       '<span>Измените поиск или выберите другой фильтр.</span>',
       '</article>',
     ].join('');
+    return;
+  }
+
+  if (activeTab === 'all') {
+    renderAllTasks(visibleTasks);
     return;
   }
 
@@ -1983,11 +2030,18 @@ async function handleEditTaskSubmit(event) {
 
 function createTaskPayloadFromForm() {
   const formData = new FormData(elements.createTaskForm);
+  const controlDate = String(formData.get('controlDate') || '').trim();
   return {
     title: String(formData.get('title') || '').trim(),
     organization: String(formData.get('organization') || '').trim(),
+    category: String(formData.get('category') || '').trim(),
+    status: String(formData.get('status') || '').trim(),
+    priority: String(formData.get('priority') || '').trim(),
     nextAction: String(formData.get('nextAction') || '').trim(),
-    deadline: String(formData.get('deadline') || '').trim(),
+    deadline: controlDate,
+    controlDate: controlDate,
+    reminder: String(formData.get('reminder') || '').trim(),
+    comment: String(formData.get('comment') || '').trim(),
   };
 }
 
@@ -1999,6 +2053,11 @@ function validateCreateTaskPayload(payload) {
   if (!payload.nextAction) {
     missing.push('Следующее действие');
   }
+  ['deadline', 'controlDate', 'reminder'].forEach(function (field) {
+    if (payload[field] && !/^\d{4}-\d{2}-\d{2}$/.test(payload[field])) {
+      missing.push(field === 'reminder' ? 'Reminder' : 'Control Date');
+    }
+  });
   return missing;
 }
 
@@ -2183,6 +2242,23 @@ elements.workspaceControls.addEventListener('click', function (event) {
 });
 
 elements.taskList.addEventListener('click', function (event) {
+  const quickActionButton = event.target.closest('[data-quick-action]');
+  if (quickActionButton) {
+    const action = quickActionButton.dataset.quickAction;
+    if (action === 'newTask') {
+      openCreateTaskModal();
+    } else if (action === 'createReport') {
+      reportPreview = {
+        type: 'daySummary',
+        text: buildReport('daySummary'),
+      };
+      setTab('reports');
+    } else if (action === 'checkMail') {
+      setTab('mail');
+    }
+    return;
+  }
+
   const reportButton = event.target.closest('[data-report-action]');
   if (reportButton) {
     const reportType = reportButton.dataset.reportAction || 'daySummary';

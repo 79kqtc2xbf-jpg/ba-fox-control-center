@@ -306,7 +306,21 @@ function baFoxCreateTask(request) {
 }
 
 function baFoxCreateTaskAllowedKeys_() {
-  return ['route', 'callback', 'token', 'title', 'organization', 'nextAction', 'deadline'];
+  return [
+    'route',
+    'callback',
+    'token',
+    'title',
+    'organization',
+    'nextAction',
+    'deadline',
+    'controlDate',
+    'reminder',
+    'status',
+    'priority',
+    'category',
+    'comment'
+  ];
 }
 
 function baFoxRejectedCreateTaskKeys_(request) {
@@ -328,6 +342,22 @@ function baFoxValidateCreateTaskDeadline_(deadline) {
   return !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function baFoxValidateCreateTaskStatus_(status) {
+  var value = baFoxSafeString(status);
+  if (!value) {
+    return true;
+  }
+  return ['Not Started', 'In Progress', 'Waiting Reply', 'Push', 'Done', 'В работе'].indexOf(value) !== -1;
+}
+
+function baFoxValidateCreateTaskPriority_(priority) {
+  var value = baFoxSafeString(priority);
+  if (!value) {
+    return true;
+  }
+  return ['High', 'Medium', 'Low', 'Высокий', 'Средний', 'Низкий'].indexOf(value) !== -1;
+}
+
 function baFoxBuildSafeCreateTaskId_(now) {
   var compactNow = baFoxSafeString(now).replace(/[^0-9]/g, '').slice(0, 14);
   var suffix = Math.floor(Math.random() * 1000000).toString();
@@ -338,20 +368,22 @@ function baFoxBuildSafeCreateTaskId_(now) {
 }
 
 function baFoxSafeCreateTaskRow_(taskId, normalized, now) {
+  var controlDate = baFoxSafeString(normalized.controlDate || normalized.deadline);
+  var reminder = baFoxSafeString(normalized.reminder);
   return [
     taskId,
     '',
-    '',
+    baFoxSafeString(normalized.category),
     baFoxSafeString(normalized.organization),
     baFoxSafeString(normalized.title),
     baFoxSafeString(normalized.nextAction),
     'BA Fox Web',
-    '',
-    baFoxSafeString(normalized.deadline),
-    '',
-    'В работе',
-    '',
-    '',
+    baFoxSafeString(normalized.priority),
+    controlDate,
+    reminder ? 'date' : '',
+    baFoxSafeString(normalized.status || 'В работе'),
+    controlDate || reminder,
+    baFoxSafeString(normalized.comment),
     'Web',
     'work',
     'Lisa',
@@ -376,7 +408,8 @@ function baFoxSafeCreateTask(request) {
     });
   }
 
-  var objectFields = baFoxValidateCreateTaskScalar_(normalized, ['title', 'organization', 'nextAction', 'deadline']);
+  var createFields = ['title', 'organization', 'nextAction', 'deadline', 'controlDate', 'reminder', 'status', 'priority', 'category', 'comment'];
+  var objectFields = baFoxValidateCreateTaskScalar_(normalized, createFields);
   if (objectFields.length) {
     return baFoxError('VALIDATION_ERROR', 'Create task fields must be simple text values.', {
       fields: objectFields
@@ -391,6 +424,39 @@ function baFoxSafeCreateTask(request) {
   if (!baFoxValidateCreateTaskDeadline_(normalized.deadline)) {
     return baFoxError('VALIDATION_ERROR', 'Deadline must use YYYY-MM-DD format.', {
       deadline: normalized.deadline || ''
+    });
+  }
+
+  if (!baFoxValidateCreateTaskDeadline_(normalized.controlDate)) {
+    return baFoxError('VALIDATION_ERROR', 'Control date must use YYYY-MM-DD format.', {
+      controlDate: normalized.controlDate || ''
+    });
+  }
+
+  if (!baFoxValidateCreateTaskDeadline_(normalized.reminder)) {
+    return baFoxError('VALIDATION_ERROR', 'Reminder must use YYYY-MM-DD format.', {
+      reminder: normalized.reminder || ''
+    });
+  }
+
+  if (!baFoxValidateCreateTaskStatus_(normalized.status)) {
+    return baFoxError('VALIDATION_ERROR', 'Invalid status.', {
+      status: normalized.status || ''
+    });
+  }
+
+  if (!baFoxValidateCreateTaskPriority_(normalized.priority)) {
+    return baFoxError('VALIDATION_ERROR', 'Invalid priority.', {
+      priority: normalized.priority || ''
+    });
+  }
+
+  var formulaFields = createFields.filter(function(field) {
+    return baFoxSafeString(normalized[field]) && baFoxLooksLikeFormula_(normalized[field]);
+  });
+  if (formulaFields.length) {
+    return baFoxError('VALIDATION_ERROR', 'Formula-like values are not allowed.', {
+      fields: formulaFields
     });
   }
 
@@ -427,12 +493,23 @@ function baFoxSafeCreateTask(request) {
     routeAction: 'createTask',
     source: 'web',
     result: 'success',
-    errorCode: ''
+    errorCode: '',
+    newValues: baFoxSafeJson_({
+      title: normalized.title || '',
+      organization: normalized.organization || '',
+      category: normalized.category || '',
+      status: normalized.status || 'В работе',
+      priority: normalized.priority || '',
+      nextAction: normalized.nextAction || '',
+      controlDate: normalized.controlDate || normalized.deadline || '',
+      reminder: normalized.reminder || '',
+      comment: normalized.comment || ''
+    })
   });
 
   return baFoxOk({
     taskId: taskId,
-    status: 'В работе',
+    status: normalized.status || 'В работе',
     source: 'BA Fox Web',
     createdAt: now,
     appendResult: appendResponse.data,
