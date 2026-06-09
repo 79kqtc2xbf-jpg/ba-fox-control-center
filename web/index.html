@@ -39,21 +39,11 @@
           <strong>EA OS</strong>
         </div>
         <nav class="tabs" aria-label="Разделы EA FOX">
-          <button class="tab active" type="button" data-tab="inbox" aria-selected="true">Inbox</button>
-          <button class="tab" type="button" data-tab="focus" aria-selected="false">Focus</button>
-          <button class="tab" type="button" data-tab="today" aria-selected="false">Today</button>
-          <button class="tab" type="button" data-tab="documents" aria-selected="false">Documents</button>
-          <button class="tab" type="button" data-tab="communication" aria-selected="false">Communication</button>
-          <button class="tab" type="button" data-tab="presentations" aria-selected="false">Presentations</button>
-          <button class="tab" type="button" data-tab="brokers" aria-selected="false">Brokers</button>
-          <button class="tab" type="button" data-tab="waiting" aria-selected="false">Waiting</button>
-          <button class="tab" type="button" data-tab="all" aria-selected="false">All Tasks</button>
-          <button class="tab" type="button" data-tab="completed" aria-selected="false">Completed</button>
-          <button class="tab" type="button" data-tab="calendar" aria-selected="false">Calendar</button>
-          <button class="tab" type="button" data-tab="reports" aria-selected="false">Reports</button>
-          <button class="tab" type="button" data-tab="mail" aria-selected="false">Mail</button>
-          <button class="tab" type="button" data-tab="telegram" aria-selected="false">Telegram</button>
-          <button class="tab" type="button" data-tab="system" aria-selected="false">System</button>
+          <button class="tab active" type="button" data-tab="all" aria-selected="true">Все задачи</button>
+          <button class="tab" type="button" data-tab="focus" aria-selected="false">Фокус</button>
+          <button class="tab" type="button" data-tab="mail" aria-selected="false">Почта</button>
+          <button class="tab" type="button" data-tab="reports" aria-selected="false">Отчёты</button>
+          <button class="tab" type="button" data-tab="system" aria-selected="false">Настройки</button>
         </nav>
       </aside>
 
@@ -63,8 +53,8 @@
         <section class="content-panel">
           <div class="panel-header">
             <div>
-              <p class="eyebrow" id="panelEyebrow">Inbox</p>
-              <h2 id="panelTitle">Новые задачи и входящий поток</h2>
+              <p class="eyebrow" id="panelEyebrow">📋 Все задачи</p>
+              <h2 id="panelTitle">Фокус, очередь и быстрые действия</h2>
             </div>
             <span class="panel-badge" id="panelBadge">Read-only</span>
           </div>
@@ -87,22 +77,60 @@
           <button class="modal-close" type="button" id="cancelCreateTaskTop" aria-label="Закрыть">×</button>
         </div>
 
-        <label class="form-field">
-          <span>Название задачи</span>
-          <input type="text" name="title" autocomplete="off" required />
-        </label>
-        <label class="form-field">
-          <span>Компания</span>
-          <input type="text" name="organization" autocomplete="organization" />
-        </label>
-        <label class="form-field">
-          <span>Следующее действие</span>
-          <textarea name="nextAction" rows="3" required></textarea>
-        </label>
-        <label class="form-field">
-          <span>Срок / контрольная дата</span>
-          <input type="date" name="deadline" />
-        </label>
+        <div class="form-grid">
+          <label class="form-field form-field-wide">
+            <span>Название задачи</span>
+            <input type="text" name="title" autocomplete="off" required />
+          </label>
+          <label class="form-field">
+            <span>Организация / контакт</span>
+            <input type="text" name="organization" autocomplete="organization" />
+          </label>
+          <label class="form-field form-field-wide">
+            <span>Следующее действие</span>
+            <textarea name="nextAction" rows="3" required></textarea>
+          </label>
+          <label class="form-field">
+            <span>Контрольная дата</span>
+            <input type="date" name="controlDate" />
+          </label>
+          <label class="form-field">
+            <span>Напоминание</span>
+            <input type="date" name="reminder" />
+          </label>
+          <label class="form-field">
+            <span>Приоритет</span>
+            <select name="priority">
+              <option value="Medium">Средний</option>
+              <option value="High">Высокий</option>
+              <option value="Low">Низкий</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span>Статус</span>
+            <select name="status">
+              <option value="In Progress">В работе</option>
+              <option value="Not Started">Не начато</option>
+              <option value="Waiting Reply">Ждём ответ</option>
+              <option value="Push">Пуш</option>
+              <option value="Done">Готово</option>
+            </select>
+          </label>
+          <label class="form-field">
+            <span>Категория</span>
+            <select name="category">
+              <option value="Documents">Документы</option>
+              <option value="Communication">Коммуникация</option>
+              <option value="Presentations">Презентации</option>
+              <option value="Brokers">Брокеры</option>
+              <option value="Waiting">Ждут ответа</option>
+            </select>
+          </label>
+          <label class="form-field form-field-wide">
+            <span>Комментарий</span>
+            <textarea name="comment" rows="3" placeholder="Контекст, решение, источник или важная деталь"></textarea>
+          </label>
+        </div>
 
         <div class="modal-message" id="createTaskMessage" role="status"></div>
         <div class="modal-actions">
