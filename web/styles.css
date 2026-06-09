@@ -2804,6 +2804,12 @@ h1 {
 
 .home-focus {
   margin-bottom: 14px;
+  padding: 22px;
+  box-shadow: 0 0 0 1px rgba(255, 79, 216, 0.18), 0 24px 70px rgba(255, 79, 216, 0.2);
+}
+
+.home-focus .task-group-header h3 {
+  font-size: 31px;
 }
 
 .home-actions {
@@ -2857,6 +2863,56 @@ h1 {
 
 .all-task-queue > .task-group-header {
   padding: 0 2px;
+}
+
+.workspace-main {
+  display: flex;
+  flex-direction: column;
+}
+
+.content-panel {
+  order: 1;
+}
+
+.dashboard-grid {
+  order: 2;
+}
+
+.category-filter {
+  display: grid;
+  gap: 7px;
+}
+
+.category-filter span {
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.category-filter select {
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(6, 10, 22, 0.76);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 15px;
+}
+
+.dashboard-grid {
+  opacity: 0.76;
+}
+
+.summary-card {
+  box-shadow: none;
+}
+
+.summary-card strong {
+  font-size: 25px;
+}
+
+.summary-card span {
+  font-size: 13px;
 }
 
 .workspace-layout .tabs {

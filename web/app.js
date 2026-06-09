@@ -1,19 +1,19 @@
 const viewLabels = Object.freeze({
   inbox: ['📥 Inbox', 'Новые задачи и входящий поток'],
-  focus: ['🎯 Focus', '3–5 задач, которые двигают день'],
+  focus: ['🎯 Фокус', '3–5 задач, которые двигают день'],
   today: ['🔥 Today', 'Сроки, контроль и напоминания на сегодня'],
   documents: ['Документы', 'Документы, договоры и KYC'],
   communication: ['Коммуникация', 'Ответы, письма и касания'],
   presentations: ['Презентации', 'Деки, офферы и материалы'],
   brokers: ['Брокеры', 'Брокеры, партнёры и внешние касания'],
-  waiting: ['⏰ Waiting', 'Ожидания, контрольные даты и пуши'],
-  all: ['📋 All Tasks', 'Фокус, очередь и быстрые действия'],
-  completed: ['Completed', 'Архив, история и память для отчётов'],
+  waiting: ['⏰ Ждут ответа', 'Ожидания, контрольные даты и пуши'],
+  all: ['📋 Все задачи', 'Фокус, очередь и быстрые действия'],
+  completed: ['Завершённые', 'Архив, история и память для отчётов'],
   calendar: ['Календарь', 'Задачи по срокам и напоминаниям'],
-  reports: ['📈 Reports', 'Дневной и недельный отчёт'],
-  mail: ['📬 Mail', 'Сверка писем и follow-up'],
+  reports: ['📈 Отчёты', 'Дневной и недельный отчёт'],
+  mail: ['📬 Почта', 'Сверка писем и follow-up'],
   telegram: ['Telegram', 'Быстрые действия и уведомления'],
-  system: ['⚙️ Settings', 'Безопасный режим'],
+  system: ['⚙️ Настройки', 'Безопасный режим'],
 });
 
 const elements = {
@@ -65,13 +65,17 @@ const severityRank = Object.freeze({
 });
 
 const taskFilters = Object.freeze([
-  { id: 'all', label: 'All' },
-  { id: 'documents', label: 'Documents' },
-  { id: 'communication', label: 'Communication' },
-  { id: 'presentations', label: 'Presentations' },
-  { id: 'brokers', label: 'Brokers' },
-  { id: 'waiting', label: 'Waiting' },
-  { id: 'completed', label: 'Completed' },
+  { id: 'all', label: 'Все' },
+  { id: 'waiting', label: 'Ждут ответа' },
+  { id: 'completed', label: 'Завершённые' },
+]);
+
+const categoryFilters = Object.freeze([
+  { id: 'all', label: 'Все категории' },
+  { id: 'documents', label: 'Документы' },
+  { id: 'communication', label: 'Коммуникация' },
+  { id: 'presentations', label: 'Презентации' },
+  { id: 'brokers', label: 'Брокеры' },
 ]);
 
 const waitingStatuses = Object.freeze([
@@ -127,8 +131,8 @@ const reportTypes = Object.freeze({
     button: 'План дня',
   },
   weekly: {
-    title: 'Weekly Summary',
-    button: 'Weekly summary',
+    title: 'Недельный отчёт',
+    button: 'Недельный отчёт',
   },
   telegram: {
     title: 'Telegram-ready',
@@ -152,12 +156,12 @@ const telegramPlannedActions = Object.freeze([
 ]);
 
 const workflowGroupLabels = Object.freeze({
-  urgent: ['Urgent', 'Просрочено, сегодня, высокий приоритет'],
-  active: ['In Progress', 'Активная операционная работа'],
-  waiting: ['Waiting', 'Нужен ответ или подтверждение'],
-  pushes: ['Pushes', 'Нужно следующее касание'],
-  blockers: ['Blockers', 'Нужна разблокировка'],
-  review: ['Needs Review', 'Требуется разбор или очистка'],
+  urgent: ['Срочно', 'Просрочено, сегодня, высокий приоритет'],
+  active: ['В работе', 'Активная операционная работа'],
+  waiting: ['Ждут ответа', 'Нужен ответ или подтверждение'],
+  pushes: ['Пуши', 'Нужно следующее касание'],
+  blockers: ['Блокеры', 'Нужна разблокировка'],
+  review: ['Нужен разбор', 'Требуется разбор или очистка'],
 });
 
 const actionSuccessMessages = Object.freeze({
@@ -189,6 +193,7 @@ const todaySectionLabels = Object.freeze({
 
 let activeTab = 'all';
 let activeTaskFilter = 'all';
+let activeCategoryFilter = 'all';
 let taskSearchQuery = '';
 let activeAuditFilter = 'all';
 let sidebarOpen = false;
@@ -854,7 +859,7 @@ function renderCreateTaskButton() {
 
 function renderSummary() {
   if (dashboardState.status === 'loading') {
-    elements.summaryCards.innerHTML = ['Total', 'Today', 'Focus', 'Overdue'].map(function (label) {
+    elements.summaryCards.innerHTML = ['Всего', 'Сегодня', 'Фокус', 'Просрочено'].map(function (label) {
       return '<article class="summary-card loading"><strong>...</strong><span>' + label + '</span></article>';
     }).join('');
     return;
@@ -862,13 +867,13 @@ function renderSummary() {
 
   const openTasks = allOpenTasks();
   const cards = [
-    { value: openTasks.length, label: 'Total tasks', tone: 'total' },
-    { value: derivedTodayTasks().length, label: 'Today', tone: 'today' },
-    { value: focusTasks().length, label: 'Focus', tone: 'focus' },
-    { value: openTasks.filter(isWaitingTask).length, label: 'Waiting', tone: 'waiting' },
-    { value: openTasks.filter(isPushTask).length, label: 'Pushes', tone: 'push' },
-    { value: openTasks.filter(isBlockerTask).length, label: 'Blockers', tone: 'blocker' },
-    { value: completedThisWeekTasks().length, label: 'Completed this week', tone: 'completed' },
+    { value: openTasks.length, label: 'Всего задач', tone: 'total' },
+    { value: derivedTodayTasks().length, label: 'На сегодня', tone: 'today' },
+    { value: focusTasks().length, label: 'В фокусе', tone: 'focus' },
+    { value: openTasks.filter(isWaitingTask).length, label: 'Ждут ответа', tone: 'waiting' },
+    { value: openTasks.filter(isPushTask).length, label: 'Пуши', tone: 'push' },
+    { value: openTasks.filter(isBlockerTask).length, label: 'Блокеры', tone: 'blocker' },
+    { value: completedThisWeekTasks().length, label: 'Готово за неделю', tone: 'completed' },
     { value: openTasks.filter(isOverdueTask).length, label: 'Просрочено', tone: 'overdue' },
   ];
 
@@ -888,19 +893,19 @@ function statusText() {
     return dashboardState.message || 'Ошибка чтения: рабочие данные не открыты, ниже показан demo-набор.';
   }
   if (activeTab === 'system') {
-    return 'Settings показывает состояние live read, safe writes и отключенной автоматизации.';
+    return 'Настройки показывают состояние live read, safe writes и отключенной автоматизации.';
   }
   if (activeTab === 'inbox') {
     return 'Inbox собирает новые и неразобранные задачи. Они не попадают в Today, пока не появится срок или контрольная дата.';
   }
   if (activeTab === 'focus') {
-    return 'Focus показывает максимум 5 задач: просрочено, сегодня, высокий приоритет, blocker/push или ручная отметка.';
+    return 'Фокус показывает максимум 5 задач: просрочено, сегодня, высокий приоритет, блокер, пуш или ручная отметка.';
   }
   if (activeTab === 'today') {
     return 'Today показывает только просроченные, due today, control date today и reminder today задачи.';
   }
   if (activeTab === 'all') {
-    return 'All Tasks — главный рабочий экран: фокус дня, быстрые действия, поиск и фильтры категорий.';
+    return 'Все задачи — главный рабочий экран: фокус дня, быстрые действия, поиск и фильтры категорий.';
   }
   if (activeTab === 'reports') {
     return 'Reports генерирует локальный preview. PDF, Sheets-запись и отправка выполняются только отдельным подтверждённым шагом.';
@@ -943,13 +948,16 @@ function taskMeta(task) {
 
 function taskMatchesFilter(task, filterId) {
   if (filterId === 'all') return true;
-  if (filterId === 'documents') return taskSectionKey(task) === 'documents';
-  if (filterId === 'communication') return taskSectionKey(task) === 'communication';
-  if (filterId === 'presentations') return taskSectionKey(task) === 'presentations';
-  if (filterId === 'brokers') return taskSectionKey(task) === 'brokers';
   if (filterId === 'waiting') return isWaitingTask(task) || taskSectionKey(task) === 'waiting';
   if (filterId === 'completed') return isFinalTask(task);
   return true;
+}
+
+function taskMatchesCategoryFilter(task) {
+  if (activeCategoryFilter === 'all') {
+    return true;
+  }
+  return taskSectionKey(task) === activeCategoryFilter;
 }
 
 function taskMatchesSearch(task) {
@@ -968,11 +976,25 @@ function taskFilterHtml(tasks) {
   if (!shouldShowWorkspaceControls() || activeTab === 'calendar') {
     return '';
   }
-  return '<div class="task-filters" aria-label="Фильтры задач">' + taskFilters.map(function (filter) {
+  const primaryFiltersHtml = '<div class="task-filters" aria-label="Фильтры задач">' + taskFilters.map(function (filter) {
     const count = tasks.filter(function (task) { return taskMatchesFilter(task, filter.id); }).length;
     const activeClass = filter.id === activeTaskFilter ? ' active' : '';
     return '<button class="task-filter' + activeClass + '" type="button" data-task-filter="' + escapeHtml(filter.id) + '">' + escapeHtml(filter.label) + ' <span>' + count + '</span></button>';
   }).join('') + '</div>';
+  const categoryOptionsHtml = categoryFilters.map(function (filter) {
+    const count = filter.id === 'all'
+      ? tasks.length
+      : tasks.filter(function (task) { return taskSectionKey(task) === filter.id; }).length;
+    const selected = filter.id === activeCategoryFilter ? ' selected' : '';
+    return '<option value="' + escapeHtml(filter.id) + '"' + selected + '>' + escapeHtml(filter.label) + ' · ' + count + '</option>';
+  }).join('');
+  return [
+    primaryFiltersHtml,
+    '<label class="category-filter">',
+    '<span>Категория</span>',
+    '<select id="categoryFilterSelect">' + categoryOptionsHtml + '</select>',
+    '</label>',
+  ].join('');
 }
 
 function renderWorkspaceControls(tasks) {
@@ -1055,8 +1077,8 @@ function actionButtonsHtml(task) {
   return [
     '<div class="task-actions" aria-label="Действия задачи">',
     '<div class="task-chip-row" aria-label="Статус">' + moveButtons + '</div>',
-    '<div class="task-chip-row reminder-row" aria-label="Контрольная дата"><span class="chip-row-label">Control date</span>' + reminderButtons + '<span class="chip-row-label muted">Pick date через обновление этапа</span></div>',
-    '<button class="task-action chip focus-chip" type="button" data-task-focus="' + escapeHtml(task.id) + '">' + (isManualFocusTask(task) ? '✓ В фокусе' : 'Mark as Focus') + '</button>',
+    '<div class="task-chip-row reminder-row" aria-label="Контрольная дата"><span class="chip-row-label">Контроль</span>' + reminderButtons + '<span class="chip-row-label muted">Выбор даты через обновление этапа</span></div>',
+    '<button class="task-action chip focus-chip" type="button" data-task-focus="' + escapeHtml(task.id) + '">' + (isManualFocusTask(task) ? '✓ В фокусе' : 'В фокус') + '</button>',
     '<button class="task-action chip edit-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-edit="' + escapeHtml(task.id) + '">Обновить этап</button>',
     '</div>',
     message,
@@ -1147,7 +1169,7 @@ function todaySectionGroups(tasks) {
 
 function renderTodayWorkMode(tasks) {
   const visibleTasks = tasks.filter(function (task) {
-    return taskMatchesFilter(task, activeTaskFilter) && taskMatchesSearch(task);
+    return taskMatchesFilter(task, activeTaskFilter) && taskMatchesCategoryFilter(task) && taskMatchesSearch(task);
   });
   if (!visibleTasks.length) {
     elements.taskList.innerHTML = [
@@ -1181,7 +1203,7 @@ function renderTodayWorkMode(tasks) {
 
 function renderInbox(tasks) {
   const visibleTasks = tasks.filter(function (task) {
-    return taskMatchesFilter(task, activeTaskFilter) && taskMatchesSearch(task);
+    return taskMatchesFilter(task, activeTaskFilter) && taskMatchesCategoryFilter(task) && taskMatchesSearch(task);
   });
   const intro = [
     '<section class="inbox-guide">',
@@ -1199,10 +1221,10 @@ function renderFocus(tasks) {
   const visibleTasks = tasks.filter(taskMatchesSearch).slice(0, 5);
   const focusHtml = visibleTasks.length
     ? visibleTasks.map(taskCardHtml).join('')
-    : '<article class="empty-state"><strong>Фокус пока пуст</strong><span>Отметьте задачу как Focus или дождитесь срочных сигналов.</span></article>';
+    : '<article class="empty-state"><strong>Фокус пока пуст</strong><span>Отметьте задачу как фокус или дождитесь срочных сигналов.</span></article>';
   elements.taskList.innerHTML = [
     '<section class="focus-day">',
-    '<div class="task-group-header"><div><h3>🎯 Фокус</h3><span>Максимум 5 задач: overdue, today, high priority, blocker/push или ручная отметка.</span></div><strong>' + visibleTasks.length + '/5</strong></div>',
+    '<div class="task-group-header"><div><h3>🎯 Фокус</h3><span>Максимум 5 задач: просрочено, сегодня, высокий приоритет, блокер, пуш или ручная отметка.</span></div><strong>' + visibleTasks.length + '/5</strong></div>',
     '<div class="task-group-list focus-list">' + focusHtml + '</div>',
     '</section>',
   ].join('');
@@ -1211,9 +1233,9 @@ function renderFocus(tasks) {
 function homeQuickActionsHtml() {
   return [
     '<section class="home-actions" aria-label="Быстрые действия">',
-    '<button class="home-action primary" type="button" data-quick-action="newTask"><strong>New Task</strong><span>Добавить задачу</span></button>',
-    '<button class="home-action" type="button" data-quick-action="createReport"><strong>Create Report</strong><span>Собрать preview</span></button>',
-    '<button class="home-action" type="button" data-quick-action="checkMail"><strong>Check Mail</strong><span>Сверить письма</span></button>',
+    '<button class="home-action primary" type="button" data-quick-action="newTask"><strong>Новая задача</strong><span>Быстро зафиксировать</span></button>',
+    '<button class="home-action" type="button" data-quick-action="createReport"><strong>Создать отчёт</strong><span>Собрать предпросмотр</span></button>',
+    '<button class="home-action" type="button" data-quick-action="checkMail"><strong>Сверить почту</strong><span>Проверить ответы</span></button>',
     '</section>',
   ].join('');
 }
@@ -1225,7 +1247,7 @@ function focusOfDayHtml() {
     : '<article class="empty-state"><strong>Фокус дня пуст</strong><span>EA FOX покажет здесь до пяти главных задач.</span></article>';
   return [
     '<section class="focus-day home-focus">',
-    '<div class="task-group-header"><div><h3>🎯 Focus of the Day</h3><span>Максимум 5 задач для управляемого дня.</span></div><strong>' + items.length + '/5</strong></div>',
+    '<div class="task-group-header"><div><h3>🎯 Фокус дня</h3><span>Максимум 5 задач для управляемого дня.</span></div><strong>' + items.length + '/5</strong></div>',
     '<div class="task-group-list focus-list">' + tasksHtml + '</div>',
     '</section>',
   ].join('');
@@ -1246,7 +1268,7 @@ function renderAllTasks(visibleTasks) {
     focusOfDayHtml(),
     homeQuickActionsHtml(),
     '<section class="all-task-queue">',
-    '<div class="task-group-header"><div><h3>Task Queue</h3><span>Категории работают как фильтры, а не отдельные разделы.</span></div><strong>' + visibleTasks.length + '</strong></div>',
+    '<div class="task-group-header"><div><h3>Очередь задач</h3><span>Категории работают как фильтры, а не отдельные разделы.</span></div><strong>' + visibleTasks.length + '</strong></div>',
     queueHtml,
     '</section>',
   ].join('');
@@ -1383,15 +1405,15 @@ function buildReport(type) {
   return [
     title + ' · ' + todayIsoBangkok(),
     '',
-    reportSection(type === 'weekly' ? '✅ Done this week' : '✅ Итог дня', done, reportLine),
+    reportSection(type === 'weekly' ? '✅ Готово за неделю' : '✅ Итог дня', done, reportLine),
     '',
-    reportSection('🔄 In Progress', active.filter(function (task) { return canonicalStatus(task) === 'active'; })),
+    reportSection('🔄 В работе', active.filter(function (task) { return canonicalStatus(task) === 'active'; })),
     '',
-    reportSection('⏳ Waiting', waiting),
+    reportSection('⏳ Ждут ответа', waiting),
     '',
-    reportSection('⚠️ Blockers', blockers),
+    reportSection('⚠️ Блокеры', blockers),
     '',
-    reportSection('🎯 Tomorrow Focus', tomorrowFocus),
+    reportSection('🎯 Фокус на завтра', tomorrowFocus),
   ].join('\n');
 }
 
@@ -1406,15 +1428,15 @@ function renderReports() {
   elements.taskList.innerHTML = [
     '<section class="reports-panel">',
     '<div class="integration-hero">',
-    '<div><strong>Создать отчёт</strong><span>Локальный preview из задач, статусов и архива. Ничего не отправляется и не записывается без отдельного подтверждения.</span></div>',
+    '<div><strong>Создать отчёт</strong><span>Локальный предпросмотр из задач, статусов и архива. Ничего не отправляется и не записывается без отдельного подтверждения.</span></div>',
     '</div>',
     '<div class="report-actions">',
     typeButtons,
     '</div>',
     '<div class="report-summary-grid">',
-    '<article><strong>' + escapeHtml(reportableCompletedTasks().length) + '</strong><span>Done source</span></article>',
-    '<article><strong>' + escapeHtml(allOpenTasks().length) + '</strong><span>Active source</span></article>',
-    '<article><strong>' + escapeHtml(focusTasks().length) + '</strong><span>Tomorrow focus</span></article>',
+    '<article><strong>' + escapeHtml(reportableCompletedTasks().length) + '</strong><span>Готово</span></article>',
+    '<article><strong>' + escapeHtml(allOpenTasks().length) + '</strong><span>Активные</span></article>',
+    '<article><strong>' + escapeHtml(focusTasks().length) + '</strong><span>Фокус</span></article>',
     '</div>',
     '<pre class="report-preview">' + escapeHtml(preview) + '</pre>',
     '</section>',
@@ -1840,6 +1862,7 @@ function setTab(tabName) {
   }
   activeTab = tabName;
   activeTaskFilter = 'all';
+  activeCategoryFilter = 'all';
   taskSearchQuery = '';
   flashMessage = '';
   elements.tabs.forEach(function (tab) {
@@ -2055,7 +2078,7 @@ function validateCreateTaskPayload(payload) {
   }
   ['deadline', 'controlDate', 'reminder'].forEach(function (field) {
     if (payload[field] && !/^\d{4}-\d{2}-\d{2}$/.test(payload[field])) {
-      missing.push(field === 'reminder' ? 'Reminder' : 'Control Date');
+      missing.push(field === 'reminder' ? 'Напоминание' : 'Контрольная дата');
     }
   });
   return missing;
@@ -2233,6 +2256,13 @@ elements.workspaceControls.addEventListener('input', function (event) {
   }
 });
 
+elements.workspaceControls.addEventListener('change', function (event) {
+  if (event.target && event.target.id === 'categoryFilterSelect') {
+    activeCategoryFilter = event.target.value || 'all';
+    renderTasks();
+  }
+});
+
 elements.workspaceControls.addEventListener('click', function (event) {
   const taskFilterButton = event.target.closest('[data-task-filter]');
   if (taskFilterButton) {
@@ -2369,12 +2399,12 @@ async function handleFocusToggle(taskId) {
       taskId: taskId,
       focus: nextFocus ? 'true' : 'false',
     });
-    await refreshDashboardAfterAction(taskId, nextFocus ? 'Задача добавлена в Focus.' : 'Задача убрана из Focus.');
+    await refreshDashboardAfterAction(taskId, nextFocus ? 'Задача добавлена в фокус.' : 'Задача убрана из фокуса.');
   } catch (error) {
     if (error && error.code === 'SCHEMA_FIELD_MISSING') {
       taskActionState[taskId] = {
         status: 'success',
-        message: 'Focus сохранён локально. Для постоянной отметки нужна колонка focus в Tasks.',
+        message: 'Фокус сохранён локально. Для постоянной отметки нужна колонка focus в Tasks.',
       };
       renderPanel();
       return;
@@ -2385,7 +2415,7 @@ async function handleFocusToggle(taskId) {
     }
     taskActionState[taskId] = {
       status: 'error',
-      message: error && error.message ? error.message : 'Не удалось сохранить Focus.',
+      message: error && error.message ? error.message : 'Не удалось сохранить фокус.',
     };
     renderPanel();
   }
