@@ -83,7 +83,7 @@
             <input type="text" name="title" autocomplete="off" required />
           </label>
           <label class="form-field">
-            <span>Организация / контакт</span>
+            <span>Контакт / компания</span>
             <input type="text" name="organization" autocomplete="organization" />
           </label>
           <label class="form-field form-field-wide">
@@ -92,11 +92,17 @@
           </label>
           <label class="form-field">
             <span>Контрольная дата</span>
-            <input type="date" name="controlDate" />
+            <div class="date-control" data-date-picker-for="controlDate">
+              <input type="date" name="controlDate" />
+              <button class="date-picker-button" type="button" data-date-picker-for="controlDate" aria-label="Выбрать контрольную дату">Выбрать дату</button>
+            </div>
           </label>
           <label class="form-field">
             <span>Напоминание</span>
-            <input type="date" name="reminder" />
+            <div class="date-control" data-date-picker-for="reminder">
+              <input type="date" name="reminder" />
+              <button class="date-picker-button" type="button" data-date-picker-for="reminder" aria-label="Выбрать дату напоминания">Выбрать дату</button>
+            </div>
           </label>
           <label class="form-field">
             <span>Приоритет</span>

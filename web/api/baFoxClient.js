@@ -26,7 +26,7 @@
     UNAUTHORIZED: 'Нет доступа для выполнения действия. Проверьте action token.',
   });
   const CREATE_TASK_MESSAGES = Object.freeze({
-    FIELDS_NOT_ALLOWED: 'Можно заполнить только название, компанию, следующее действие и срок.',
+    FIELDS_NOT_ALLOWED: 'Заполните название, контакт/компанию, следующее действие и контрольную дату.',
     SAFE_WRITES_DISABLED: 'Безопасная запись выключена. Создание задач недоступно.',
     TASKS_SHEET_MISSING: 'Лист Tasks недоступен.',
     TASK_APPEND_FAILED: 'Не удалось добавить задачу в Tasks.',

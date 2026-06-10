@@ -1884,6 +1884,23 @@ function renderCreateTaskModal() {
   elements.createTaskMessage.classList.toggle('error', createTaskState.status === 'error');
 }
 
+function openCreateTaskDatePicker(fieldName) {
+  const input = elements.createTaskForm && elements.createTaskForm.elements[fieldName];
+  if (!input) {
+    return;
+  }
+  input.focus();
+  if (typeof input.showPicker === 'function') {
+    try {
+      input.showPicker();
+      return;
+    } catch (error) {
+      // Some browsers only allow showPicker during direct user gestures.
+    }
+  }
+  input.click();
+}
+
 function openCreateTaskModal() {
   if (!safeWritesEnabled()) {
     return;
@@ -2241,6 +2258,14 @@ elements.editTaskForm.addEventListener('submit', handleEditTaskSubmit);
 elements.createTaskModal.addEventListener('click', function (event) {
   if (event.target === elements.createTaskModal) {
     closeCreateTaskModal();
+    return;
+  }
+  if (event.target && event.target.matches('input[type="date"]')) {
+    return;
+  }
+  const datePickerControl = event.target.closest('[data-date-picker-for]');
+  if (datePickerControl && elements.createTaskModal.contains(datePickerControl)) {
+    openCreateTaskDatePicker(datePickerControl.dataset.datePickerFor);
   }
 });
 elements.editTaskModal.addEventListener('click', function (event) {

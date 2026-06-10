@@ -2899,6 +2899,46 @@ h1 {
   font-size: 15px;
 }
 
+.date-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: stretch;
+  padding: 4px;
+  border: 1px solid rgba(255, 79, 216, 0.28);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  cursor: pointer;
+}
+
+.date-control:focus-within,
+.date-control:hover {
+  border-color: rgba(255, 79, 216, 0.72);
+  box-shadow: 0 0 0 3px rgba(255, 79, 216, 0.12);
+}
+
+.date-control input[type="date"] {
+  border: 0;
+  background: transparent;
+}
+
+.date-picker-button {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 79, 216, 0.34);
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(255, 79, 216, 0.22), rgba(139, 92, 255, 0.16));
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.date-picker-button::before {
+  content: "📅";
+  margin-right: 6px;
+}
+
 .dashboard-grid {
   opacity: 0.76;
 }
@@ -2927,6 +2967,10 @@ h1 {
 @media (max-width: 720px) {
   .form-grid,
   .home-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .date-control {
     grid-template-columns: 1fr;
   }
 }
