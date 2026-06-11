@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#070b1a" />
-  <title>MF Group Tracker - Operations Dashboard</title>
+  <title>MF Group Tracker - Операционный дашборд</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -16,37 +16,37 @@
       </button>
       <div>
         <p class="eyebrow">MF Group Tracker</p>
-        <h1>Operations Dashboard</h1>
-        <p class="hero-copy">Team ownership, dependencies, blockers and reports in one read-only command view.</p>
+        <h1>Операционный дашборд</h1>
+        <p class="hero-copy">Командные задачи, зависимости, блокеры и отчёты в одном дашборде.</p>
       </div>
       <div class="hero-status">
         <span class="read-only-pill" id="writeModePill">Только просмотр</span>
         <div class="date-pill" id="todayLabel">Время Бангкока</div>
-        <button class="create-task-button" type="button" id="createTaskButton" disabled>Read-only mock</button>
+        <button class="create-task-button" type="button" id="createTaskButton" disabled>Только просмотр</button>
       </div>
     </header>
 
     <div class="mode-banner mock" id="modeBanner" role="status">
-      <strong>MF Group mock mode</strong>
-      <span>Read-only design preview. No Sheet migration, writes, Telegram, Gmail, or Apps Script changes.</span>
+      <strong>Демо-режим MF Group</strong>
+      <span>Макет только для просмотра. Без миграции таблиц, записей, Telegram, Gmail и изменений Apps Script.</span>
     </div>
 
     <div class="workspace-layout">
       <button class="sidebar-backdrop" type="button" id="sidebarBackdrop" aria-label="Закрыть меню" hidden></button>
       <aside class="sidebar-shell" id="sidebarShell" aria-label="MF Group Tracker workspace" aria-hidden="true">
         <div class="sidebar-title">
-          <span>Workspace</span>
+          <span>Рабочая зона</span>
           <strong>MF OPS</strong>
         </div>
         <nav class="tabs" aria-label="MF Group Tracker sections">
-          <button class="tab active" type="button" data-tab="dashboard" aria-selected="true">Dashboard</button>
-          <button class="tab" type="button" data-tab="myTasks" aria-selected="false">My Tasks</button>
-          <button class="tab" type="button" data-tab="myFocus" aria-selected="false">My Focus</button>
-          <button class="tab" type="button" data-tab="team" aria-selected="false">Team</button>
-          <button class="tab" type="button" data-tab="departments" aria-selected="false">Departments</button>
-          <button class="tab" type="button" data-tab="dependencies" aria-selected="false">Dependencies / Blockers</button>
-          <button class="tab" type="button" data-tab="reports" aria-selected="false">Reports</button>
-          <button class="tab" type="button" data-tab="settings" aria-selected="false">Settings</button>
+          <button class="tab active" type="button" data-tab="dashboard" aria-selected="true">Дашборд</button>
+          <button class="tab" type="button" data-tab="myTasks" aria-selected="false">Мои задачи</button>
+          <button class="tab" type="button" data-tab="myFocus" aria-selected="false">Мой фокус</button>
+          <button class="tab" type="button" data-tab="team" aria-selected="false">Команда</button>
+          <button class="tab" type="button" data-tab="departments" aria-selected="false">Отделы</button>
+          <button class="tab" type="button" data-tab="dependencies" aria-selected="false">Зависимости / блокеры</button>
+          <button class="tab" type="button" data-tab="reports" aria-selected="false">Отчёты</button>
+          <button class="tab" type="button" data-tab="settings" aria-selected="false">Настройки</button>
         </nav>
       </aside>
 
@@ -59,7 +59,7 @@
               <p class="eyebrow" id="panelEyebrow">📋 Все задачи</p>
               <h2 id="panelTitle">Фокус, очередь и быстрые действия</h2>
             </div>
-            <span class="panel-badge" id="panelBadge">Read-only</span>
+            <span class="panel-badge" id="panelBadge">Только просмотр</span>
           </div>
           <div class="focus-note" id="statusMessage" role="status"></div>
           <div class="workspace-controls" id="workspaceControls"></div>

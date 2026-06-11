@@ -1,12 +1,12 @@
 const viewLabels = Object.freeze({
-  dashboard: ['Dashboard', 'Executive operations overview'],
-  myTasks: ['My Tasks', 'Lisa ownership, control dates and reportable work'],
-  myFocus: ['My Focus', 'Personal focus queue derived from team operations'],
-  team: ['Team', 'Employees, workload, blockers and reporting status'],
-  departments: ['Departments', 'Department health, leads and dependencies'],
-  dependencies: ['Dependencies / Blockers', 'Who is waiting for whom'],
-  reports: ['Reports', 'Daily, weekly, department and executive summaries'],
-  settings: ['Settings', 'Employees, roles, Telegram identity and permissions preview'],
+  dashboard: ['Дашборд', 'Операционный обзор для руководителя'],
+  myTasks: ['Мои задачи', 'Ответственность Lisa, контрольные даты и задачи для отчётов'],
+  myFocus: ['Мой фокус', 'Личный фокус из командной операционной очереди'],
+  team: ['Команда', 'Сотрудники, нагрузка, блокеры и статус отчётов'],
+  departments: ['Отделы', 'Состояние отделов, руководители и зависимости'],
+  dependencies: ['Зависимости / блокеры', 'Кто кого ждёт'],
+  reports: ['Отчёты', 'Дневные, недельные, отделовые и управленческие сводки'],
+  settings: ['Настройки', 'Сотрудники, роли, Telegram и права доступа'],
   inbox: ['📥 Inbox', 'Новые задачи и входящий поток'],
   focus: ['🎯 Фокус', '3–5 задач, которые двигают день'],
   today: ['🔥 Today', 'Сроки, контроль и напоминания на сегодня'],
@@ -178,294 +178,294 @@ const mfEmployees = Object.freeze([
   {
     id: 'emp_lisa',
     name: 'Lisa',
-    role: 'Operations lead',
+    role: 'Операционный лидер',
     departmentId: 'dept_ops',
     telegram: '@lisa_ops',
-    status: 'Active',
-    reports: 'Daily ready',
+    status: 'Активна',
+    reports: 'Дневной готов',
   },
   {
     id: 'emp_teodor',
     name: 'Teodor',
-    role: 'Manager',
+    role: 'Руководитель',
     departmentId: 'dept_management',
     telegram: '@teodor_mf',
-    status: 'Active',
-    reports: 'Reviewing',
+    status: 'Активен',
+    reports: 'На проверке',
   },
   {
     id: 'emp_finance',
-    name: 'Finance owner',
-    role: 'Finance',
+    name: 'Ответственный за финансы',
+    role: 'Финансы',
     departmentId: 'dept_finance',
-    telegram: 'Pending map',
-    status: 'Active',
-    reports: 'Pending',
+    telegram: 'Нужно связать',
+    status: 'Активен',
+    reports: 'Ждём',
   },
   {
     id: 'emp_legal',
-    name: 'Legal owner',
-    role: 'Legal',
+    name: 'Ответственный юрист',
+    role: 'Юридический отдел',
     departmentId: 'dept_legal',
-    telegram: 'Pending map',
-    status: 'Active',
-    reports: 'Submitted',
+    telegram: 'Нужно связать',
+    status: 'Активен',
+    reports: 'Отправлен',
   },
   {
     id: 'emp_sales',
-    name: 'Sales lead',
-    role: 'Real estate sales',
+    name: 'Лидер продаж',
+    role: 'Продажи недвижимости',
     departmentId: 'dept_sales',
     telegram: '@mf_sales',
-    status: 'Active',
-    reports: 'Pending',
+    status: 'Активен',
+    reports: 'Ждём',
   },
   {
     id: 'emp_marketing',
-    name: 'Marketing lead',
-    role: 'Presentations',
+    name: 'Лидер маркетинга',
+    role: 'Презентации',
     departmentId: 'dept_marketing',
     telegram: '@mf_decks',
-    status: 'Active',
-    reports: 'Draft',
+    status: 'Активен',
+    reports: 'Черновик',
   },
   {
     id: 'emp_compliance',
-    name: 'Compliance owner',
-    role: 'Onboarding',
+    name: 'Ответственный за комплаенс',
+    role: 'Онбординг',
     departmentId: 'dept_compliance',
-    telegram: 'Pending map',
-    status: 'Active',
-    reports: 'Blocked',
+    telegram: 'Нужно связать',
+    status: 'Активен',
+    reports: 'Блокер',
   },
 ]);
 
 const mfDepartments = Object.freeze([
-  { id: 'dept_ops', name: 'Operations', leadId: 'emp_lisa', status: 'Active', mission: 'Daily control loop, owners, blockers and reporting.' },
-  { id: 'dept_management', name: 'Management', leadId: 'emp_teodor', status: 'Active', mission: 'Executive overview, escalation and priority decisions.' },
-  { id: 'dept_finance', name: 'Finance', leadId: 'emp_finance', status: 'Active', mission: 'Payment flows, bank follow-ups and finance dependencies.' },
-  { id: 'dept_legal', name: 'Legal', leadId: 'emp_legal', status: 'Active', mission: 'Agreement review, contract risk and approvals.' },
-  { id: 'dept_sales', name: 'Sales / Real Estate', leadId: 'emp_sales', status: 'Active', mission: 'Developer, agency and real-estate partner pipeline.' },
-  { id: 'dept_marketing', name: 'Marketing / Presentations', leadId: 'emp_marketing', status: 'Active', mission: 'Investor decks, offers and presentation materials.' },
-  { id: 'dept_compliance', name: 'Compliance / Onboarding', leadId: 'emp_compliance', status: 'Active', mission: 'KYB, onboarding packets and source-of-funds checks.' },
+  { id: 'dept_ops', name: 'Операции', leadId: 'emp_lisa', status: 'Активен', mission: 'Ежедневный контроль, ответственные, блокеры и отчётность.' },
+  { id: 'dept_management', name: 'Руководство', leadId: 'emp_teodor', status: 'Активен', mission: 'Управленческий обзор, эскалации и приоритетные решения.' },
+  { id: 'dept_finance', name: 'Финансы', leadId: 'emp_finance', status: 'Активен', mission: 'Платёжные потоки, банки и финансовые зависимости.' },
+  { id: 'dept_legal', name: 'Юридический отдел', leadId: 'emp_legal', status: 'Активен', mission: 'Договоры, юридические риски и согласования.' },
+  { id: 'dept_sales', name: 'Продажи / недвижимость', leadId: 'emp_sales', status: 'Активен', mission: 'Девелоперы, агентские договоры и партнёрская воронка.' },
+  { id: 'dept_marketing', name: 'Маркетинг / презентации', leadId: 'emp_marketing', status: 'Активен', mission: 'Инвесторские деки, офферы и презентационные материалы.' },
+  { id: 'dept_compliance', name: 'Комплаенс / онбординг', leadId: 'emp_compliance', status: 'Активен', mission: 'KYB, пакеты онбординга и проверки источников средств.' },
 ]);
 
 const mfTasks = Object.freeze([
   {
     id: 'MF-001',
-    title: 'Sansiri agreement review',
+    title: 'Проверка договора Sansiri',
     ownerId: 'emp_legal',
     requestedById: 'emp_teodor',
     departmentId: 'dept_legal',
     collaborators: ['emp_lisa', 'emp_sales'],
     watchers: ['emp_teodor'],
     company: 'Sansiri',
-    project: 'Developer agreements',
-    category: 'Legal',
-    priority: 'High',
-    status: 'Blocked',
+    project: 'Договоры с девелоперами',
+    category: 'Юридический отдел',
+    priority: 'Высокий',
+    status: 'Блокер',
     deadline: '2026-06-13',
     controlDate: '2026-06-11',
     reminderDate: '2026-06-11',
     dependencyOwnerId: 'emp_teodor',
     dependencyDepartmentId: 'dept_management',
-    blockerType: 'Decision',
-    blockerDescription: 'Commercial position needs manager confirmation before redlines are final.',
-    nextAction: 'Confirm negotiation limits, then Legal can return the redline package.',
+    blockerType: 'Решение',
+    blockerDescription: 'Коммерческую позицию нужно подтвердить у руководства до финальной версии правок.',
+    nextAction: 'Подтвердить границы переговоров, после этого юристы вернут пакет правок.',
     reportable: true,
-    source: 'Meeting',
-    channel: 'Management sync',
-    escalation: 'Needs Teodor today',
+    source: 'Встреча',
+    channel: 'Синк руководства',
+    escalation: 'Нужен Teodor сегодня',
   },
   {
     id: 'MF-002',
-    title: 'Bitazza KYB package',
+    title: 'KYB-пакет Bitazza',
     ownerId: 'emp_compliance',
     requestedById: 'emp_lisa',
     departmentId: 'dept_compliance',
     collaborators: ['emp_finance'],
     watchers: ['emp_teodor'],
     company: 'Bitazza',
-    project: 'KYB onboarding',
-    category: 'Compliance',
-    priority: 'High',
-    status: 'Waiting',
+    project: 'KYB-онбординг',
+    category: 'Комплаенс',
+    priority: 'Высокий',
+    status: 'Ждём',
     deadline: '2026-06-14',
     controlDate: '2026-06-11',
     reminderDate: '2026-06-11',
     dependencyOwnerId: 'emp_finance',
     dependencyDepartmentId: 'dept_finance',
-    blockerType: 'Info',
-    blockerDescription: 'Waiting for final payment-flow explanation and bank document list.',
-    nextAction: 'Finance to confirm payment flow wording and missing bank references.',
+    blockerType: 'Инфо',
+    blockerDescription: 'Ждём финальное описание платёжного потока и список банковских документов.',
+    nextAction: 'Финансы подтверждают формулировку платёжного потока и недостающие банковские ссылки.',
     reportable: true,
     source: 'Telegram',
-    channel: 'Compliance chat',
-    escalation: 'Control today',
+    channel: 'Чат комплаенса',
+    escalation: 'Контроль сегодня',
   },
   {
     id: 'MF-003',
-    title: 'MontAzur agency agreement',
+    title: 'Агентский договор MontAzur',
     ownerId: 'emp_sales',
     requestedById: 'emp_lisa',
     departmentId: 'dept_sales',
     collaborators: ['emp_legal'],
     watchers: ['emp_teodor'],
     company: 'MontAzur',
-    project: 'Agency agreements',
-    category: 'Sales / Real Estate',
-    priority: 'Medium',
-    status: 'In progress',
+    project: 'Агентские договоры',
+    category: 'Продажи / недвижимость',
+    priority: 'Средний',
+    status: 'В работе',
     deadline: '2026-06-18',
     controlDate: '2026-06-12',
     reminderDate: '2026-06-12',
     dependencyOwnerId: 'emp_legal',
     dependencyDepartmentId: 'dept_legal',
-    blockerType: 'Approval',
-    blockerDescription: 'Legal needs to approve commission clause before partner send.',
-    nextAction: 'Sales to attach latest draft and Legal to approve commission clause.',
+    blockerType: 'Согласование',
+    blockerDescription: 'Юристы должны согласовать пункт о комиссии до отправки партнёру.',
+    nextAction: 'Продажи прикладывают последнюю версию, юристы согласуют пункт о комиссии.',
     reportable: true,
-    source: 'Web',
-    channel: 'Partner pipeline',
-    escalation: 'Normal',
+    source: 'Веб',
+    channel: 'Партнёрская воронка',
+    escalation: 'Обычный контроль',
   },
   {
     id: 'MF-004',
-    title: 'Sber Private Phuket deck',
+    title: 'Дек Sber Private Phuket',
     ownerId: 'emp_marketing',
     requestedById: 'emp_teodor',
     departmentId: 'dept_marketing',
     collaborators: ['emp_sales', 'emp_lisa'],
     watchers: ['emp_teodor'],
     company: 'Sber Private',
-    project: 'Phuket investor deck',
-    category: 'Presentations',
-    priority: 'High',
-    status: 'In progress',
+    project: 'Инвесторский дек Phuket',
+    category: 'Презентации',
+    priority: 'Высокий',
+    status: 'В работе',
     deadline: '2026-06-12',
     controlDate: '2026-06-11',
     reminderDate: '2026-06-11',
     dependencyOwnerId: 'emp_sales',
     dependencyDepartmentId: 'dept_sales',
-    blockerType: 'Info',
-    blockerDescription: 'Waiting for updated villa availability and pricing bullets.',
-    nextAction: 'Sales to send latest availability; Marketing finalizes executive deck.',
+    blockerType: 'Инфо',
+    blockerDescription: 'Ждём обновлённую доступность вилл и тезисы по ценам.',
+    nextAction: 'Продажи отправляют актуальную доступность, маркетинг финализирует управленческий дек.',
     reportable: true,
-    source: 'Meeting',
-    channel: 'Deck request',
-    escalation: 'Due tomorrow',
+    source: 'Встреча',
+    channel: 'Запрос на дек',
+    escalation: 'Дедлайн завтра',
   },
   {
     id: 'MF-005',
-    title: 'Payment flow clarification',
+    title: 'Уточнение платёжного потока',
     ownerId: 'emp_finance',
     requestedById: 'emp_compliance',
     departmentId: 'dept_finance',
     collaborators: ['emp_lisa'],
     watchers: ['emp_teodor'],
     company: 'Bitazza',
-    project: 'KYB onboarding',
-    category: 'Finance',
-    priority: 'High',
-    status: 'Overdue',
+    project: 'KYB-онбординг',
+    category: 'Финансы',
+    priority: 'Высокий',
+    status: 'Просрочено',
     deadline: '2026-06-10',
     controlDate: '2026-06-10',
     reminderDate: '2026-06-11',
     dependencyOwnerId: 'emp_teodor',
     dependencyDepartmentId: 'dept_management',
-    blockerType: 'Decision',
-    blockerDescription: 'Need approved wording for cross-border payment explanation.',
-    nextAction: 'Finance drafts final explanation and Teodor approves the wording.',
+    blockerType: 'Решение',
+    blockerDescription: 'Нужна утверждённая формулировка для описания трансграничного платежа.',
+    nextAction: 'Финансы готовят финальное описание, Teodor утверждает формулировку.',
     reportable: true,
     source: 'Telegram',
-    channel: 'Finance chat',
-    escalation: 'Escalated',
+    channel: 'Финансовый чат',
+    escalation: 'Эскалировано',
   },
   {
     id: 'MF-006',
-    title: 'Bank onboarding follow-up',
+    title: 'Follow-up по банковскому онбордингу',
     ownerId: 'emp_lisa',
     requestedById: 'emp_teodor',
     departmentId: 'dept_ops',
     collaborators: ['emp_finance', 'emp_compliance'],
     watchers: ['emp_teodor'],
     company: 'Private bank',
-    project: 'Bank onboarding',
-    category: 'Operations',
-    priority: 'Medium',
-    status: 'Waiting',
+    project: 'Банковский онбординг',
+    category: 'Операции',
+    priority: 'Средний',
+    status: 'Ждём',
     deadline: '2026-06-17',
     controlDate: '2026-06-11',
     reminderDate: '2026-06-11',
     dependencyOwnerId: 'emp_finance',
     dependencyDepartmentId: 'dept_finance',
-    blockerType: 'External',
-    blockerDescription: 'Waiting for bank confirmation on next onboarding slot.',
-    nextAction: 'Lisa to send follow-up and update Finance/Compliance when bank replies.',
+    blockerType: 'Внешнее',
+    blockerDescription: 'Ждём подтверждение банка по следующему слоту онбординга.',
+    nextAction: 'Lisa отправляет follow-up и обновляет финансы/комплаенс после ответа банка.',
     reportable: true,
     source: 'Email',
-    channel: 'Bank thread',
-    escalation: 'Control today',
+    channel: 'Банковская переписка',
+    escalation: 'Контроль сегодня',
   },
   {
     id: 'MF-007',
-    title: 'Weekly report collection',
+    title: 'Сбор недельных отчётов',
     ownerId: 'emp_lisa',
     requestedById: 'emp_teodor',
     departmentId: 'dept_ops',
     collaborators: ['emp_finance', 'emp_legal', 'emp_sales', 'emp_marketing', 'emp_compliance'],
     watchers: ['emp_teodor'],
     company: 'MF Group',
-    project: 'Weekly management report',
-    category: 'Reports',
-    priority: 'High',
-    status: 'In progress',
+    project: 'Недельный управленческий отчёт',
+    category: 'Отчёты',
+    priority: 'Высокий',
+    status: 'В работе',
     deadline: '2026-06-14',
     controlDate: '2026-06-12',
     reminderDate: '2026-06-12',
     dependencyOwnerId: 'emp_finance',
     dependencyDepartmentId: 'dept_finance',
-    blockerType: 'Report',
-    blockerDescription: 'Finance and Sales summaries are still pending.',
-    nextAction: 'Collect pending department summaries and prepare manager executive summary.',
+    blockerType: 'Отчёт',
+    blockerDescription: 'Сводки финансов и продаж ещё не сданы.',
+    nextAction: 'Собрать недостающие сводки отделов и подготовить управленческое резюме.',
     reportable: true,
-    source: 'Web',
-    channel: 'Reports',
-    escalation: 'Pending reports',
+    source: 'Веб',
+    channel: 'Отчёты',
+    escalation: 'Ждём отчёты',
   },
   {
     id: 'MF-008',
-    title: 'Marketing weekly materials update',
+    title: 'Обновление недельных материалов маркетинга',
     ownerId: 'emp_marketing',
     requestedById: 'emp_lisa',
     departmentId: 'dept_marketing',
     collaborators: [],
     watchers: ['emp_teodor'],
     company: 'MF Group',
-    project: 'Weekly management report',
-    category: 'Presentations',
-    priority: 'Low',
-    status: 'Done',
+    project: 'Недельный управленческий отчёт',
+    category: 'Презентации',
+    priority: 'Низкий',
+    status: 'Готово',
     deadline: '2026-06-09',
     controlDate: '2026-06-09',
     reminderDate: '',
     dependencyOwnerId: '',
     dependencyDepartmentId: '',
-    blockerType: 'None',
+    blockerType: 'Нет',
     blockerDescription: '',
-    nextAction: 'Summary sent to Operations for weekly report.',
+    nextAction: 'Сводка отправлена в операции для недельного отчёта.',
     reportable: true,
-    source: 'Web',
-    channel: 'Reports',
-    escalation: 'Closed',
+    source: 'Веб',
+    channel: 'Отчёты',
+    escalation: 'Закрыто',
   },
 ]);
 
 const mfReportRows = Object.freeze([
-  { type: 'Individual daily', owner: 'Lisa', period: '2026-06-11', status: 'Draft ready', summary: 'Bank onboarding, report collection and cross-department controls.' },
-  { type: 'Individual weekly', owner: 'Finance owner', period: '2026-06-08 - 2026-06-14', status: 'Pending', summary: 'Payment flow clarification and bank onboarding inputs still open.' },
-  { type: 'Department summary', owner: 'Legal', period: '2026-06-08 - 2026-06-14', status: 'Submitted', summary: 'Sansiri and MontAzur agreement risk items ready for manager review.' },
-  { type: 'Manager executive summary', owner: 'Teodor', period: '2026-06-08 - 2026-06-14', status: 'Placeholder', summary: 'Executive summary will aggregate blockers, overdue items and department status.' },
+  { type: 'Индивидуальный дневной', owner: 'Lisa', period: '2026-06-11', status: 'Черновик готов', summary: 'Банковский онбординг, сбор отчётов и межотдельные контрольные точки.' },
+  { type: 'Индивидуальный недельный', owner: 'Ответственный за финансы', period: '2026-06-08 - 2026-06-14', status: 'Ждём', summary: 'Уточнение платёжного потока и вводные по банковскому онбордингу ещё открыты.' },
+  { type: 'Сводка отдела', owner: 'Юридический отдел', period: '2026-06-08 - 2026-06-14', status: 'Отправлен', summary: 'Риски по договорам Sansiri и MontAzur готовы для проверки руководителем.' },
+  { type: 'Управленческое резюме', owner: 'Teodor', period: '2026-06-08 - 2026-06-14', status: 'Заглушка', summary: 'Управленческое резюме будет собирать блокеры, просрочку и статус отделов.' },
 ]);
 
 const actionSuccessMessages = Object.freeze({
@@ -910,20 +910,20 @@ function mfDepartment(departmentId) {
 
 function mfOpenTasks() {
   return mfTasks.filter(function (task) {
-    return !['Done', 'Archived', 'Canceled'].includes(task.status);
+    return !['Готово', 'Архив', 'Отменено'].includes(task.status);
   });
 }
 
 function mfBlockedTasks() {
   return mfOpenTasks().filter(function (task) {
-    return ['Blocked', 'Overdue'].includes(task.status) || normalizeText(task.blockerType) !== 'none';
+    return ['Блокер', 'Просрочено'].includes(task.status) || !['нет', 'none'].includes(normalizeText(task.blockerType));
   });
 }
 
 function mfOverdueTasks() {
   const today = todayIsoBangkok();
   return mfOpenTasks().filter(function (task) {
-    return task.status === 'Overdue' || (task.deadline && task.deadline < today) || (task.controlDate && task.controlDate < today);
+    return task.status === 'Просрочено' || (task.deadline && task.deadline < today) || (task.controlDate && task.controlDate < today);
   });
 }
 
@@ -936,7 +936,7 @@ function mfControlTodayTasks() {
 
 function mfWaitingTasks() {
   return mfOpenTasks().filter(function (task) {
-    return task.status === 'Waiting' || task.blockerType === 'External' || task.dependencyDepartmentId;
+    return task.status === 'Ждём' || task.blockerType === 'Внешнее' || task.dependencyDepartmentId;
   });
 }
 
@@ -959,36 +959,36 @@ function mfTasksForDepartment(departmentId) {
 }
 
 function mfDependencyDepartmentName(task) {
-  return mfDepartment(task.dependencyDepartmentId).name || 'None';
+  return mfDepartment(task.dependencyDepartmentId).name || 'Нет';
 }
 
 function mfOwnerName(task) {
-  return mfEmployee(task.ownerId).name || 'Unassigned';
+  return mfEmployee(task.ownerId).name || 'Не назначен';
 }
 
 function mfDepartmentName(task) {
-  return mfDepartment(task.departmentId).name || 'Unassigned';
+  return mfDepartment(task.departmentId).name || 'Не назначен';
 }
 
 function mfStatusTone(task) {
-  if (task.status === 'Overdue') return 'critical';
-  if (task.status === 'Blocked') return 'critical';
-  if (task.status === 'Waiting') return 'waiting';
-  if (task.status === 'Done') return 'done';
+  if (task.status === 'Просрочено') return 'critical';
+  if (task.status === 'Блокер') return 'critical';
+  if (task.status === 'Ждём') return 'waiting';
+  if (task.status === 'Готово') return 'done';
   return 'active';
 }
 
 function mfMetricCards() {
   const open = mfOpenTasks();
   return [
-    { label: 'Open tasks', value: open.length, tone: 'cyan' },
-    { label: 'Control today', value: mfControlTodayTasks().length, tone: 'green' },
-    { label: 'Overdue', value: mfOverdueTasks().length, tone: 'critical' },
-    { label: 'Blockers', value: mfBlockedTasks().length, tone: 'critical' },
-    { label: 'Waiting departments', value: new Set(mfWaitingTasks().map(function (task) { return task.dependencyDepartmentId; }).filter(Boolean)).size, tone: 'cyan' },
-    { label: 'Reports pending', value: mfReportRows.filter(function (report) { return ['Pending', 'Draft ready', 'Placeholder'].includes(report.status); }).length, tone: 'green' },
-    { label: 'Reportable', value: mfReportableTasks().length, tone: 'cyan' },
-    { label: 'Departments', value: mfDepartments.length, tone: 'green' },
+    { label: 'Открытые задачи', value: open.length, tone: 'cyan' },
+    { label: 'Контроль сегодня', value: mfControlTodayTasks().length, tone: 'green' },
+    { label: 'Просрочено', value: mfOverdueTasks().length, tone: 'critical' },
+    { label: 'Блокеры', value: mfBlockedTasks().length, tone: 'critical' },
+    { label: 'Ждём отделы', value: new Set(mfWaitingTasks().map(function (task) { return task.dependencyDepartmentId; }).filter(Boolean)).size, tone: 'cyan' },
+    { label: 'Отчёты ждём', value: mfReportRows.filter(function (report) { return ['Ждём', 'Черновик готов', 'Заглушка'].includes(report.status); }).length, tone: 'green' },
+    { label: 'Для отчёта', value: mfReportableTasks().length, tone: 'cyan' },
+    { label: 'Отделы', value: mfDepartments.length, tone: 'green' },
   ];
 }
 
@@ -998,8 +998,8 @@ function navCountForTab(tabName) {
   }
   const counts = {
     dashboard: mfOpenTasks().length,
-    myTasks: mfTasksForEmployee(mfCurrentUserId).filter(function (task) { return task.status !== 'Done'; }).length,
-    myFocus: mfTasksForEmployee(mfCurrentUserId).filter(function (task) { return task.priority === 'High' || task.controlDate === todayIsoBangkok() || task.status === 'Overdue'; }).length,
+    myTasks: mfTasksForEmployee(mfCurrentUserId).filter(function (task) { return task.status !== 'Готово'; }).length,
+    myFocus: mfTasksForEmployee(mfCurrentUserId).filter(function (task) { return task.priority === 'Высокий' || task.controlDate === todayIsoBangkok() || task.status === 'Просрочено'; }).length,
     team: mfEmployees.length,
     departments: mfDepartments.length,
     dependencies: mfBlockedTasks().length,
@@ -1248,9 +1248,9 @@ function renderModeBanner() {
   }
   elements.modeBanner.className = 'mode-banner ' + (failed ? 'warning' : isMock ? 'mock' : 'live');
   elements.modeBanner.innerHTML = failed
-    ? '<strong>MF Group mock fallback</strong><span>' + escapeHtml(dashboardState.message || cleanupAuditState.message || 'Live source unavailable. Showing read-only MF mock data.') + '</span>'
+    ? '<strong>Демо-данные MF Group</strong><span>' + escapeHtml(dashboardState.message || cleanupAuditState.message || 'Живой источник недоступен. Показываю временные данные MF.') + '</span>'
     : isMock
-      ? '<strong>MF Group mock mode</strong><span>Read-only design preview. No Sheet migration, writes, Telegram, Gmail, or Apps Script changes.</span>'
+      ? '<strong>Демо-режим MF Group</strong><span>Макет только для просмотра. Без миграции таблиц, записей, Telegram, Gmail и изменений Apps Script.</span>'
       : safeWritesEnabled()
         ? '<strong>БЕЗОПАСНАЯ ЗАПИСЬ ВКЛЮЧЕНА</strong><span>Доступны только безопасное создание, статус, напоминание и обновление этапа.</span>'
         : '<strong>ТОЛЬКО ЧТЕНИЕ</strong><span>Данные загружены только для просмотра. Безопасные действия отключены.</span>';
@@ -1259,16 +1259,16 @@ function renderModeBanner() {
 function renderCreateTaskButton() {
   const loading = dashboardState.status === 'loading' || scaffoldState.status === 'loading';
   elements.createTaskButton.disabled = loading || !safeWritesEnabled();
-  elements.writeModePill.textContent = safeWritesEnabled() ? 'Safe write enabled' : 'Read-only mock';
-  elements.createTaskButton.textContent = safeWritesEnabled() ? '+ New task' : 'Read-only mock';
+  elements.writeModePill.textContent = safeWritesEnabled() ? 'Запись включена' : 'Только просмотр';
+  elements.createTaskButton.textContent = safeWritesEnabled() ? '+ Новая задача' : 'Только просмотр';
   elements.createTaskButton.title = safeWritesEnabled()
     ? 'Создать новую задачу'
-    : 'Stage 19 is mock/read-only. Existing safe-write code remains isolated behind runtime flags.';
+    : 'Макет только для просмотра. Существующая безопасная запись остаётся за runtime-флагами.';
 }
 
 function renderSummary() {
   if (dashboardState.status === 'loading') {
-    elements.summaryCards.innerHTML = ['Open tasks', 'Control today', 'Blockers', 'Reports'].map(function (label) {
+    elements.summaryCards.innerHTML = ['Открытые', 'Контроль', 'Блокеры', 'Отчёты'].map(function (label) {
       return '<article class="summary-card loading"><strong>...</strong><span>' + label + '</span></article>';
     }).join('');
     return;
@@ -1292,25 +1292,25 @@ function statusText() {
     return dashboardState.message || 'Ошибка чтения: рабочие данные не открыты, ниже показан demo-набор.';
   }
   if (activeTab === 'dashboard') {
-    return 'Read-only executive overview built from Stage 19 mock data. It does not read or write the future Team Tasks schema yet.';
+    return 'Операционный обзор только для просмотра на демо-данных. Будущая схема командных задач здесь пока не читается и не изменяется.';
   }
   if (activeTab === 'myTasks') {
-    return 'Lisa view: owned and collaborated work, preserving individualization inside the team operations model.';
+    return 'Личный вид Lisa: свои задачи, совместная работа, контрольные даты и задачи для отчётов.';
   }
   if (activeTab === 'myFocus') {
-    return 'Personal focus is derived from priority, blockers and control dates, not a new writable field.';
+    return 'Личный фокус считается из приоритета, блокеров и контрольных дат. Это не новое поле для записи.';
   }
   if (activeTab === 'team') {
-    return 'Team view shows mock employee workload, blockers, waiting items and report status.';
+    return 'Командный вид показывает нагрузку, блокеры, ожидания и статус отчётов.';
   }
   if (activeTab === 'departments') {
-    return 'Department cards show lead, open work, blockers and cross-department dependencies.';
+    return 'Карточки отделов показывают руководителя, открытые задачи, блокеры и межотдельные зависимости.';
   }
   if (activeTab === 'dependencies') {
-    return 'Dependencies and blockers show who is waiting for whom, blocker type, control date and escalation.';
+    return 'Зависимости и блокеры показывают, кто кого ждёт, тип блокера, контрольную дату и эскалацию.';
   }
   if (activeTab === 'settings') {
-    return 'Settings is a placeholder for employees, departments, roles, Telegram identity mapping and permissions.';
+    return 'Настройки пока показывают макет сотрудников, отделов, ролей, Telegram-связки и прав доступа.';
   }
   if (activeTab === 'system') {
     return 'Настройки показывают состояние live read, safe writes и отключенной автоматизации.';
@@ -1328,7 +1328,7 @@ function statusText() {
     return 'Все задачи — главный рабочий экран: фокус дня, быстрые действия, поиск и фильтры категорий.';
   }
   if (activeTab === 'reports') {
-    return 'Reports генерирует локальный preview. PDF, Sheets-запись и отправка выполняются только отдельным подтверждённым шагом.';
+    return 'Отчёты генерируют локальный предпросмотр. PDF, запись в Sheets и отправка выполняются только отдельным подтверждённым шагом.';
   }
   if (activeTab === 'mail') {
     return 'Сверка почты пока запускается через ChatGPT. После анализа можно обновить задачи и follow-up.';
@@ -1908,7 +1908,7 @@ function renderTelegramWorkflow() {
     '<button class="secondary-button" type="button" disabled>Telegram отключён</button>',
     '</div>',
     '<div class="integration-grid">' + actionsHtml + '</div>',
-    '<p class="integration-note">Telegram-ready отчёт можно сформировать в Reports как preview. Отправка будет отдельным подтверждённым действием в будущем stage.</p>',
+    '<p class="integration-note">Telegram-ready отчёт можно сформировать в разделе «Отчёты» как предпросмотр. Отправка будет отдельным подтверждённым действием в будущем этапе.</p>',
     '</section>',
   ].join('');
 }
@@ -2239,12 +2239,12 @@ function mfTaskCard(task) {
     '</div>',
     '<p>' + escapeHtml(task.nextAction) + '</p>',
     '<div class="mf-task-meta">',
-    '<span>Owner: <strong>' + escapeHtml(owner) + '</strong></span>',
-    '<span>Department: <strong>' + escapeHtml(department) + '</strong></span>',
-    '<span>Control: <strong>' + escapeHtml(task.controlDate || '-') + '</strong></span>',
-    '<span>Deadline: <strong>' + escapeHtml(task.deadline || '-') + '</strong></span>',
-    '<span>Waiting on: <strong>' + escapeHtml(dependency) + '</strong></span>',
-    '<span>Channel: <strong>' + escapeHtml(task.channel || '-') + '</strong></span>',
+    '<span>Ответственный: <strong>' + escapeHtml(owner) + '</strong></span>',
+    '<span>Отдел: <strong>' + escapeHtml(department) + '</strong></span>',
+    '<span>Контроль: <strong>' + escapeHtml(task.controlDate || '-') + '</strong></span>',
+    '<span>Дедлайн: <strong>' + escapeHtml(task.deadline || '-') + '</strong></span>',
+    '<span>Ждём от: <strong>' + escapeHtml(dependency) + '</strong></span>',
+    '<span>Канал: <strong>' + escapeHtml(task.channel || '-') + '</strong></span>',
     '</div>',
     task.blockerDescription ? '<div class="mf-blocker-note"><strong>' + escapeHtml(task.blockerType) + '</strong><span>' + escapeHtml(task.blockerDescription) + '</span></div>' : '',
     '</article>',
@@ -2264,16 +2264,16 @@ function renderMfDashboard() {
   const waitingDepartments = Array.from(new Set(mfWaitingTasks().map(function (task) {
     return mfDependencyDepartmentName(task);
   }).filter(function (name) {
-    return name && name !== 'None';
+    return name && name !== 'Нет';
   })));
   const focusByDepartment = mfDepartments.map(function (department) {
-    const tasks = mfTasksForDepartment(department.id).filter(function (task) { return task.status !== 'Done'; });
-    const blocked = tasks.filter(function (task) { return ['Blocked', 'Overdue'].includes(task.status); });
+    const tasks = mfTasksForDepartment(department.id).filter(function (task) { return task.status !== 'Готово'; });
+    const blocked = tasks.filter(function (task) { return ['Блокер', 'Просрочено'].includes(task.status); });
     return [
       '<article class="mf-density-row">',
-      '<div><strong>' + escapeHtml(department.name) + '</strong><span>' + escapeHtml(mfEmployee(department.leadId).name || 'No lead') + '</span></div>',
+      '<div><strong>' + escapeHtml(department.name) + '</strong><span>' + escapeHtml(mfEmployee(department.leadId).name || 'Нет руководителя') + '</span></div>',
       '<div class="mf-density-bar"><span style="width: ' + Math.min(100, tasks.length * 18) + '%"></span></div>',
-      '<em>' + tasks.length + ' open / ' + blocked.length + ' blocked</em>',
+      '<em>' + tasks.length + ' открыто / ' + blocked.length + ' блокер</em>',
       '</article>',
     ].join('');
   }).join('');
@@ -2282,79 +2282,79 @@ function renderMfDashboard() {
     '<section class="mf-dashboard">',
     '<div class="mf-hero-grid">',
     '<article class="mf-exec-card">',
-    '<span>Executive summary</span>',
-    '<h3>Operations are moving, but Finance and Management decisions are constraining Compliance and Legal work.</h3>',
-    '<p>Primary control today: payment-flow wording, Sansiri redline decision, Sber deck input, bank onboarding follow-up and weekly report collection.</p>',
+    '<span>Управленческое резюме</span>',
+    '<h3>Операционная работа движется, но решения по финансам и руководству сдерживают комплаенс и юридический блок.</h3>',
+    '<p>Главный контроль сегодня: формулировка платёжного потока, решение по правкам Sansiri, вводные для дека Sber, follow-up по банку и сбор недельных отчётов.</p>',
     '<div class="mf-pill-row">',
-    mfPill('Read-only mock', 'green'),
-    mfPill('No schema migration', 'cyan'),
-    mfPill('No Telegram writes', 'neutral'),
+    mfPill('Только просмотр', 'green'),
+    mfPill('Без миграции схемы', 'cyan'),
+    mfPill('Без записей в Telegram', 'neutral'),
     '</div>',
     '</article>',
     '<div class="mf-mini-grid">',
-    mfMiniStat('Control today', controlToday.length, 'green'),
-    mfMiniStat('Blockers', blockers.length, 'critical'),
-    mfMiniStat('Waiting depts', waitingDepartments.length, 'cyan'),
-    mfMiniStat('Reports pending', mfReportRows.filter(function (report) { return report.status === 'Pending'; }).length, 'green'),
+    mfMiniStat('Контроль сегодня', controlToday.length, 'green'),
+    mfMiniStat('Блокеры', blockers.length, 'critical'),
+    mfMiniStat('Ждём отделы', waitingDepartments.length, 'cyan'),
+    mfMiniStat('Отчёты ждём', mfReportRows.filter(function (report) { return report.status === 'Ждём'; }).length, 'green'),
     '</div>',
     '</div>',
     '<div class="mf-two-column">',
-    '<section><div class="mf-section-title"><h3>Overdue / control today</h3><span>' + controlToday.length + '</span></div>' + mfTaskList(controlToday, 'No controls today', 'The mock control queue is empty.') + '</section>',
-    '<section><div class="mf-section-title"><h3>Blockers</h3><span>' + blockers.length + '</span></div>' + mfTaskList(blockers, 'No blockers', 'No blockers in the mock dataset.') + '</section>',
+    '<section><div class="mf-section-title"><h3>Просрочено / контроль сегодня</h3><span>' + controlToday.length + '</span></div>' + mfTaskList(controlToday, 'Сегодня нет контроля', 'В демо-очереди нет контрольных задач.') + '</section>',
+    '<section><div class="mf-section-title"><h3>Блокеры</h3><span>' + blockers.length + '</span></div>' + mfTaskList(blockers, 'Блокеров нет', 'В демо-данных нет блокеров.') + '</section>',
     '</div>',
-    '<section><div class="mf-section-title"><h3>Focus by owner / department</h3><span>' + mfDepartments.length + '</span></div><div class="mf-density-list">' + focusByDepartment + '</div></section>',
+    '<section><div class="mf-section-title"><h3>Фокус по ответственным / отделам</h3><span>' + mfDepartments.length + '</span></div><div class="mf-density-list">' + focusByDepartment + '</div></section>',
     '</section>',
   ].join('');
 }
 
 function renderMfMyTasks() {
   const tasks = mfTasksForEmployee(mfCurrentUserId);
-  const owned = tasks.filter(function (task) { return task.ownerId === mfCurrentUserId && task.status !== 'Done'; });
+  const owned = tasks.filter(function (task) { return task.ownerId === mfCurrentUserId && task.status !== 'Готово'; });
   const reportable = tasks.filter(function (task) { return task.reportable; });
   elements.taskList.innerHTML = [
     '<section class="mf-page-grid">',
     '<div class="mf-mini-grid">',
-    mfMiniStat('Owned open', owned.length, 'cyan'),
-    mfMiniStat('Control today', owned.filter(function (task) { return task.controlDate === todayIsoBangkok(); }).length, 'green'),
-    mfMiniStat('Reportable', reportable.length, 'green'),
-    mfMiniStat('Collaborations', tasks.filter(function (task) { return task.ownerId !== mfCurrentUserId; }).length, 'cyan'),
+    mfMiniStat('Мои открытые', owned.length, 'cyan'),
+    mfMiniStat('Контроль сегодня', owned.filter(function (task) { return task.controlDate === todayIsoBangkok(); }).length, 'green'),
+    mfMiniStat('Для отчёта', reportable.length, 'green'),
+    mfMiniStat('Совместные', tasks.filter(function (task) { return task.ownerId !== mfCurrentUserId; }).length, 'cyan'),
     '</div>',
-    '<section><div class="mf-section-title"><h3>Lisa tasks</h3><span>' + owned.length + '</span></div>' + mfTaskList(owned, 'No Lisa-owned tasks', 'The mock owner queue is empty.') + '</section>',
-    '<section><div class="mf-section-title"><h3>My reportable tasks</h3><span>' + reportable.length + '</span></div>' + mfTaskList(reportable, 'No reportable tasks', 'Report source list is empty.') + '</section>',
+    '<section><div class="mf-section-title"><h3>Задачи Lisa</h3><span>' + owned.length + '</span></div>' + mfTaskList(owned, 'Нет задач Lisa', 'Очередь ответственного в демо-данных пуста.') + '</section>',
+    '<section><div class="mf-section-title"><h3>Мои задачи для отчёта</h3><span>' + reportable.length + '</span></div>' + mfTaskList(reportable, 'Нет задач для отчёта', 'Список источников для отчёта пуст.') + '</section>',
     '</section>',
   ].join('');
 }
 
 function renderMfMyFocus() {
   const focus = mfTasksForEmployee(mfCurrentUserId).filter(function (task) {
-    return task.status !== 'Done' && (task.priority === 'High' || task.controlDate === todayIsoBangkok() || task.status === 'Overdue' || task.status === 'Blocked');
+    return task.status !== 'Готово' && (task.priority === 'Высокий' || task.controlDate === todayIsoBangkok() || task.status === 'Просрочено' || task.status === 'Блокер');
   });
   elements.taskList.innerHTML = [
     '<section class="mf-page-grid">',
     '<article class="mf-exec-card compact">',
-    '<span>Personal focus</span>',
-    '<h3>Individualization stays: Lisa still has My Tasks, My Focus, My Reports and own controls.</h3>',
-    '<p>This focus list is derived from mock team work and remains read-only in Stage 19.</p>',
+    '<span>Личный фокус</span>',
+    '<h3>Индивидуальность остаётся: у Lisa есть «Мои задачи», «Мой фокус», «Мои отчёты» и свои контрольные даты.</h3>',
+    '<p>Этот список считается из демо-командных задач и остаётся только для просмотра.</p>',
     '</article>',
-    mfTaskList(focus, 'No focus items', 'No priority, blocker or control-date items for Lisa.'),
+    mfTaskList(focus, 'Фокус пуст', 'У Lisa нет приоритетных задач, блокеров или контрольных дат.'),
     '</section>',
   ].join('');
 }
 
 function renderMfTeam() {
   const rows = mfEmployees.map(function (employee) {
-    const tasks = mfTasksForEmployee(employee.id).filter(function (task) { return task.status !== 'Done'; });
-    const blocked = tasks.filter(function (task) { return ['Blocked', 'Overdue'].includes(task.status); });
-    const waiting = tasks.filter(function (task) { return task.status === 'Waiting'; });
+    const tasks = mfTasksForEmployee(employee.id).filter(function (task) { return task.status !== 'Готово'; });
+    const blocked = tasks.filter(function (task) { return ['Блокер', 'Просрочено'].includes(task.status); });
+    const waiting = tasks.filter(function (task) { return task.status === 'Ждём'; });
     return [
       '<article class="mf-person-card">',
       '<div><strong>' + escapeHtml(employee.name) + '</strong><span>' + escapeHtml(employee.role) + ' · ' + escapeHtml(mfDepartment(employee.departmentId).name || '-') + '</span></div>',
       '<div class="mf-person-stats">',
-      mfMiniStat('Tasks', tasks.length, 'cyan'),
-      mfMiniStat('Blockers', blocked.length, blocked.length ? 'critical' : 'green'),
-      mfMiniStat('Waiting', waiting.length, 'neutral'),
+      mfMiniStat('Задачи', tasks.length, 'cyan'),
+      mfMiniStat('Блокеры', blocked.length, blocked.length ? 'critical' : 'green'),
+      mfMiniStat('Ждём', waiting.length, 'neutral'),
       '</div>',
-      '<div class="mf-pill-row">' + mfPill(employee.reports, employee.reports === 'Pending' || employee.reports === 'Blocked' ? 'critical' : 'green') + mfPill(employee.telegram, employee.telegram === 'Pending map' ? 'neutral' : 'cyan') + '</div>',
+      '<div class="mf-pill-row">' + mfPill(employee.reports, employee.reports === 'Ждём' || employee.reports === 'Блокер' ? 'critical' : 'green') + mfPill(employee.telegram, employee.telegram === 'Нужно связать' ? 'neutral' : 'cyan') + '</div>',
       '</article>',
     ].join('');
   }).join('');
@@ -2363,18 +2363,18 @@ function renderMfTeam() {
 
 function renderMfDepartments() {
   const cards = mfDepartments.map(function (department) {
-    const tasks = mfTasksForDepartment(department.id).filter(function (task) { return task.status !== 'Done'; });
-    const blockers = tasks.filter(function (task) { return ['Blocked', 'Overdue'].includes(task.status); });
+    const tasks = mfTasksForDepartment(department.id).filter(function (task) { return task.status !== 'Готово'; });
+    const blockers = tasks.filter(function (task) { return ['Блокер', 'Просрочено'].includes(task.status); });
     const deps = tasks.filter(function (task) { return task.dependencyDepartmentId; });
     return [
       '<article class="mf-department-card">',
       '<div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(department.id) + '</span><h3>' + escapeHtml(department.name) + '</h3></div>' + mfPill(department.status, 'green') + '</div>',
       '<p>' + escapeHtml(department.mission) + '</p>',
       '<div class="mf-task-meta">',
-      '<span>Lead: <strong>' + escapeHtml(mfEmployee(department.leadId).name || '-') + '</strong></span>',
-      '<span>Open tasks: <strong>' + tasks.length + '</strong></span>',
-      '<span>Blockers: <strong>' + blockers.length + '</strong></span>',
-      '<span>Dependencies: <strong>' + deps.length + '</strong></span>',
+      '<span>Руководитель: <strong>' + escapeHtml(mfEmployee(department.leadId).name || '-') + '</strong></span>',
+      '<span>Открытые задачи: <strong>' + tasks.length + '</strong></span>',
+      '<span>Блокеры: <strong>' + blockers.length + '</strong></span>',
+      '<span>Зависимости: <strong>' + deps.length + '</strong></span>',
       '</div>',
       '</article>',
     ].join('');
@@ -2397,7 +2397,7 @@ function renderMfDependencies() {
   }).join('');
   elements.taskList.innerHTML = [
     '<section class="mf-dependencies">',
-    '<div class="mf-dependency-header"><span>Task</span><span>Owner</span><span>Blocking department</span><span>Type</span><span>Control</span><span>Escalation</span></div>',
+    '<div class="mf-dependency-header"><span>Задача</span><span>Ответственный</span><span>Блокирующий отдел</span><span>Тип</span><span>Контроль</span><span>Эскалация</span></div>',
     rows,
     '</section>',
   ].join('');
@@ -2407,15 +2407,15 @@ function renderMfReports() {
   const rows = mfReportRows.map(function (report) {
     return [
       '<article class="mf-report-card">',
-      '<div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(report.type) + '</span><h3>' + escapeHtml(report.owner) + '</h3></div>' + mfPill(report.status, report.status === 'Pending' ? 'critical' : 'green') + '</div>',
+      '<div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(report.type) + '</span><h3>' + escapeHtml(report.owner) + '</h3></div>' + mfPill(report.status, report.status === 'Ждём' ? 'critical' : 'green') + '</div>',
       '<p>' + escapeHtml(report.summary) + '</p>',
-      '<div class="mf-task-meta"><span>Period: <strong>' + escapeHtml(report.period) + '</strong></span><span>Source: <strong>Mock report records</strong></span></div>',
+      '<div class="mf-task-meta"><span>Период: <strong>' + escapeHtml(report.period) + '</strong></span><span>Источник: <strong>Демо-записи отчётов</strong></span></div>',
       '</article>',
     ].join('');
   }).join('');
   elements.taskList.innerHTML = [
     '<section class="mf-page-grid">',
-    '<article class="mf-exec-card compact"><span>Reports</span><h3>Daily, weekly, department and executive summaries are preview placeholders.</h3><p>No report is generated, submitted, reviewed, written to Sheets or sent to Telegram in Stage 19.</p></article>',
+    '<article class="mf-exec-card compact"><span>Отчёты</span><h3>Дневные, недельные, отделовые и управленческие сводки пока показаны как демо-заглушки.</h3><p>Отчёт не генерируется, не отправляется, не проверяется, не пишется в Sheets и не отправляется в Telegram.</p></article>',
     '<div class="mf-card-grid reports">' + rows + '</div>',
     '</section>',
   ].join('');
@@ -2423,20 +2423,20 @@ function renderMfReports() {
 
 function renderMfSettings() {
   const roleRows = [
-    ['employee', 'Own tasks, own reports, permitted shared work'],
-    ['department_lead', 'Department tasks, assignments and report review'],
-    ['manager', 'All departments, blockers, executive reports'],
-    ['admin', 'Settings, identity mapping, audit and restore'],
+    ['employee', 'Свои задачи, свои отчёты и разрешённая совместная работа'],
+    ['department_lead', 'Задачи отдела, назначения и проверка отчётов'],
+    ['manager', 'Все отделы, блокеры и управленческие отчёты'],
+    ['admin', 'Настройки, связка идентичности, аудит и восстановление'],
   ].map(function (row) {
     return '<article class="mf-settings-row"><strong>' + escapeHtml(row[0]) + '</strong><span>' + escapeHtml(row[1]) + '</span></article>';
   }).join('');
   const identityRows = mfEmployees.map(function (employee) {
-    return '<article class="mf-settings-row"><strong>' + escapeHtml(employee.name) + '</strong><span>Telegram: ' + escapeHtml(employee.telegram) + ' · Role: ' + escapeHtml(employee.role) + '</span></article>';
+    return '<article class="mf-settings-row"><strong>' + escapeHtml(employee.name) + '</strong><span>Telegram: ' + escapeHtml(employee.telegram) + ' · Роль: ' + escapeHtml(employee.role) + '</span></article>';
   }).join('');
   elements.taskList.innerHTML = [
     '<section class="mf-two-column settings">',
-    '<section><div class="mf-section-title"><h3>Roles and permissions</h3><span>placeholder</span></div><div class="mf-settings-list">' + roleRows + '</div></section>',
-    '<section><div class="mf-section-title"><h3>Telegram identity mapping</h3><span>placeholder</span></div><div class="mf-settings-list">' + identityRows + '</div></section>',
+    '<section><div class="mf-section-title"><h3>Роли и права</h3><span>заглушка</span></div><div class="mf-settings-list">' + roleRows + '</div></section>',
+    '<section><div class="mf-section-title"><h3>Связка Telegram</h3><span>заглушка</span></div><div class="mf-settings-list">' + identityRows + '</div></section>',
     '</section>',
   ].join('');
 }
