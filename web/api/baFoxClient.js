@@ -44,8 +44,9 @@
     UNAUTHORIZED: 'Нет доступа для обновления задачи. Проверьте action token.',
     VALIDATION_ERROR: 'Проверьте поля обновления этапа.',
   });
-  const JSONP_TIMEOUT_MS = 10000;
+  const JSONP_TIMEOUT_MS = 25000;
   const RATE_LIMIT_MESSAGE = 'Google Sheets временно ограничил чтение. EA FOX повторит попытку позже.';
+  const TIMEOUT_FALLBACK_MESSAGE = 'Google Sheets отвечает дольше обычного. Показываю временные данные, EA FOX повторит попытку при следующем обновлении.';
   let jsonpRequestSequence = 0;
 
   function assertRoute(route) {
@@ -171,7 +172,18 @@
       || message.includes('429');
   }
 
+  function isTimeoutError(error) {
+    const code = error && error.code;
+    const message = String(error && error.message ? error.message : '').toLowerCase();
+    return code === 'JSONP_TIMEOUT'
+      || message.includes('jsonp endpoint timed out')
+      || message.includes('timed out');
+  }
+
   function backoffDelayMs(error, attempt) {
+    if (isTimeoutError(error)) {
+      return attempt === 0 ? 900 : 1800;
+    }
     const retryAfterSeconds = error && error.details && Number(error.details.retryAfterSeconds);
     if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
       return Math.min(retryAfterSeconds * 1000, 5000);
@@ -231,7 +243,9 @@
       };
       timeoutId = global.setTimeout(function () {
         cleanup();
-        reject(new Error('Read-only JSONP endpoint timed out. URL: ' + script.src));
+        const timeoutError = new Error('Read-only JSONP endpoint timed out. URL: ' + script.src);
+        timeoutError.code = 'JSONP_TIMEOUT';
+        reject(timeoutError);
       }, JSONP_TIMEOUT_MS);
       global.document.head.appendChild(script);
     });
@@ -314,7 +328,7 @@
       try {
         data = await readLive(route, params);
       } catch (firstError) {
-        if (!isRateLimitError(firstError)) {
+        if (!isRateLimitError(firstError) && !isTimeoutError(firstError)) {
           throw firstError;
         }
         await wait(backoffDelayMs(firstError, 0));
@@ -329,6 +343,7 @@
     } catch (clientError) {
       const fallback = global.BAFoxMockData.getResponse(route, params).data;
       const rateLimited = isRateLimitError(clientError);
+      const timedOut = isTimeoutError(clientError);
       const diagnosticMessage = clientError && clientError.message
         ? clientError.message
         : 'Unknown endpoint error.';
@@ -337,7 +352,9 @@
         fallbackData: fallback,
         message: rateLimited
           ? RATE_LIMIT_MESSAGE
-          : 'Live endpoint error: ' + diagnosticMessage,
+          : timedOut
+            ? TIMEOUT_FALLBACK_MESSAGE
+            : 'Live endpoint error: ' + diagnosticMessage,
       });
     }
   }
