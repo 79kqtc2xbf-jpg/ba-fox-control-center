@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#070b1a" />
-  <title>EA FOX - Control Center</title>
+  <title>MF Group Tracker - Operations Dashboard</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -15,35 +15,38 @@
         <span>Меню</span>
       </button>
       <div>
-        <p class="eyebrow">EA FOX</p>
-        <h1>EA FOX Control Center</h1>
-        <p class="hero-copy">Фокус, задачи и контроль — в одном рабочем центре.</p>
+        <p class="eyebrow">MF Group Tracker</p>
+        <h1>Operations Dashboard</h1>
+        <p class="hero-copy">Team ownership, dependencies, blockers and reports in one read-only command view.</p>
       </div>
       <div class="hero-status">
         <span class="read-only-pill" id="writeModePill">Только просмотр</span>
         <div class="date-pill" id="todayLabel">Время Бангкока</div>
-        <button class="create-task-button" type="button" id="createTaskButton" disabled>+ Новая задача</button>
+        <button class="create-task-button" type="button" id="createTaskButton" disabled>Read-only mock</button>
       </div>
     </header>
 
     <div class="mode-banner mock" id="modeBanner" role="status">
-      <strong>Demo mode / mock data</strong>
-      <span>Без подключения к рабочей таблице и без изменений задач.</span>
+      <strong>MF Group mock mode</strong>
+      <span>Read-only design preview. No Sheet migration, writes, Telegram, Gmail, or Apps Script changes.</span>
     </div>
 
     <div class="workspace-layout">
       <button class="sidebar-backdrop" type="button" id="sidebarBackdrop" aria-label="Закрыть меню" hidden></button>
-      <aside class="sidebar-shell" id="sidebarShell" aria-label="Рабочее пространство EA FOX" aria-hidden="true">
+      <aside class="sidebar-shell" id="sidebarShell" aria-label="MF Group Tracker workspace" aria-hidden="true">
         <div class="sidebar-title">
           <span>Workspace</span>
-          <strong>EA OS</strong>
+          <strong>MF OPS</strong>
         </div>
-        <nav class="tabs" aria-label="Разделы EA FOX">
-          <button class="tab active" type="button" data-tab="all" aria-selected="true">Все задачи</button>
-          <button class="tab" type="button" data-tab="focus" aria-selected="false">Фокус</button>
-          <button class="tab" type="button" data-tab="mail" aria-selected="false">Почта</button>
-          <button class="tab" type="button" data-tab="reports" aria-selected="false">Отчёты</button>
-          <button class="tab" type="button" data-tab="system" aria-selected="false">Настройки</button>
+        <nav class="tabs" aria-label="MF Group Tracker sections">
+          <button class="tab active" type="button" data-tab="dashboard" aria-selected="true">Dashboard</button>
+          <button class="tab" type="button" data-tab="myTasks" aria-selected="false">My Tasks</button>
+          <button class="tab" type="button" data-tab="myFocus" aria-selected="false">My Focus</button>
+          <button class="tab" type="button" data-tab="team" aria-selected="false">Team</button>
+          <button class="tab" type="button" data-tab="departments" aria-selected="false">Departments</button>
+          <button class="tab" type="button" data-tab="dependencies" aria-selected="false">Dependencies / Blockers</button>
+          <button class="tab" type="button" data-tab="reports" aria-selected="false">Reports</button>
+          <button class="tab" type="button" data-tab="settings" aria-selected="false">Settings</button>
         </nav>
       </aside>
 

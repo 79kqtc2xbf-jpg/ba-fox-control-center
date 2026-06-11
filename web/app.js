@@ -1,4 +1,12 @@
 const viewLabels = Object.freeze({
+  dashboard: ['Dashboard', 'Executive operations overview'],
+  myTasks: ['My Tasks', 'Lisa ownership, control dates and reportable work'],
+  myFocus: ['My Focus', 'Personal focus queue derived from team operations'],
+  team: ['Team', 'Employees, workload, blockers and reporting status'],
+  departments: ['Departments', 'Department health, leads and dependencies'],
+  dependencies: ['Dependencies / Blockers', 'Who is waiting for whom'],
+  reports: ['Reports', 'Daily, weekly, department and executive summaries'],
+  settings: ['Settings', 'Employees, roles, Telegram identity and permissions preview'],
   inbox: ['📥 Inbox', 'Новые задачи и входящий поток'],
   focus: ['🎯 Фокус', '3–5 задач, которые двигают день'],
   today: ['🔥 Today', 'Сроки, контроль и напоминания на сегодня'],
@@ -10,7 +18,7 @@ const viewLabels = Object.freeze({
   all: ['📋 Все задачи', 'Фокус, очередь и быстрые действия'],
   completed: ['Завершённые', 'Архив, история и память для отчётов'],
   calendar: ['Календарь', 'Задачи по срокам и напоминаниям'],
-  reports: ['📈 Отчёты', 'Дневной и недельный отчёт'],
+  legacyReports: ['📈 Отчёты', 'Дневной и недельный отчёт'],
   mail: ['📬 Почта', 'Сверка писем и follow-up'],
   telegram: ['Telegram', 'Быстрые действия и уведомления'],
   system: ['⚙️ Настройки', 'Безопасный режим'],
@@ -164,6 +172,302 @@ const workflowGroupLabels = Object.freeze({
   review: ['Нужен разбор', 'Требуется разбор или очистка'],
 });
 
+const mfCurrentUserId = 'emp_lisa';
+
+const mfEmployees = Object.freeze([
+  {
+    id: 'emp_lisa',
+    name: 'Lisa',
+    role: 'Operations lead',
+    departmentId: 'dept_ops',
+    telegram: '@lisa_ops',
+    status: 'Active',
+    reports: 'Daily ready',
+  },
+  {
+    id: 'emp_teodor',
+    name: 'Teodor',
+    role: 'Manager',
+    departmentId: 'dept_management',
+    telegram: '@teodor_mf',
+    status: 'Active',
+    reports: 'Reviewing',
+  },
+  {
+    id: 'emp_finance',
+    name: 'Finance owner',
+    role: 'Finance',
+    departmentId: 'dept_finance',
+    telegram: 'Pending map',
+    status: 'Active',
+    reports: 'Pending',
+  },
+  {
+    id: 'emp_legal',
+    name: 'Legal owner',
+    role: 'Legal',
+    departmentId: 'dept_legal',
+    telegram: 'Pending map',
+    status: 'Active',
+    reports: 'Submitted',
+  },
+  {
+    id: 'emp_sales',
+    name: 'Sales lead',
+    role: 'Real estate sales',
+    departmentId: 'dept_sales',
+    telegram: '@mf_sales',
+    status: 'Active',
+    reports: 'Pending',
+  },
+  {
+    id: 'emp_marketing',
+    name: 'Marketing lead',
+    role: 'Presentations',
+    departmentId: 'dept_marketing',
+    telegram: '@mf_decks',
+    status: 'Active',
+    reports: 'Draft',
+  },
+  {
+    id: 'emp_compliance',
+    name: 'Compliance owner',
+    role: 'Onboarding',
+    departmentId: 'dept_compliance',
+    telegram: 'Pending map',
+    status: 'Active',
+    reports: 'Blocked',
+  },
+]);
+
+const mfDepartments = Object.freeze([
+  { id: 'dept_ops', name: 'Operations', leadId: 'emp_lisa', status: 'Active', mission: 'Daily control loop, owners, blockers and reporting.' },
+  { id: 'dept_management', name: 'Management', leadId: 'emp_teodor', status: 'Active', mission: 'Executive overview, escalation and priority decisions.' },
+  { id: 'dept_finance', name: 'Finance', leadId: 'emp_finance', status: 'Active', mission: 'Payment flows, bank follow-ups and finance dependencies.' },
+  { id: 'dept_legal', name: 'Legal', leadId: 'emp_legal', status: 'Active', mission: 'Agreement review, contract risk and approvals.' },
+  { id: 'dept_sales', name: 'Sales / Real Estate', leadId: 'emp_sales', status: 'Active', mission: 'Developer, agency and real-estate partner pipeline.' },
+  { id: 'dept_marketing', name: 'Marketing / Presentations', leadId: 'emp_marketing', status: 'Active', mission: 'Investor decks, offers and presentation materials.' },
+  { id: 'dept_compliance', name: 'Compliance / Onboarding', leadId: 'emp_compliance', status: 'Active', mission: 'KYB, onboarding packets and source-of-funds checks.' },
+]);
+
+const mfTasks = Object.freeze([
+  {
+    id: 'MF-001',
+    title: 'Sansiri agreement review',
+    ownerId: 'emp_legal',
+    requestedById: 'emp_teodor',
+    departmentId: 'dept_legal',
+    collaborators: ['emp_lisa', 'emp_sales'],
+    watchers: ['emp_teodor'],
+    company: 'Sansiri',
+    project: 'Developer agreements',
+    category: 'Legal',
+    priority: 'High',
+    status: 'Blocked',
+    deadline: '2026-06-13',
+    controlDate: '2026-06-11',
+    reminderDate: '2026-06-11',
+    dependencyOwnerId: 'emp_teodor',
+    dependencyDepartmentId: 'dept_management',
+    blockerType: 'Decision',
+    blockerDescription: 'Commercial position needs manager confirmation before redlines are final.',
+    nextAction: 'Confirm negotiation limits, then Legal can return the redline package.',
+    reportable: true,
+    source: 'Meeting',
+    channel: 'Management sync',
+    escalation: 'Needs Teodor today',
+  },
+  {
+    id: 'MF-002',
+    title: 'Bitazza KYB package',
+    ownerId: 'emp_compliance',
+    requestedById: 'emp_lisa',
+    departmentId: 'dept_compliance',
+    collaborators: ['emp_finance'],
+    watchers: ['emp_teodor'],
+    company: 'Bitazza',
+    project: 'KYB onboarding',
+    category: 'Compliance',
+    priority: 'High',
+    status: 'Waiting',
+    deadline: '2026-06-14',
+    controlDate: '2026-06-11',
+    reminderDate: '2026-06-11',
+    dependencyOwnerId: 'emp_finance',
+    dependencyDepartmentId: 'dept_finance',
+    blockerType: 'Info',
+    blockerDescription: 'Waiting for final payment-flow explanation and bank document list.',
+    nextAction: 'Finance to confirm payment flow wording and missing bank references.',
+    reportable: true,
+    source: 'Telegram',
+    channel: 'Compliance chat',
+    escalation: 'Control today',
+  },
+  {
+    id: 'MF-003',
+    title: 'MontAzur agency agreement',
+    ownerId: 'emp_sales',
+    requestedById: 'emp_lisa',
+    departmentId: 'dept_sales',
+    collaborators: ['emp_legal'],
+    watchers: ['emp_teodor'],
+    company: 'MontAzur',
+    project: 'Agency agreements',
+    category: 'Sales / Real Estate',
+    priority: 'Medium',
+    status: 'In progress',
+    deadline: '2026-06-18',
+    controlDate: '2026-06-12',
+    reminderDate: '2026-06-12',
+    dependencyOwnerId: 'emp_legal',
+    dependencyDepartmentId: 'dept_legal',
+    blockerType: 'Approval',
+    blockerDescription: 'Legal needs to approve commission clause before partner send.',
+    nextAction: 'Sales to attach latest draft and Legal to approve commission clause.',
+    reportable: true,
+    source: 'Web',
+    channel: 'Partner pipeline',
+    escalation: 'Normal',
+  },
+  {
+    id: 'MF-004',
+    title: 'Sber Private Phuket deck',
+    ownerId: 'emp_marketing',
+    requestedById: 'emp_teodor',
+    departmentId: 'dept_marketing',
+    collaborators: ['emp_sales', 'emp_lisa'],
+    watchers: ['emp_teodor'],
+    company: 'Sber Private',
+    project: 'Phuket investor deck',
+    category: 'Presentations',
+    priority: 'High',
+    status: 'In progress',
+    deadline: '2026-06-12',
+    controlDate: '2026-06-11',
+    reminderDate: '2026-06-11',
+    dependencyOwnerId: 'emp_sales',
+    dependencyDepartmentId: 'dept_sales',
+    blockerType: 'Info',
+    blockerDescription: 'Waiting for updated villa availability and pricing bullets.',
+    nextAction: 'Sales to send latest availability; Marketing finalizes executive deck.',
+    reportable: true,
+    source: 'Meeting',
+    channel: 'Deck request',
+    escalation: 'Due tomorrow',
+  },
+  {
+    id: 'MF-005',
+    title: 'Payment flow clarification',
+    ownerId: 'emp_finance',
+    requestedById: 'emp_compliance',
+    departmentId: 'dept_finance',
+    collaborators: ['emp_lisa'],
+    watchers: ['emp_teodor'],
+    company: 'Bitazza',
+    project: 'KYB onboarding',
+    category: 'Finance',
+    priority: 'High',
+    status: 'Overdue',
+    deadline: '2026-06-10',
+    controlDate: '2026-06-10',
+    reminderDate: '2026-06-11',
+    dependencyOwnerId: 'emp_teodor',
+    dependencyDepartmentId: 'dept_management',
+    blockerType: 'Decision',
+    blockerDescription: 'Need approved wording for cross-border payment explanation.',
+    nextAction: 'Finance drafts final explanation and Teodor approves the wording.',
+    reportable: true,
+    source: 'Telegram',
+    channel: 'Finance chat',
+    escalation: 'Escalated',
+  },
+  {
+    id: 'MF-006',
+    title: 'Bank onboarding follow-up',
+    ownerId: 'emp_lisa',
+    requestedById: 'emp_teodor',
+    departmentId: 'dept_ops',
+    collaborators: ['emp_finance', 'emp_compliance'],
+    watchers: ['emp_teodor'],
+    company: 'Private bank',
+    project: 'Bank onboarding',
+    category: 'Operations',
+    priority: 'Medium',
+    status: 'Waiting',
+    deadline: '2026-06-17',
+    controlDate: '2026-06-11',
+    reminderDate: '2026-06-11',
+    dependencyOwnerId: 'emp_finance',
+    dependencyDepartmentId: 'dept_finance',
+    blockerType: 'External',
+    blockerDescription: 'Waiting for bank confirmation on next onboarding slot.',
+    nextAction: 'Lisa to send follow-up and update Finance/Compliance when bank replies.',
+    reportable: true,
+    source: 'Email',
+    channel: 'Bank thread',
+    escalation: 'Control today',
+  },
+  {
+    id: 'MF-007',
+    title: 'Weekly report collection',
+    ownerId: 'emp_lisa',
+    requestedById: 'emp_teodor',
+    departmentId: 'dept_ops',
+    collaborators: ['emp_finance', 'emp_legal', 'emp_sales', 'emp_marketing', 'emp_compliance'],
+    watchers: ['emp_teodor'],
+    company: 'MF Group',
+    project: 'Weekly management report',
+    category: 'Reports',
+    priority: 'High',
+    status: 'In progress',
+    deadline: '2026-06-14',
+    controlDate: '2026-06-12',
+    reminderDate: '2026-06-12',
+    dependencyOwnerId: 'emp_finance',
+    dependencyDepartmentId: 'dept_finance',
+    blockerType: 'Report',
+    blockerDescription: 'Finance and Sales summaries are still pending.',
+    nextAction: 'Collect pending department summaries and prepare manager executive summary.',
+    reportable: true,
+    source: 'Web',
+    channel: 'Reports',
+    escalation: 'Pending reports',
+  },
+  {
+    id: 'MF-008',
+    title: 'Marketing weekly materials update',
+    ownerId: 'emp_marketing',
+    requestedById: 'emp_lisa',
+    departmentId: 'dept_marketing',
+    collaborators: [],
+    watchers: ['emp_teodor'],
+    company: 'MF Group',
+    project: 'Weekly management report',
+    category: 'Presentations',
+    priority: 'Low',
+    status: 'Done',
+    deadline: '2026-06-09',
+    controlDate: '2026-06-09',
+    reminderDate: '',
+    dependencyOwnerId: '',
+    dependencyDepartmentId: '',
+    blockerType: 'None',
+    blockerDescription: '',
+    nextAction: 'Summary sent to Operations for weekly report.',
+    reportable: true,
+    source: 'Web',
+    channel: 'Reports',
+    escalation: 'Closed',
+  },
+]);
+
+const mfReportRows = Object.freeze([
+  { type: 'Individual daily', owner: 'Lisa', period: '2026-06-11', status: 'Draft ready', summary: 'Bank onboarding, report collection and cross-department controls.' },
+  { type: 'Individual weekly', owner: 'Finance owner', period: '2026-06-08 - 2026-06-14', status: 'Pending', summary: 'Payment flow clarification and bank onboarding inputs still open.' },
+  { type: 'Department summary', owner: 'Legal', period: '2026-06-08 - 2026-06-14', status: 'Submitted', summary: 'Sansiri and MontAzur agreement risk items ready for manager review.' },
+  { type: 'Manager executive summary', owner: 'Teodor', period: '2026-06-08 - 2026-06-14', status: 'Placeholder', summary: 'Executive summary will aggregate blockers, overdue items and department status.' },
+]);
+
 const actionSuccessMessages = Object.freeze({
   moveToWork: 'Задача переведена в работу.',
   moveToPush: 'Задача переведена в пуши.',
@@ -191,7 +495,7 @@ const todaySectionLabels = Object.freeze({
   other: 'Остальное',
 });
 
-let activeTab = 'all';
+let activeTab = 'dashboard';
 let activeTaskFilter = 'all';
 let activeCategoryFilter = 'all';
 let taskSearchQuery = '';
@@ -592,11 +896,115 @@ function completedThisWeekTasks() {
   });
 }
 
+function mfEmployee(employeeId) {
+  return mfEmployees.find(function (employee) {
+    return employee.id === employeeId;
+  }) || {};
+}
+
+function mfDepartment(departmentId) {
+  return mfDepartments.find(function (department) {
+    return department.id === departmentId;
+  }) || {};
+}
+
+function mfOpenTasks() {
+  return mfTasks.filter(function (task) {
+    return !['Done', 'Archived', 'Canceled'].includes(task.status);
+  });
+}
+
+function mfBlockedTasks() {
+  return mfOpenTasks().filter(function (task) {
+    return ['Blocked', 'Overdue'].includes(task.status) || normalizeText(task.blockerType) !== 'none';
+  });
+}
+
+function mfOverdueTasks() {
+  const today = todayIsoBangkok();
+  return mfOpenTasks().filter(function (task) {
+    return task.status === 'Overdue' || (task.deadline && task.deadline < today) || (task.controlDate && task.controlDate < today);
+  });
+}
+
+function mfControlTodayTasks() {
+  const today = todayIsoBangkok();
+  return mfOpenTasks().filter(function (task) {
+    return task.controlDate === today || task.reminderDate === today;
+  });
+}
+
+function mfWaitingTasks() {
+  return mfOpenTasks().filter(function (task) {
+    return task.status === 'Waiting' || task.blockerType === 'External' || task.dependencyDepartmentId;
+  });
+}
+
+function mfReportableTasks() {
+  return mfTasks.filter(function (task) {
+    return task.reportable === true;
+  });
+}
+
+function mfTasksForEmployee(employeeId) {
+  return mfTasks.filter(function (task) {
+    return task.ownerId === employeeId || (Array.isArray(task.collaborators) && task.collaborators.includes(employeeId));
+  });
+}
+
+function mfTasksForDepartment(departmentId) {
+  return mfTasks.filter(function (task) {
+    return task.departmentId === departmentId;
+  });
+}
+
+function mfDependencyDepartmentName(task) {
+  return mfDepartment(task.dependencyDepartmentId).name || 'None';
+}
+
+function mfOwnerName(task) {
+  return mfEmployee(task.ownerId).name || 'Unassigned';
+}
+
+function mfDepartmentName(task) {
+  return mfDepartment(task.departmentId).name || 'Unassigned';
+}
+
+function mfStatusTone(task) {
+  if (task.status === 'Overdue') return 'critical';
+  if (task.status === 'Blocked') return 'critical';
+  if (task.status === 'Waiting') return 'waiting';
+  if (task.status === 'Done') return 'done';
+  return 'active';
+}
+
+function mfMetricCards() {
+  const open = mfOpenTasks();
+  return [
+    { label: 'Open tasks', value: open.length, tone: 'cyan' },
+    { label: 'Control today', value: mfControlTodayTasks().length, tone: 'green' },
+    { label: 'Overdue', value: mfOverdueTasks().length, tone: 'critical' },
+    { label: 'Blockers', value: mfBlockedTasks().length, tone: 'critical' },
+    { label: 'Waiting departments', value: new Set(mfWaitingTasks().map(function (task) { return task.dependencyDepartmentId; }).filter(Boolean)).size, tone: 'cyan' },
+    { label: 'Reports pending', value: mfReportRows.filter(function (report) { return ['Pending', 'Draft ready', 'Placeholder'].includes(report.status); }).length, tone: 'green' },
+    { label: 'Reportable', value: mfReportableTasks().length, tone: 'cyan' },
+    { label: 'Departments', value: mfDepartments.length, tone: 'green' },
+  ];
+}
+
 function navCountForTab(tabName) {
   if (dashboardState.status === 'loading') {
     return '...';
   }
   const counts = {
+    dashboard: mfOpenTasks().length,
+    myTasks: mfTasksForEmployee(mfCurrentUserId).filter(function (task) { return task.status !== 'Done'; }).length,
+    myFocus: mfTasksForEmployee(mfCurrentUserId).filter(function (task) { return task.priority === 'High' || task.controlDate === todayIsoBangkok() || task.status === 'Overdue'; }).length,
+    team: mfEmployees.length,
+    departments: mfDepartments.length,
+    dependencies: mfBlockedTasks().length,
+    reports: mfReportRows.length,
+    settings: '',
     inbox: inboxTasks().length,
     focus: focusTasks().length,
     today: derivedTodayTasks().length,
@@ -608,7 +1016,7 @@ function navCountForTab(tabName) {
     all: allLoadedTasks().length,
     completed: completedTasks().length,
     calendar: allLoadedTasks().length,
-    reports: completedThisWeekTasks().length,
+    legacyReports: completedThisWeekTasks().length,
     mail: '',
     telegram: '',
     system: '',
@@ -840,9 +1248,9 @@ function renderModeBanner() {
   }
   elements.modeBanner.className = 'mode-banner ' + (failed ? 'warning' : isMock ? 'mock' : 'live');
   elements.modeBanner.innerHTML = failed
-    ? '<strong>Демо-режим</strong><span>' + escapeHtml(dashboardState.message || cleanupAuditState.message || 'Источник недоступен. Показаны безопасные демо-данные.') + '</span>'
+    ? '<strong>MF Group mock fallback</strong><span>' + escapeHtml(dashboardState.message || cleanupAuditState.message || 'Live source unavailable. Showing read-only MF mock data.') + '</span>'
     : isMock
-      ? '<strong>Демо-режим</strong><span>Без подключения к рабочей таблице и без изменений задач.</span>'
+      ? '<strong>MF Group mock mode</strong><span>Read-only design preview. No Sheet migration, writes, Telegram, Gmail, or Apps Script changes.</span>'
       : safeWritesEnabled()
         ? '<strong>БЕЗОПАСНАЯ ЗАПИСЬ ВКЛЮЧЕНА</strong><span>Доступны только безопасное создание, статус, напоминание и обновление этапа.</span>'
         : '<strong>ТОЛЬКО ЧТЕНИЕ</strong><span>Данные загружены только для просмотра. Безопасные действия отключены.</span>';
@@ -851,31 +1259,22 @@ function renderModeBanner() {
 function renderCreateTaskButton() {
   const loading = dashboardState.status === 'loading' || scaffoldState.status === 'loading';
   elements.createTaskButton.disabled = loading || !safeWritesEnabled();
-  elements.writeModePill.textContent = safeWritesEnabled() ? 'Безопасная запись' : 'Только просмотр';
+  elements.writeModePill.textContent = safeWritesEnabled() ? 'Safe write enabled' : 'Read-only mock';
+  elements.createTaskButton.textContent = safeWritesEnabled() ? '+ New task' : 'Read-only mock';
   elements.createTaskButton.title = safeWritesEnabled()
     ? 'Создать новую задачу'
-    : 'Создание доступно только при SAFE WRITE ENABLED и настроенном action token.';
+    : 'Stage 19 is mock/read-only. Existing safe-write code remains isolated behind runtime flags.';
 }
 
 function renderSummary() {
   if (dashboardState.status === 'loading') {
-    elements.summaryCards.innerHTML = ['Всего', 'Сегодня', 'Фокус', 'Просрочено'].map(function (label) {
+    elements.summaryCards.innerHTML = ['Open tasks', 'Control today', 'Blockers', 'Reports'].map(function (label) {
       return '<article class="summary-card loading"><strong>...</strong><span>' + label + '</span></article>';
     }).join('');
     return;
   }
 
-  const openTasks = allOpenTasks();
-  const cards = [
-    { value: openTasks.length, label: 'Всего задач', tone: 'total' },
-    { value: derivedTodayTasks().length, label: 'На сегодня', tone: 'today' },
-    { value: focusTasks().length, label: 'В фокусе', tone: 'focus' },
-    { value: openTasks.filter(isWaitingTask).length, label: 'Ждут ответа', tone: 'waiting' },
-    { value: openTasks.filter(isPushTask).length, label: 'Пуши', tone: 'push' },
-    { value: openTasks.filter(isBlockerTask).length, label: 'Блокеры', tone: 'blocker' },
-    { value: completedThisWeekTasks().length, label: 'Готово за неделю', tone: 'completed' },
-    { value: openTasks.filter(isOverdueTask).length, label: 'Просрочено', tone: 'overdue' },
-  ];
+  const cards = mfMetricCards();
 
   elements.summaryCards.innerHTML = cards.map(function (card) {
     return '<article class="summary-card ' + escapeHtml(card.tone) + '"><strong>' + escapeHtml(card.value) + '</strong><span>' + card.label + '</span></article>';
@@ -891,6 +1290,27 @@ function statusText() {
   }
   if (dashboardState.status === 'error' || scaffoldState.status === 'error') {
     return dashboardState.message || 'Ошибка чтения: рабочие данные не открыты, ниже показан demo-набор.';
+  }
+  if (activeTab === 'dashboard') {
+    return 'Read-only executive overview built from Stage 19 mock data. It does not read or write the future Team Tasks schema yet.';
+  }
+  if (activeTab === 'myTasks') {
+    return 'Lisa view: owned and collaborated work, preserving individualization inside the team operations model.';
+  }
+  if (activeTab === 'myFocus') {
+    return 'Personal focus is derived from priority, blockers and control dates, not a new writable field.';
+  }
+  if (activeTab === 'team') {
+    return 'Team view shows mock employee workload, blockers, waiting items and report status.';
+  }
+  if (activeTab === 'departments') {
+    return 'Department cards show lead, open work, blockers and cross-department dependencies.';
+  }
+  if (activeTab === 'dependencies') {
+    return 'Dependencies and blockers show who is waiting for whom, blocker type, control date and escalation.';
+  }
+  if (activeTab === 'settings') {
+    return 'Settings is a placeholder for employees, departments, roles, Telegram identity mapping and permissions.';
   }
   if (activeTab === 'system') {
     return 'Настройки показывают состояние live read, safe writes и отключенной автоматизации.';
@@ -1796,6 +2216,268 @@ function renderAudit() {
   ].join('');
 }
 
+function mfPill(label, tone) {
+  return '<span class="mf-pill ' + escapeHtml(tone || 'neutral') + '">' + escapeHtml(label) + '</span>';
+}
+
+function mfMiniStat(label, value, tone) {
+  return '<article class="mf-mini-stat ' + escapeHtml(tone || '') + '"><strong>' + escapeHtml(value) + '</strong><span>' + escapeHtml(label) + '</span></article>';
+}
+
+function mfTaskCard(task) {
+  const owner = mfOwnerName(task);
+  const department = mfDepartmentName(task);
+  const dependency = mfDependencyDepartmentName(task);
+  return [
+    '<article class="mf-task-card" data-tone="' + escapeHtml(mfStatusTone(task)) + '">',
+    '<div class="mf-task-head">',
+    '<div>',
+    '<span class="mf-id">' + escapeHtml(task.id) + '</span>',
+    '<h3>' + escapeHtml(task.title) + '</h3>',
+    '</div>',
+    mfPill(task.status, mfStatusTone(task)),
+    '</div>',
+    '<p>' + escapeHtml(task.nextAction) + '</p>',
+    '<div class="mf-task-meta">',
+    '<span>Owner: <strong>' + escapeHtml(owner) + '</strong></span>',
+    '<span>Department: <strong>' + escapeHtml(department) + '</strong></span>',
+    '<span>Control: <strong>' + escapeHtml(task.controlDate || '-') + '</strong></span>',
+    '<span>Deadline: <strong>' + escapeHtml(task.deadline || '-') + '</strong></span>',
+    '<span>Waiting on: <strong>' + escapeHtml(dependency) + '</strong></span>',
+    '<span>Channel: <strong>' + escapeHtml(task.channel || '-') + '</strong></span>',
+    '</div>',
+    task.blockerDescription ? '<div class="mf-blocker-note"><strong>' + escapeHtml(task.blockerType) + '</strong><span>' + escapeHtml(task.blockerDescription) + '</span></div>' : '',
+    '</article>',
+  ].join('');
+}
+
+function mfTaskList(tasks, emptyTitle, emptyText) {
+  if (!tasks.length) {
+    return '<article class="empty-state"><strong>' + escapeHtml(emptyTitle) + '</strong><span>' + escapeHtml(emptyText) + '</span></article>';
+  }
+  return '<div class="mf-task-list">' + tasks.map(mfTaskCard).join('') + '</div>';
+}
+
+function renderMfDashboard() {
+  const blockers = mfBlockedTasks();
+  const controlToday = mfControlTodayTasks();
+  const waitingDepartments = Array.from(new Set(mfWaitingTasks().map(function (task) {
+    return mfDependencyDepartmentName(task);
+  }).filter(function (name) {
+    return name && name !== 'None';
+  })));
+  const focusByDepartment = mfDepartments.map(function (department) {
+    const tasks = mfTasksForDepartment(department.id).filter(function (task) { return task.status !== 'Done'; });
+    const blocked = tasks.filter(function (task) { return ['Blocked', 'Overdue'].includes(task.status); });
+    return [
+      '<article class="mf-density-row">',
+      '<div><strong>' + escapeHtml(department.name) + '</strong><span>' + escapeHtml(mfEmployee(department.leadId).name || 'No lead') + '</span></div>',
+      '<div class="mf-density-bar"><span style="width: ' + Math.min(100, tasks.length * 18) + '%"></span></div>',
+      '<em>' + tasks.length + ' open / ' + blocked.length + ' blocked</em>',
+      '</article>',
+    ].join('');
+  }).join('');
+
+  elements.taskList.innerHTML = [
+    '<section class="mf-dashboard">',
+    '<div class="mf-hero-grid">',
+    '<article class="mf-exec-card">',
+    '<span>Executive summary</span>',
+    '<h3>Operations are moving, but Finance and Management decisions are constraining Compliance and Legal work.</h3>',
+    '<p>Primary control today: payment-flow wording, Sansiri redline decision, Sber deck input, bank onboarding follow-up and weekly report collection.</p>',
+    '<div class="mf-pill-row">',
+    mfPill('Read-only mock', 'green'),
+    mfPill('No schema migration', 'cyan'),
+    mfPill('No Telegram writes', 'neutral'),
+    '</div>',
+    '</article>',
+    '<div class="mf-mini-grid">',
+    mfMiniStat('Control today', controlToday.length, 'green'),
+    mfMiniStat('Blockers', blockers.length, 'critical'),
+    mfMiniStat('Waiting depts', waitingDepartments.length, 'cyan'),
+    mfMiniStat('Reports pending', mfReportRows.filter(function (report) { return report.status === 'Pending'; }).length, 'green'),
+    '</div>',
+    '</div>',
+    '<div class="mf-two-column">',
+    '<section><div class="mf-section-title"><h3>Overdue / control today</h3><span>' + controlToday.length + '</span></div>' + mfTaskList(controlToday, 'No controls today', 'The mock control queue is empty.') + '</section>',
+    '<section><div class="mf-section-title"><h3>Blockers</h3><span>' + blockers.length + '</span></div>' + mfTaskList(blockers, 'No blockers', 'No blockers in the mock dataset.') + '</section>',
+    '</div>',
+    '<section><div class="mf-section-title"><h3>Focus by owner / department</h3><span>' + mfDepartments.length + '</span></div><div class="mf-density-list">' + focusByDepartment + '</div></section>',
+    '</section>',
+  ].join('');
+}
+
+function renderMfMyTasks() {
+  const tasks = mfTasksForEmployee(mfCurrentUserId);
+  const owned = tasks.filter(function (task) { return task.ownerId === mfCurrentUserId && task.status !== 'Done'; });
+  const reportable = tasks.filter(function (task) { return task.reportable; });
+  elements.taskList.innerHTML = [
+    '<section class="mf-page-grid">',
+    '<div class="mf-mini-grid">',
+    mfMiniStat('Owned open', owned.length, 'cyan'),
+    mfMiniStat('Control today', owned.filter(function (task) { return task.controlDate === todayIsoBangkok(); }).length, 'green'),
+    mfMiniStat('Reportable', reportable.length, 'green'),
+    mfMiniStat('Collaborations', tasks.filter(function (task) { return task.ownerId !== mfCurrentUserId; }).length, 'cyan'),
+    '</div>',
+    '<section><div class="mf-section-title"><h3>Lisa tasks</h3><span>' + owned.length + '</span></div>' + mfTaskList(owned, 'No Lisa-owned tasks', 'The mock owner queue is empty.') + '</section>',
+    '<section><div class="mf-section-title"><h3>My reportable tasks</h3><span>' + reportable.length + '</span></div>' + mfTaskList(reportable, 'No reportable tasks', 'Report source list is empty.') + '</section>',
+    '</section>',
+  ].join('');
+}
+
+function renderMfMyFocus() {
+  const focus = mfTasksForEmployee(mfCurrentUserId).filter(function (task) {
+    return task.status !== 'Done' && (task.priority === 'High' || task.controlDate === todayIsoBangkok() || task.status === 'Overdue' || task.status === 'Blocked');
+  });
+  elements.taskList.innerHTML = [
+    '<section class="mf-page-grid">',
+    '<article class="mf-exec-card compact">',
+    '<span>Personal focus</span>',
+    '<h3>Individualization stays: Lisa still has My Tasks, My Focus, My Reports and own controls.</h3>',
+    '<p>This focus list is derived from mock team work and remains read-only in Stage 19.</p>',
+    '</article>',
+    mfTaskList(focus, 'No focus items', 'No priority, blocker or control-date items for Lisa.'),
+    '</section>',
+  ].join('');
+}
+
+function renderMfTeam() {
+  const rows = mfEmployees.map(function (employee) {
+    const tasks = mfTasksForEmployee(employee.id).filter(function (task) { return task.status !== 'Done'; });
+    const blocked = tasks.filter(function (task) { return ['Blocked', 'Overdue'].includes(task.status); });
+    const waiting = tasks.filter(function (task) { return task.status === 'Waiting'; });
+    return [
+      '<article class="mf-person-card">',
+      '<div><strong>' + escapeHtml(employee.name) + '</strong><span>' + escapeHtml(employee.role) + ' · ' + escapeHtml(mfDepartment(employee.departmentId).name || '-') + '</span></div>',
+      '<div class="mf-person-stats">',
+      mfMiniStat('Tasks', tasks.length, 'cyan'),
+      mfMiniStat('Blockers', blocked.length, blocked.length ? 'critical' : 'green'),
+      mfMiniStat('Waiting', waiting.length, 'neutral'),
+      '</div>',
+      '<div class="mf-pill-row">' + mfPill(employee.reports, employee.reports === 'Pending' || employee.reports === 'Blocked' ? 'critical' : 'green') + mfPill(employee.telegram, employee.telegram === 'Pending map' ? 'neutral' : 'cyan') + '</div>',
+      '</article>',
+    ].join('');
+  }).join('');
+  elements.taskList.innerHTML = '<section class="mf-card-grid">' + rows + '</section>';
+}
+
+function renderMfDepartments() {
+  const cards = mfDepartments.map(function (department) {
+    const tasks = mfTasksForDepartment(department.id).filter(function (task) { return task.status !== 'Done'; });
+    const blockers = tasks.filter(function (task) { return ['Blocked', 'Overdue'].includes(task.status); });
+    const deps = tasks.filter(function (task) { return task.dependencyDepartmentId; });
+    return [
+      '<article class="mf-department-card">',
+      '<div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(department.id) + '</span><h3>' + escapeHtml(department.name) + '</h3></div>' + mfPill(department.status, 'green') + '</div>',
+      '<p>' + escapeHtml(department.mission) + '</p>',
+      '<div class="mf-task-meta">',
+      '<span>Lead: <strong>' + escapeHtml(mfEmployee(department.leadId).name || '-') + '</strong></span>',
+      '<span>Open tasks: <strong>' + tasks.length + '</strong></span>',
+      '<span>Blockers: <strong>' + blockers.length + '</strong></span>',
+      '<span>Dependencies: <strong>' + deps.length + '</strong></span>',
+      '</div>',
+      '</article>',
+    ].join('');
+  }).join('');
+  elements.taskList.innerHTML = '<section class="mf-card-grid departments">' + cards + '</section>';
+}
+
+function renderMfDependencies() {
+  const rows = mfBlockedTasks().map(function (task) {
+    return [
+      '<article class="mf-dependency-row" data-tone="' + escapeHtml(mfStatusTone(task)) + '">',
+      '<div><span class="mf-id">' + escapeHtml(task.id) + '</span><strong>' + escapeHtml(task.title) + '</strong><em>' + escapeHtml(task.company) + '</em></div>',
+      '<span>' + escapeHtml(mfOwnerName(task)) + '</span>',
+      '<span>' + escapeHtml(mfDependencyDepartmentName(task)) + '</span>',
+      '<span>' + escapeHtml(task.blockerType) + '</span>',
+      '<span>' + escapeHtml(task.controlDate || '-') + '</span>',
+      mfPill(task.escalation, mfStatusTone(task)),
+      '</article>',
+    ].join('');
+  }).join('');
+  elements.taskList.innerHTML = [
+    '<section class="mf-dependencies">',
+    '<div class="mf-dependency-header"><span>Task</span><span>Owner</span><span>Blocking department</span><span>Type</span><span>Control</span><span>Escalation</span></div>',
+    rows,
+    '</section>',
+  ].join('');
+}
+
+function renderMfReports() {
+  const rows = mfReportRows.map(function (report) {
+    return [
+      '<article class="mf-report-card">',
+      '<div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(report.type) + '</span><h3>' + escapeHtml(report.owner) + '</h3></div>' + mfPill(report.status, report.status === 'Pending' ? 'critical' : 'green') + '</div>',
+      '<p>' + escapeHtml(report.summary) + '</p>',
+      '<div class="mf-task-meta"><span>Period: <strong>' + escapeHtml(report.period) + '</strong></span><span>Source: <strong>Mock report records</strong></span></div>',
+      '</article>',
+    ].join('');
+  }).join('');
+  elements.taskList.innerHTML = [
+    '<section class="mf-page-grid">',
+    '<article class="mf-exec-card compact"><span>Reports</span><h3>Daily, weekly, department and executive summaries are preview placeholders.</h3><p>No report is generated, submitted, reviewed, written to Sheets or sent to Telegram in Stage 19.</p></article>',
+    '<div class="mf-card-grid reports">' + rows + '</div>',
+    '</section>',
+  ].join('');
+}
+
+function renderMfSettings() {
+  const roleRows = [
+    ['employee', 'Own tasks, own reports, permitted shared work'],
+    ['department_lead', 'Department tasks, assignments and report review'],
+    ['manager', 'All departments, blockers, executive reports'],
+    ['admin', 'Settings, identity mapping, audit and restore'],
+  ].map(function (row) {
+    return '<article class="mf-settings-row"><strong>' + escapeHtml(row[0]) + '</strong><span>' + escapeHtml(row[1]) + '</span></article>';
+  }).join('');
+  const identityRows = mfEmployees.map(function (employee) {
+    return '<article class="mf-settings-row"><strong>' + escapeHtml(employee.name) + '</strong><span>Telegram: ' + escapeHtml(employee.telegram) + ' · Role: ' + escapeHtml(employee.role) + '</span></article>';
+  }).join('');
+  elements.taskList.innerHTML = [
+    '<section class="mf-two-column settings">',
+    '<section><div class="mf-section-title"><h3>Roles and permissions</h3><span>placeholder</span></div><div class="mf-settings-list">' + roleRows + '</div></section>',
+    '<section><div class="mf-section-title"><h3>Telegram identity mapping</h3><span>placeholder</span></div><div class="mf-settings-list">' + identityRows + '</div></section>',
+    '</section>',
+  ].join('');
+}
+
+function renderMfSection() {
+  elements.workspaceControls.innerHTML = '';
+  if (activeTab === 'dashboard') {
+    renderMfDashboard();
+    return true;
+  }
+  if (activeTab === 'myTasks') {
+    renderMfMyTasks();
+    return true;
+  }
+  if (activeTab === 'myFocus') {
+    renderMfMyFocus();
+    return true;
+  }
+  if (activeTab === 'team') {
+    renderMfTeam();
+    return true;
+  }
+  if (activeTab === 'departments') {
+    renderMfDepartments();
+    return true;
+  }
+  if (activeTab === 'dependencies') {
+    renderMfDependencies();
+    return true;
+  }
+  if (activeTab === 'reports') {
+    renderMfReports();
+    return true;
+  }
+  if (activeTab === 'settings') {
+    renderMfSettings();
+    return true;
+  }
+  return false;
+}
+
 function renderPanel() {
   const label = viewLabels[activeTab];
   elements.panelEyebrow.textContent = label[0];
@@ -1807,6 +2489,9 @@ function renderPanel() {
   if (dashboardState.status === 'loading' || (activeTab === 'audit' && cleanupAuditState.status === 'loading')) {
     elements.workspaceControls.innerHTML = '';
     elements.taskList.innerHTML = '<article class="loading-state">Загружаю данные для просмотра...</article>';
+    return;
+  }
+  if (renderMfSection()) {
     return;
   }
   if (activeTab === 'audit') {
@@ -2207,7 +2892,7 @@ async function loadCleanupAuditIfNeeded() {
 }
 
 function loadLazyTabData(tabName) {
-  if (tabName === 'completed' || tabName === 'reports' || tabName === 'calendar') {
+  if (tabName === 'completed' || tabName === 'calendar') {
     loadCompletedIfNeeded();
   }
   if (tabName === 'audit') {
@@ -2246,6 +2931,13 @@ elements.tabBar.addEventListener('click', function (event) {
   }
   event.preventDefault();
   setTab(tab.dataset.tab);
+});
+
+elements.tabs.forEach(function (tab) {
+  tab.addEventListener('click', function (event) {
+    event.preventDefault();
+    setTab(tab.dataset.tab);
+  });
 });
 
 elements.createTaskButton.addEventListener('click', openCreateTaskModal);
