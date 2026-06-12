@@ -633,6 +633,77 @@ function normalizeText(value) {
   return String(value == null ? '' : value).trim().toLowerCase();
 }
 
+const statusLabels = Object.freeze({
+  not_started: 'Не начато',
+  in_progress: 'В работе',
+  waiting: 'Ждём',
+  push: 'Пуш',
+  blocked: 'Блокер',
+  done: 'Выполнено',
+  external: 'Внешнее',
+  unknown: 'Не уточнено',
+});
+
+const statusClasses = Object.freeze({
+  not_started: 'neutral',
+  in_progress: 'active',
+  waiting: 'waiting',
+  push: 'push',
+  blocked: 'critical',
+  done: 'done',
+  external: 'external',
+  unknown: 'neutral',
+});
+
+// Raw statuses can arrive from Google Sheets, Apps Script, or local mock data.
+// UI logic should normalize them into stable keys; labels remain a separate display concern.
+function normalizeStatus(rawStatus) {
+  const status = normalizeText(rawStatus);
+  if (!status) return 'unknown';
+  if (['not started', 'not_started', 'todo', 'to do', 'new', 'не начато', 'не начата', 'новая'].some(function (signal) { return status === signal || status.includes(signal); })) return 'not_started';
+  if (['in progress', 'in_progress', 'active', 'work', 'working', 'в работе', 'делаем', 'актив'].some(function (signal) { return status === signal || status.includes(signal); })) return 'in_progress';
+  if (['waiting', 'wait', 'wait list', 'ждём', 'ждем', 'ожид', 'ждёт', 'ждет'].some(function (signal) { return status === signal || status.includes(signal); })) return 'waiting';
+  if (['push', 'пуш'].some(function (signal) { return status === signal || status.includes(signal); })) return 'push';
+  if (['blocked', 'blocker', 'блокер', 'заблок'].some(function (signal) { return status === signal || status.includes(signal); })) return 'blocked';
+  if (['done', 'completed', 'complete', 'готово', 'выполнено', 'закрыто', 'closed'].some(function (signal) { return status === signal || status.includes(signal); })) return 'done';
+  if (['external', 'внешнее', 'внешний', 'outside'].some(function (signal) { return status === signal || status.includes(signal); })) return 'external';
+  return 'unknown';
+}
+
+function getStatusLabel(statusKey) {
+  return statusLabels[statusKey] || statusLabels.unknown;
+}
+
+function getStatusClass(statusKey) {
+  return statusClasses[statusKey] || statusClasses.unknown;
+}
+
+function taskStatusKey(task) {
+  return normalizeStatus(task && task.status);
+}
+
+function reportStatusKey(report) {
+  return normalizeStatus(report && report.status);
+}
+
+function isOverdueStatus(rawStatus) {
+  const status = normalizeText(rawStatus);
+  return status.includes('просроч') || status.includes('overdue');
+}
+
+function getTaskStatusLabel(task) {
+  if (task && isOverdueStatus(task.status)) {
+    return String(task.status || '').trim();
+  }
+  return getStatusLabel(taskStatusKey(task));
+}
+
+window.BAFoxStatusContract = Object.freeze({
+  normalizeStatus: normalizeStatus,
+  getStatusLabel: getStatusLabel,
+  getStatusClass: getStatusClass,
+});
+
 function isoDateFromValue(value) {
   const match = String(value || '').match(/\d{4}-\d{2}-\d{2}/);
   return match ? match[0] : '';
@@ -663,7 +734,7 @@ function removeIsoDateNoise(value) {
 
 function canonicalStatus(task) {
   const status = normalizeText(task.status);
-  if (['выполнено', 'done', 'completed', 'complete'].some(function (signal) { return status.includes(signal); })) return 'completed';
+  if (taskStatusKey(task) === 'done') return 'completed';
   if (['cancelled', 'canceled', 'отмен', 'cancel'].some(function (signal) { return status.includes(signal); })) return 'cancelled';
   if (['duplicate', 'дубликат', 'дубль'].some(function (signal) { return status.includes(signal); })) return 'duplicate';
   if (['not relevant', 'irrelevant', 'неакту', 'не акту'].some(function (signal) { return status.includes(signal); })) return 'notRelevant';
@@ -763,32 +834,34 @@ function textHasAny(text, signals) {
 }
 
 function isWaitingTask(task) {
-  const status = normalizeText(task.status);
+  if (taskStatusKey(task) === 'waiting') {
+    return true;
+  }
   const text = taskSearchText(task);
   return ['ждём ответ', 'ждем ответ', 'ждём подтверждение', 'ждём подписание', 'wait list', 'waiting', 'ожид'].some(function (signal) {
-    return status.includes(signal) || text.includes(signal);
+    return text.includes(signal);
   });
 }
 
 function isPushTask(task) {
-  const status = normalizeText(task.status);
+  if (taskStatusKey(task) === 'push') {
+    return true;
+  }
   const category = normalizeText(task.category);
   const reminderMode = normalizeText(task.reminderMode);
-  return status.includes('пуш') || status.includes('push') || category.includes('push') || reminderMode.includes('push');
+  return category.includes('push') || reminderMode.includes('push');
 }
 
 function isBlockerTask(task) {
-  const status = normalizeText(task.status);
-  return status.includes('блокер') || status.includes('blocked') || status.includes('blocker');
+  return taskStatusKey(task) === 'blocked';
 }
 
 function isOverdueTask(task) {
   const today = todayIsoBangkok();
-  const status = normalizeText(task.status);
   const dueDate = taskDueDate(task);
   const controlDate = taskControlDate(task);
   return !isFinalTask(task) && (
-    status.includes('просроч') || status.includes('overdue') || (dueDate && dueDate < today) || (controlDate && controlDate < today)
+    isOverdueStatus(task.status) || (dueDate && dueDate < today) || (controlDate && controlDate < today)
   );
 }
 
@@ -830,9 +903,7 @@ function inboxTasks() {
 
 function waitListTasks() {
   return allOpenTasks().filter(function (task) {
-    return waitingStatuses.some(function (status) {
-      return normalizeText(status) === normalizeText(task.status);
-    });
+    return isWaitingTask(task);
   });
 }
 
@@ -1004,20 +1075,21 @@ function mfInitials(name) {
 
 function mfOpenTasks() {
   return mfTasks.filter(function (task) {
-    return !['Готово', 'Архив', 'Отменено'].includes(task.status);
+    return isMfOpenTask(task) && !['архив', 'отменено'].includes(normalizeText(task.status));
   });
 }
 
 function mfBlockedTasks() {
   return mfOpenTasks().filter(function (task) {
-    return ['Блокер', 'Просрочено'].includes(task.status) || !['нет', 'none'].includes(normalizeText(task.blockerType));
+    return isMfBlockedTask(task)
+      || !['нет', 'none'].includes(normalizeText(task.blockerType));
   });
 }
 
 function mfOverdueTasks() {
   const today = todayIsoBangkok();
   return mfOpenTasks().filter(function (task) {
-    return task.status === 'Просрочено' || (task.deadline && task.deadline < today) || (task.controlDate && task.controlDate < today);
+    return isOverdueStatus(task.status) || (task.deadline && task.deadline < today) || (task.controlDate && task.controlDate < today);
   });
 }
 
@@ -1030,7 +1102,7 @@ function mfControlTodayTasks() {
 
 function mfWaitingTasks() {
   return mfOpenTasks().filter(function (task) {
-    return task.status === 'Ждём' || task.blockerType === 'Внешнее' || task.dependencyDepartmentId;
+    return taskStatusKey(task) === 'waiting' || normalizeStatus(task.blockerType) === 'external' || task.dependencyDepartmentId;
   });
 }
 
@@ -1038,6 +1110,18 @@ function mfReportableTasks() {
   return mfTasks.filter(function (task) {
     return task.reportable === true;
   });
+}
+
+function isMfOpenTask(task) {
+  return taskStatusKey(task) !== 'done';
+}
+
+function isMfBlockedTask(task) {
+  return taskStatusKey(task) === 'blocked' || isOverdueStatus(task.status);
+}
+
+function isMfWaitingTask(task) {
+  return taskStatusKey(task) === 'waiting';
 }
 
 function mfTasksForEmployee(employeeId) {
@@ -1065,11 +1149,8 @@ function mfDepartmentName(task) {
 }
 
 function mfStatusTone(task) {
-  if (task.status === 'Просрочено') return 'critical';
-  if (task.status === 'Блокер') return 'critical';
-  if (task.status === 'Ждём') return 'waiting';
-  if (task.status === 'Готово') return 'done';
-  return 'active';
+  if (isOverdueStatus(task.status)) return 'critical';
+  return getStatusClass(taskStatusKey(task));
 }
 
 function mfMetricCards() {
@@ -1080,7 +1161,7 @@ function mfMetricCards() {
     { label: 'Просрочено', value: mfOverdueTasks().length, tone: 'critical' },
     { label: 'Блокеры', value: mfBlockedTasks().length, tone: 'critical' },
     { label: 'Ждём отделы', value: new Set(mfWaitingTasks().map(function (task) { return task.dependencyDepartmentId; }).filter(Boolean)).size, tone: 'cyan' },
-    { label: 'Отчёты ждём', value: mfReportRows.filter(function (report) { return ['Ждём', 'Черновик готов', 'Заглушка'].includes(report.status); }).length, tone: 'green' },
+    { label: 'Отчёты ждём', value: mfReportRows.filter(function (report) { return reportStatusKey(report) !== 'done'; }).length, tone: 'green' },
     { label: 'Для отчёта', value: mfReportableTasks().length, tone: 'cyan' },
     { label: 'Отделы', value: mfDepartments.length, tone: 'green' },
   ];
@@ -1092,8 +1173,8 @@ function navCountForTab(tabName) {
   }
   const counts = {
     dashboard: mfOpenTasks().length,
-    myTasks: mfTasksForEmployee(mfCurrentUserId).filter(function (task) { return task.status !== 'Готово'; }).length,
-    myFocus: mfTasksForEmployee(mfCurrentUserId).filter(function (task) { return task.priority === 'Высокий' || task.controlDate === todayIsoBangkok() || task.status === 'Просрочено'; }).length,
+    myTasks: mfTasksForEmployee(mfCurrentUserId).filter(isMfOpenTask).length,
+    myFocus: mfTasksForEmployee(mfCurrentUserId).filter(function (task) { return isMfOpenTask(task) && (task.priority === 'Высокий' || task.controlDate === todayIsoBangkok() || isOverdueStatus(task.status)); }).length,
     team: mfEmployees.length,
     departments: mfDepartments.length,
     dependencies: mfBlockedTasks().length,
@@ -1156,14 +1237,14 @@ function taskSectionKey(task) {
 
 function taskScore(task) {
   let score = 0;
-  const status = normalizeText(task.status);
+  const statusKey = taskStatusKey(task);
   if (isManualFocusTask(task)) score += 8;
   if (isOverdueTask(task)) score += 7;
   if (isTodayRelevantTask(task)) score += 6;
   if (isHighPriority(task)) score += 5;
-  if (status === 'блокер' || isBlockerTask(task)) score += 5;
-  if (status === 'пуш' || isPushTask(task)) score += 4;
-  if (status.includes('ждём') || status.includes('wait')) score += 3;
+  if (statusKey === 'blocked') score += 5;
+  if (statusKey === 'push') score += 4;
+  if (statusKey === 'waiting') score += 3;
   if (taskDueDate(task) === todayIsoBangkok()) score += 4;
   if (taskControlDate(task) === todayIsoBangkok()) score += 4;
   return score;
@@ -1605,7 +1686,7 @@ function taskCardHtml(task) {
     '<article class="task-card" data-tone="' + escapeHtml(taskTone(task)) + '">',
     '<div class="task-main">',
     '<div class="task-topline">',
-    '<span class="task-chip">' + escapeHtml(task.status || 'Без статуса') + '</span>',
+    '<span class="task-chip">' + escapeHtml(getTaskStatusLabel(task)) + '</span>',
     task.priority ? '<span class="priority-label">' + escapeHtml(task.priority) + '</span>' : '',
     '</div>',
     '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title)) + '</div>',
@@ -1626,11 +1707,12 @@ function taskCardHtml(task) {
 }
 
 function completedTaskCardHtml(task) {
+  const statusKey = taskStatusKey(task);
   return [
     '<article class="task-card completed-card" data-tone="' + escapeHtml(taskTone(task)) + '">',
     '<div class="task-main">',
     '<div class="task-topline">',
-    '<span class="task-chip">' + escapeHtml(task.status || 'Выполнено') + '</span>',
+    '<span class="task-chip">' + escapeHtml(getStatusLabel(statusKey === 'unknown' ? 'done' : statusKey)) + '</span>',
     isNonReportableFinal(task) ? '<span class="priority-label">Не для отчётов</span>' : '<span class="priority-label">Для отчётов</span>',
     task.completedAt ? '<span class="priority-label">Закрыта: ' + escapeHtml(humanDate(task.completedAt)) + '</span>' : '',
     '</div>',
@@ -1822,7 +1904,7 @@ function calendarTaskHtml(task) {
     '<article class="calendar-task" data-tone="' + escapeHtml(taskTone(task)) + '">',
     '<div>',
     '<strong>' + escapeHtml(removeIsoDateNoise(task.title)) + '</strong>',
-    '<span>' + escapeHtml(task.status || 'Без статуса') + ' · ' + escapeHtml(calendarDateLabel(task)) + '</span>',
+    '<span>' + escapeHtml(getTaskStatusLabel(task)) + ' · ' + escapeHtml(calendarDateLabel(task)) + '</span>',
     '</div>',
     '<p>' + escapeHtml(nextActionText(task)) + '</p>',
     '</article>',
@@ -2329,7 +2411,7 @@ function mfTaskCard(task) {
     '<span class="mf-id">' + escapeHtml(task.id) + '</span>',
     '<h3>' + escapeHtml(task.title) + '</h3>',
     '</div>',
-    mfPill(task.status, mfStatusTone(task)),
+    mfPill(getTaskStatusLabel(task), mfStatusTone(task)),
     '</div>',
     '<p>' + escapeHtml(task.nextAction) + '</p>',
     '<div class="mf-task-meta">',
@@ -2361,8 +2443,8 @@ function renderMfDashboard() {
     return name && name !== 'Нет';
   })));
   const focusByDepartment = mfDepartments.map(function (department) {
-    const tasks = mfTasksForDepartment(department.id).filter(function (task) { return task.status !== 'Готово'; });
-    const blocked = tasks.filter(function (task) { return ['Блокер', 'Просрочено'].includes(task.status); });
+    const tasks = mfTasksForDepartment(department.id).filter(isMfOpenTask);
+    const blocked = tasks.filter(isMfBlockedTask);
     return [
       '<article class="mf-density-row">',
       '<div><strong>' + escapeHtml(department.name) + '</strong><span>' + escapeHtml(mfEmployee(department.leadId).name || 'Нет руководителя') + '</span></div>',
@@ -2389,7 +2471,7 @@ function renderMfDashboard() {
     mfMiniStat('Контроль сегодня', controlToday.length, 'green'),
     mfMiniStat('Блокеры', blockers.length, 'critical'),
     mfMiniStat('Ждём отделы', waitingDepartments.length, 'cyan'),
-    mfMiniStat('Отчёты ждём', mfReportRows.filter(function (report) { return report.status === 'Ждём'; }).length, 'green'),
+    mfMiniStat('Отчёты ждём', mfReportRows.filter(function (report) { return reportStatusKey(report) !== 'done'; }).length, 'green'),
     '</div>',
     '</div>',
     '<div class="mf-two-column">',
@@ -2403,7 +2485,7 @@ function renderMfDashboard() {
 
 function renderMfMyTasks() {
   const tasks = mfTasksForEmployee(mfCurrentUserId);
-  const owned = tasks.filter(function (task) { return task.ownerId === mfCurrentUserId && task.status !== 'Готово'; });
+  const owned = tasks.filter(function (task) { return task.ownerId === mfCurrentUserId && isMfOpenTask(task); });
   const reportable = tasks.filter(function (task) { return task.reportable; });
   elements.taskList.innerHTML = [
     '<section class="mf-page-grid">',
@@ -2421,7 +2503,7 @@ function renderMfMyTasks() {
 
 function renderMfMyFocus() {
   const focus = mfTasksForEmployee(mfCurrentUserId).filter(function (task) {
-    return task.status !== 'Готово' && (task.priority === 'Высокий' || task.controlDate === todayIsoBangkok() || task.status === 'Просрочено' || task.status === 'Блокер');
+    return isMfOpenTask(task) && (task.priority === 'Высокий' || task.controlDate === todayIsoBangkok() || isOverdueStatus(task.status) || taskStatusKey(task) === 'blocked');
   });
   elements.taskList.innerHTML = [
     '<section class="mf-page-grid">',
@@ -2437,9 +2519,10 @@ function renderMfMyFocus() {
 
 function renderMfTeam() {
   const rows = mfEmployees.map(function (employee) {
-    const tasks = mfTasksForEmployee(employee.id).filter(function (task) { return task.status !== 'Готово'; });
-    const blocked = tasks.filter(function (task) { return ['Блокер', 'Просрочено'].includes(task.status); });
-    const waiting = tasks.filter(function (task) { return task.status === 'Ждём'; });
+    const tasks = mfTasksForEmployee(employee.id).filter(isMfOpenTask);
+    const blocked = tasks.filter(isMfBlockedTask);
+    const waiting = tasks.filter(isMfWaitingTask);
+    const employeeReportStatus = normalizeStatus(employee.reports);
     return [
       '<article class="mf-person-card">',
       '<div><strong>' + escapeHtml(employee.name) + '</strong><span>' + escapeHtml(employee.role) + ' · ' + escapeHtml(mfDepartment(employee.departmentId).name || '-') + '</span></div>',
@@ -2448,7 +2531,7 @@ function renderMfTeam() {
       mfMiniStat('Блокеры', blocked.length, blocked.length ? 'critical' : 'green'),
       mfMiniStat('Ждём', waiting.length, 'neutral'),
       '</div>',
-      '<div class="mf-pill-row">' + mfPill(employee.reports, employee.reports === 'Ждём' || employee.reports === 'Блокер' ? 'critical' : 'green') + mfPill(employee.telegram, employee.telegram === 'Нужно связать' ? 'neutral' : 'cyan') + '</div>',
+      '<div class="mf-pill-row">' + mfPill(employee.reports, ['waiting', 'blocked'].includes(employeeReportStatus) ? 'critical' : 'green') + mfPill(employee.telegram, employee.telegram === 'Нужно связать' ? 'neutral' : 'cyan') + '</div>',
       '</article>',
     ].join('');
   }).join('');
@@ -2457,8 +2540,8 @@ function renderMfTeam() {
 
 function renderMfDepartments() {
   const cards = mfDepartments.map(function (department) {
-    const tasks = mfTasksForDepartment(department.id).filter(function (task) { return task.status !== 'Готово'; });
-    const blockers = tasks.filter(function (task) { return ['Блокер', 'Просрочено'].includes(task.status); });
+    const tasks = mfTasksForDepartment(department.id).filter(isMfOpenTask);
+    const blockers = tasks.filter(isMfBlockedTask);
     const deps = tasks.filter(function (task) { return task.dependencyDepartmentId; });
     return [
       '<article class="mf-department-card">',
@@ -2499,9 +2582,10 @@ function renderMfDependencies() {
 
 function renderMfReports() {
   const rows = mfReportRows.map(function (report) {
+    const statusKey = reportStatusKey(report);
     return [
       '<article class="mf-report-card">',
-      '<div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(report.type) + '</span><h3>' + escapeHtml(report.owner) + '</h3></div>' + mfPill(report.status, report.status === 'Ждём' ? 'critical' : 'green') + '</div>',
+      '<div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(report.type) + '</span><h3>' + escapeHtml(report.owner) + '</h3></div>' + mfPill(statusKey === 'unknown' ? report.status : getStatusLabel(statusKey), statusKey === 'waiting' ? 'critical' : 'green') + '</div>',
       '<p>' + escapeHtml(report.summary) + '</p>',
       '<div class="mf-task-meta"><span>Период: <strong>' + escapeHtml(report.period) + '</strong></span><span>Источник: <strong>Демо-записи отчётов</strong></span></div>',
       '</article>',
@@ -3215,7 +3299,7 @@ function cloneTaskWithAction(task, actionData) {
   if (actionData.newNextReminder !== undefined) {
     updated.nextReminder = actionData.newNextReminder;
   }
-  if (updated.status === 'Выполнено') {
+  if (taskStatusKey(updated) === 'done') {
     updated.completedAt = updated.completedAt || new Date().toISOString();
   }
   return updated;
@@ -3282,8 +3366,9 @@ async function handleFocusToggle(taskId) {
 }
 
 function taskBelongsInPushes(task) {
+  const statusKey = taskStatusKey(task);
   const text = [task.status, task.category, task.reminderMode].map(normalizeText).join(' ');
-  return ['пуш', 'ждём ответ', 'ждем ответ', 'waiting', 'push', 'control', 'follow-up', 'контроль'].some(function (signal) {
+  return statusKey === 'push' || statusKey === 'waiting' || ['control', 'follow-up', 'контроль'].some(function (signal) {
     return text.includes(signal);
   });
 }
@@ -3316,7 +3401,7 @@ function applyTaskActionResult(taskId, action, actionData) {
     return;
   }
   const updatedTask = cloneTaskWithAction(currentTask, actionData);
-  const isDone = normalizeText(updatedTask.status) === 'выполнено';
+  const isDone = taskStatusKey(updatedTask) === 'done';
 
   updateSectionTasks(data.open, taskId, updatedTask, function () {
     return !isDone;
@@ -3326,7 +3411,7 @@ function applyTaskActionResult(taskId, action, actionData) {
       dateSignalIsDue(task.nextReminder, todayIsoBangkok())
       || dateSignalIsDue(task.deadline, todayIsoBangkok())
       || isHighPriority(task)
-      || ['пуш', 'ждём ответ', 'ждём подтверждение', 'ждём подписание'].includes(normalizeText(task.status))
+      || ['push', 'waiting'].includes(taskStatusKey(task))
     );
   });
   updateSectionTasks(data.pushes, taskId, updatedTask, function (task) {
