@@ -174,6 +174,24 @@ const workflowGroupLabels = Object.freeze({
 
 const mfCurrentUserId = 'emp_lisa';
 
+const personalizationStorageKey = 'mfGroupTracker.personalizationPreview';
+
+const mfThemePresets = Object.freeze([
+  { id: 'neon_dark', label: 'Neon dark', description: 'Тёмная операционная тема с неоновыми акцентами.' },
+  { id: 'classic_dark', label: 'Classic dark', description: 'Более спокойная тёмная тема для долгой работы.' },
+  { id: 'light', label: 'Light', description: 'Светлая тема для дневного просмотра.' },
+]);
+
+const mfAccentColors = Object.freeze([
+  { id: 'cyan', label: 'Cyan' },
+  { id: 'green', label: 'Green' },
+  { id: 'blue', label: 'Blue' },
+  { id: 'violet', label: 'Violet' },
+  { id: 'yellow', label: 'Yellow' },
+  { id: 'orange', label: 'Orange' },
+  { id: 'magenta', label: 'Magenta' },
+]);
+
 const mfEmployees = Object.freeze([
   {
     id: 'emp_lisa',
@@ -249,6 +267,8 @@ const mfDepartments = Object.freeze([
   { id: 'dept_marketing', name: 'Маркетинг / презентации', leadId: 'emp_marketing', status: 'Активен', mission: 'Инвесторские деки, офферы и презентационные материалы.' },
   { id: 'dept_compliance', name: 'Комплаенс / онбординг', leadId: 'emp_compliance', status: 'Активен', mission: 'KYB, пакеты онбординга и проверки источников средств.' },
 ]);
+
+let personalizationState = loadPersonalizationState();
 
 const mfTasks = Object.freeze([
   {
@@ -906,6 +926,80 @@ function mfDepartment(departmentId) {
   return mfDepartments.find(function (department) {
     return department.id === departmentId;
   }) || {};
+}
+
+function isAllowedPersonalizationValue(options, value) {
+  return options.some(function (option) {
+    return option.id === value;
+  });
+}
+
+function loadPersonalizationState() {
+  const fallback = {
+    theme: 'neon_dark',
+    accent: 'cyan',
+  };
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(personalizationStorageKey) || '{}');
+    return {
+      theme: isAllowedPersonalizationValue(mfThemePresets, stored.theme) ? stored.theme : fallback.theme,
+      accent: isAllowedPersonalizationValue(mfAccentColors, stored.accent) ? stored.accent : fallback.accent,
+    };
+  } catch (error) {
+    return fallback;
+  }
+}
+
+function savePersonalizationState() {
+  try {
+    window.localStorage.setItem(personalizationStorageKey, JSON.stringify(personalizationState));
+  } catch (error) {
+    // Preview persistence is optional; the mock should still work without storage.
+  }
+}
+
+function applyPersonalizationState() {
+  document.body.dataset.mfTheme = personalizationState.theme;
+  document.body.dataset.mfAccent = personalizationState.accent;
+}
+
+function updatePersonalizationSetting(setting, value) {
+  if (setting === 'theme' && isAllowedPersonalizationValue(mfThemePresets, value)) {
+    personalizationState = Object.assign({}, personalizationState, { theme: value });
+  } else if (setting === 'accent' && isAllowedPersonalizationValue(mfAccentColors, value)) {
+    personalizationState = Object.assign({}, personalizationState, { accent: value });
+  } else {
+    return;
+  }
+  applyPersonalizationState();
+  savePersonalizationState();
+  if (activeTab === 'settings') {
+    renderPanel();
+  }
+}
+
+function mfSelectOptions(options, selectedId) {
+  return options.map(function (option) {
+    return '<option value="' + escapeHtml(option.id) + '"' + (option.id === selectedId ? ' selected' : '') + '>' + escapeHtml(option.label) + '</option>';
+  }).join('');
+}
+
+function mfThemeDescription(themeId) {
+  const preset = mfThemePresets.find(function (theme) {
+    return theme.id === themeId;
+  });
+  return preset ? preset.description : '';
+}
+
+function mfInitials(name) {
+  return String(name || 'MF')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(function (part) {
+      return part.charAt(0).toUpperCase();
+    })
+    .join('') || 'MF';
 }
 
 function mfOpenTasks() {
@@ -2422,6 +2516,9 @@ function renderMfReports() {
 }
 
 function renderMfSettings() {
+  const currentUser = mfEmployee(mfCurrentUserId);
+  const currentDepartment = mfDepartment(currentUser.departmentId);
+  const workspaceName = 'MF Group';
   const roleRows = [
     ['employee', 'Свои задачи, свои отчёты и разрешённая совместная работа'],
     ['department_lead', 'Задачи отдела, назначения и проверка отчётов'],
@@ -2434,9 +2531,47 @@ function renderMfSettings() {
     return '<article class="mf-settings-row"><strong>' + escapeHtml(employee.name) + '</strong><span>Telegram: ' + escapeHtml(employee.telegram) + ' · Роль: ' + escapeHtml(employee.role) + '</span></article>';
   }).join('');
   elements.taskList.innerHTML = [
+    '<section class="mf-settings-page">',
     '<section class="mf-two-column settings">',
-    '<section><div class="mf-section-title"><h3>Роли и права</h3><span>заглушка</span></div><div class="mf-settings-list">' + roleRows + '</div></section>',
-    '<section><div class="mf-section-title"><h3>Связка Telegram</h3><span>заглушка</span></div><div class="mf-settings-list">' + identityRows + '</div></section>',
+    '<article class="mf-settings-card mf-profile-card">',
+    '<div class="mf-section-title"><h3>Мой профиль</h3><span>preview</span></div>',
+    '<div class="mf-profile-head"><div class="mf-avatar" aria-hidden="true">' + escapeHtml(mfInitials(currentUser.name)) + '</div><div><strong>' + escapeHtml(currentUser.name) + '</strong><span>lisa@example.com</span></div></div>',
+    '<div class="mf-readonly-grid">',
+    '<span>Роль / должность <strong>' + escapeHtml(currentUser.role || 'Операционный участник') + '</strong></span>',
+    '<span>Отдел <strong>' + escapeHtml(currentDepartment.name || 'Операции') + '</strong></span>',
+    '<span>Текущий workspace <strong>' + workspaceName + '</strong></span>',
+    '<span>Права доступа <strong>Не меняются от цвета профиля</strong></span>',
+    '</div>',
+    '</article>',
+    '<article class="mf-settings-card">',
+    '<div class="mf-section-title"><h3>Персонализация</h3><span>локально</span></div>',
+    '<label class="mf-form-control" for="personalizationThemeSelect"><span>Тема интерфейса</span><select id="personalizationThemeSelect" data-personalization-setting="theme">' + mfSelectOptions(mfThemePresets, personalizationState.theme) + '</select></label>',
+    '<label class="mf-form-control" for="personalizationAccentSelect"><span>Акцентный цвет</span><select id="personalizationAccentSelect" data-personalization-setting="accent">' + mfSelectOptions(mfAccentColors, personalizationState.accent) + '</select></label>',
+    '<div class="mf-theme-preview"><span>Текущий preview</span><strong>' + escapeHtml(mfThemeDescription(personalizationState.theme)) + '</strong><div class="mf-accent-row">' + mfAccentColors.map(function (color) {
+      return '<span class="mf-color-dot' + (color.id === personalizationState.accent ? ' active' : '') + '" data-color="' + escapeHtml(color.id) + '" title="' + escapeHtml(color.label) + '"></span>';
+    }).join('') + '</div><p>Цвет профиля не влияет на права доступа.</p></div>',
+    '</article>',
+    '</section>',
+    '<section class="mf-two-column settings">',
+    '<article class="mf-settings-card">',
+    '<div class="mf-section-title"><h3>Рабочее пространство</h3><span>preview</span></div>',
+    '<div class="mf-readonly-grid">',
+    '<span>Название <strong>' + workspaceName + '</strong></span>',
+    '<span>Тема по умолчанию <strong>Neon dark</strong></span>',
+    '<span>Участники <strong>' + mfEmployees.length + ' сотрудников</strong></span>',
+    '<span>Настройки workspace <strong>Роли, отделы, Telegram mapping, аудит</strong></span>',
+    '</div>',
+    '</article>',
+    '<article class="mf-settings-card mf-external-card">',
+    '<div class="mf-section-title"><h3>Внешние зависимости</h3><span class="mf-external-marker">Единый маркер</span></div>',
+    '<p>Внешние задачи всегда отмечаются единым янтарным маркером. Это означает внешний контрагент, внешний блокер или зависимость вне компании.</p>',
+    '<p>Маркер не настраивается пользователем и не является логикой прав доступа.</p>',
+    '</article>',
+    '</section>',
+    '<section class="mf-two-column settings">',
+    '<section><div class="mf-section-title"><h3>Участники и роли</h3><span>preview</span></div><div class="mf-settings-list">' + roleRows + '</div></section>',
+    '<section><div class="mf-section-title"><h3>Связка Telegram</h3><span>preview</span></div><div class="mf-settings-list">' + identityRows + '</div></section>',
+    '</section>',
     '</section>',
   ].join('');
 }
@@ -3042,6 +3177,14 @@ elements.taskList.addEventListener('click', function (event) {
   }
 });
 
+elements.taskList.addEventListener('change', function (event) {
+  const control = event.target && event.target.closest('[data-personalization-setting]');
+  if (!control || !elements.taskList.contains(control)) {
+    return;
+  }
+  updatePersonalizationSetting(control.dataset.personalizationSetting, control.value);
+});
+
 function safeReminderFor(action) {
   const today = todayIsoBangkok();
   const date = new Date(today + 'T00:00:00Z');
@@ -3248,6 +3391,7 @@ async function handleTaskAction(button) {
 }
 
 async function initializeDashboard() {
+  applyPersonalizationState();
   formatBangkokTime();
   setInterval(formatBangkokTime, 30000);
   render();
