@@ -35,11 +35,12 @@ function baFoxBuildCleanupAuditDryRun(storeResult) {
   try {
     storeResult = storeResult || baFoxReadTasksRows();
     var rows = storeResult.rows || [];
+    var tasks = baFoxNormalizeTaskRows_(storeResult);
     var normalizedRows = rows.map(function(row, index) {
       return {
         rowNumber: index + 2,
         raw: row,
-        task: baFoxNormalizeTaskRow(row)
+        task: tasks[index] || baFoxNormalizeTaskRow(row, storeResult.headers || [])
       };
     });
 

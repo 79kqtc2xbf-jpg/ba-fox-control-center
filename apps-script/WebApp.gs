@@ -25,12 +25,15 @@ function baFoxRequestParameters_(event) {
 }
 
 function baFoxCacheTtlSeconds_() {
-  return 45;
+  return 60;
 }
 
 function baFoxCacheKey_(route, parameters) {
   var keyParts = [route];
-  ['date', 'taskType', 'scope', 'dateRange', 'limit', 'completedLimit'].forEach(function(name) {
+  Object.keys(parameters || {}).sort().forEach(function(name) {
+    if (['route', 'callback', 'refresh', 'nocache'].indexOf(name) !== -1) {
+      return;
+    }
     if (parameters[name]) {
       keyParts.push(name + '=' + parameters[name]);
     }
@@ -42,6 +45,37 @@ function baFoxIsWriteRoute_(route) {
   return ['taskAction', 'createTask', 'editTask'].indexOf(route) !== -1;
 }
 
+function baFoxIsCacheBypass_(parameters) {
+  return parameters && (parameters.refresh === '1' || parameters.nocache === '1');
+}
+
+function baFoxHasUserScopedParameters_(parameters) {
+  return ['user', 'userId', 'employeeId', 'ownerId', 'telegramUserId', 'email'].some(function(name) {
+    return parameters && parameters[name];
+  });
+}
+
+function baFoxIsCacheableReadRoute_(route, parameters) {
+  // Dashboard cache is read-only and short-lived. Writes are never cached.
+  // Pass refresh=1 or nocache=1 to force a live read while debugging.
+  return ['dashboard', 'workspaceDashboard', 'fullDashboard'].indexOf(route) !== -1
+    && !baFoxIsWriteRoute_(route)
+    && !baFoxIsCacheBypass_(parameters)
+    && !baFoxHasUserScopedParameters_(parameters);
+}
+
+function baFoxLogReadRoute_(route, message, startedAt) {
+  var elapsed = startedAt ? (new Date().getTime() - startedAt) : 0;
+  var text = 'BA_FOX_READ route=' + route + ' ' + message + ' elapsedMs=' + elapsed;
+  if (typeof console !== 'undefined' && console.log) {
+    console.log(text);
+    return;
+  }
+  if (typeof Logger !== 'undefined' && Logger.log) {
+    Logger.log(text);
+  }
+}
+
 function baFoxReadCache_() {
   if (typeof CacheService === 'undefined') {
     return null;
@@ -50,6 +84,9 @@ function baFoxReadCache_() {
 }
 
 function baFoxGetCachedResponse_(route, parameters) {
+  if (!baFoxIsCacheableReadRoute_(route, parameters)) {
+    return null;
+  }
   var cache = baFoxReadCache_();
   if (!cache) {
     return null;
@@ -68,6 +105,9 @@ function baFoxGetCachedResponse_(route, parameters) {
 }
 
 function baFoxPutCachedResponse_(route, parameters, response) {
+  if (!baFoxIsCacheableReadRoute_(route, parameters)) {
+    return;
+  }
   var cache = baFoxReadCache_();
   if (!cache || !response || response.ok !== true) {
     return;
@@ -256,6 +296,7 @@ function baFoxBuildRouteResponse_(route, parameters) {
 }
 
 function doGet(event) {
+  var startedAt = new Date().getTime();
   var parameters = baFoxRequestParameters_(event);
   var route = parameters.route || 'scaffoldInfo';
   var callback = parameters.callback || '';
@@ -272,14 +313,25 @@ function doGet(event) {
   try {
     if (baFoxIsWriteRoute_(route)) {
       response = baFoxBuildRouteResponse_(route, parameters);
+      baFoxLogReadRoute_(route, 'write-route-uncached', startedAt);
     } else {
-      response = baFoxGetCachedResponse_(route, parameters);
+      var cacheable = baFoxIsCacheableReadRoute_(route, parameters);
+      response = cacheable ? baFoxGetCachedResponse_(route, parameters) : null;
       if (!response) {
+        var cacheMessage = baFoxIsCacheBypass_(parameters)
+          ? 'cache-bypass'
+          : cacheable
+            ? 'cache-miss'
+            : 'uncached-read';
+        baFoxLogReadRoute_(route, cacheMessage, startedAt);
         response = baFoxBuildRouteResponse_(route, parameters);
         baFoxPutCachedResponse_(route, parameters, response);
+      } else {
+        baFoxLogReadRoute_(route, 'cache-hit', startedAt);
       }
     }
   } catch (err) {
+    baFoxLogReadRoute_(route, 'error', startedAt);
     response = baFoxReadErrorResponse_(err);
   }
 

@@ -4,9 +4,16 @@ function baFoxTaskOptionalValue_(row, headers, field) {
 }
 
 function baFoxNormalizeTaskRows_(storeResult) {
-  return (storeResult.rows || []).map(function(row) {
+  if (!storeResult) {
+    return [];
+  }
+  if (storeResult.normalizedTasks) {
+    return storeResult.normalizedTasks;
+  }
+  storeResult.normalizedTasks = (storeResult.rows || []).map(function(row) {
     return baFoxNormalizeTaskRow(row, storeResult.headers || []);
   });
+  return storeResult.normalizedTasks;
 }
 
 function baFoxNormalizeTaskRow(row, headers) {
