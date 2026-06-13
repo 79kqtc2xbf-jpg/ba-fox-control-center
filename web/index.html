@@ -51,6 +51,18 @@
       </aside>
 
       <section class="workspace-main">
+        <section class="live-data-status" id="liveDataStatus" aria-live="polite">
+          <div>
+            <strong id="liveStatusMessage">Обновляем данные…</strong>
+            <span id="liveLastUpdated">Последнее обновление: --:--</span>
+          </div>
+          <div class="live-data-meta">
+            <span id="liveDataSource">Источник: Demo fallback</span>
+            <span>Live-данные могут обновляться с задержкой до 60 секунд</span>
+          </div>
+          <button class="secondary-button refresh-button" type="button" id="refreshDashboardButton">Обновить</button>
+        </section>
+
         <section class="dashboard-grid" id="summaryCards" aria-label="Краткая сводка"></section>
 
         <section class="content-panel">
