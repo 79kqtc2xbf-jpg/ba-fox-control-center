@@ -384,6 +384,10 @@ h1 {
   color: var(--danger);
 }
 
+.modal-message.success {
+  color: var(--success);
+}
+
 .modal-actions {
   display: flex;
   justify-content: flex-end;

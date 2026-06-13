@@ -1476,7 +1476,7 @@ function renderCreateTaskButton() {
   const loading = dashboardState.status === 'loading' || scaffoldState.status === 'loading';
   elements.createTaskButton.disabled = loading || !safeWritesEnabled();
   elements.writeModePill.textContent = safeWritesEnabled() ? 'Запись включена' : 'Только просмотр';
-  elements.createTaskButton.textContent = safeWritesEnabled() ? '+ Новая задача' : 'Только просмотр';
+  elements.createTaskButton.textContent = safeWritesEnabled() ? 'Новая задача' : 'Только просмотр';
   elements.createTaskButton.title = safeWritesEnabled()
     ? 'Создать новую задачу'
     : 'Макет только для просмотра. Существующая безопасная запись остаётся за runtime-флагами.';
@@ -2842,8 +2842,14 @@ function renderCreateTaskModal() {
   elements.submitCreateTask.disabled = busy;
   elements.cancelCreateTask.disabled = busy;
   elements.cancelCreateTaskTop.disabled = busy;
+  elements.submitCreateTask.textContent = busy
+    ? 'Сохраняем…'
+    : createTaskState.status === 'success'
+      ? 'Добавить ещё'
+      : 'Сохранить';
   elements.createTaskMessage.textContent = createTaskState.message || '';
   elements.createTaskMessage.classList.toggle('error', createTaskState.status === 'error');
+  elements.createTaskMessage.classList.toggle('success', createTaskState.status === 'success');
 }
 
 function openCreateTaskDatePicker(fieldName) {
@@ -3050,10 +3056,10 @@ function createTaskPayloadFromForm() {
 function validateCreateTaskPayload(payload) {
   const missing = [];
   if (!payload.title) {
-    missing.push('Название задачи');
+    missing.push('Введите название задачи');
   }
   if (!payload.nextAction) {
-    missing.push('Следующее действие');
+    payload.nextAction = payload.title;
   }
   ['deadline', 'controlDate', 'reminder'].forEach(function (field) {
     if (payload[field] && !/^\d{4}-\d{2}-\d{2}$/.test(payload[field])) {
@@ -3068,13 +3074,18 @@ async function handleCreateTaskSubmit(event) {
   if (!safeWritesEnabled()) {
     return;
   }
+  if (createTaskState.status === 'loading') {
+    return;
+  }
 
   const payload = createTaskPayloadFromForm();
   const missing = validateCreateTaskPayload(payload);
   if (missing.length) {
     createTaskState = {
       status: 'error',
-      message: 'Заполните: ' + missing.join(', ') + '.',
+      message: missing.includes('Введите название задачи')
+        ? 'Введите название задачи'
+        : 'Проверьте: ' + missing.join(', ') + '.',
     };
     renderCreateTaskModal();
     return;
@@ -3082,21 +3093,26 @@ async function handleCreateTaskSubmit(event) {
 
   createTaskState = {
     status: 'loading',
-    message: 'Создаю задачу...',
+    message: 'Сохраняем задачу...',
   };
   renderCreateTaskModal();
 
   try {
-    const result = await BAFoxClient.createTask(payload);
-    elements.createTaskModal.hidden = true;
-    createTaskState = { status: 'success', message: '' };
+    await BAFoxClient.createTask(payload);
+    elements.createTaskForm.reset();
+    createTaskState = { status: 'success', message: 'Задача добавлена' };
     await loadDashboard();
-    flashMessage = 'Задача создана: ' + (result && result.taskId ? result.taskId : 'новая задача') + '.';
+    flashMessage = 'Задача добавлена';
     render();
+    elements.createTaskModal.hidden = false;
+    renderCreateTaskModal();
+    elements.createTaskForm.elements.title.focus();
   } catch (error) {
     createTaskState = {
       status: 'error',
-      message: error && error.message ? error.message : 'Не удалось создать задачу.',
+      message: error && error.message && !String(error.message).includes('JSONP')
+        ? error.message
+        : 'Не удалось добавить задачу. Проверьте данные и попробуйте ещё раз.',
     };
     renderCreateTaskModal();
   }
