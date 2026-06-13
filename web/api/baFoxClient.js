@@ -347,6 +347,13 @@
       const diagnosticMessage = clientError && clientError.message
         ? clientError.message
         : 'Unknown endpoint error.';
+      if (global.console && typeof global.console.warn === 'function') {
+        global.console.warn('BA FOX live read failed; showing fallback data.', {
+          route: route,
+          message: diagnosticMessage,
+          error: clientError,
+        });
+      }
       return global.BAFoxUiState.error(route, clientError, {
         isMock: true,
         fallbackData: fallback,
@@ -354,7 +361,7 @@
           ? RATE_LIMIT_MESSAGE
           : timedOut
             ? TIMEOUT_FALLBACK_MESSAGE
-            : 'Live endpoint error: ' + diagnosticMessage,
+            : 'Не удалось обновить live-данные, показана последняя доступная версия / mock fallback.',
       });
     }
   }

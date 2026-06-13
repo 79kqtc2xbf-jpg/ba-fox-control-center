@@ -39,6 +39,11 @@ const elements = {
   taskList: document.querySelector('#taskList'),
   todayLabel: document.querySelector('#todayLabel'),
   modeBanner: document.querySelector('#modeBanner'),
+  liveDataStatus: document.querySelector('#liveDataStatus'),
+  liveStatusMessage: document.querySelector('#liveStatusMessage'),
+  liveLastUpdated: document.querySelector('#liveLastUpdated'),
+  liveDataSource: document.querySelector('#liveDataSource'),
+  refreshDashboardButton: document.querySelector('#refreshDashboardButton'),
   writeModePill: document.querySelector('#writeModePill'),
   createTaskButton: document.querySelector('#createTaskButton'),
   createTaskModal: document.querySelector('#createTaskModal'),
@@ -531,6 +536,13 @@ let taskActionState = {};
 let createTaskState = { status: 'idle', message: '' };
 let editTaskState = { status: 'idle', message: '', taskId: '' };
 let flashMessage = '';
+let liveRefreshState = {
+  status: 'loading',
+  message: 'Обновляем данные…',
+  source: 'Demo fallback',
+  lastUpdatedAt: null,
+  isForced: false,
+};
 
 function stateFromFullDashboard(fullState, route, data) {
   return {
@@ -562,6 +574,35 @@ function formatBangkokTime() {
     timeZone: 'Asia/Bangkok',
   });
   elements.todayLabel.textContent = formatter.format(new Date()) + ' · Бангкок';
+}
+
+function formatLastUpdatedTime(date) {
+  if (!date) {
+    return '--:--';
+  }
+  return new Intl.DateTimeFormat('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Bangkok',
+  }).format(date);
+}
+
+function liveSourceLabel(state) {
+  return state && state.isMock ? 'Demo fallback' : 'Live';
+}
+
+function updateLiveRefreshStateFromDashboard(state, options) {
+  const settings = options || {};
+  const failed = state.status === 'error';
+  liveRefreshState = {
+    status: failed ? 'error' : 'success',
+    message: failed
+      ? 'Не удалось обновить live-данные, показана последняя доступная версия / mock fallback'
+      : 'Данные обновлены',
+    source: liveSourceLabel(state),
+    lastUpdatedAt: new Date(),
+    isForced: Boolean(settings.isForced),
+  };
 }
 
 function dashboardData() {
@@ -1441,6 +1482,20 @@ function renderCreateTaskButton() {
     : 'Макет только для просмотра. Существующая безопасная запись остаётся за runtime-флагами.';
 }
 
+function renderLiveDataStatus() {
+  const loading = liveRefreshState.status === 'loading' || dashboardState.status === 'loading';
+  const hasError = liveRefreshState.status === 'error' || dashboardState.status === 'error' || scaffoldState.status === 'error';
+  elements.liveDataStatus.classList.toggle('loading', loading);
+  elements.liveDataStatus.classList.toggle('error', hasError);
+  elements.liveStatusMessage.textContent = loading
+    ? 'Обновляем данные…'
+    : liveRefreshState.message || 'Данные обновлены';
+  elements.liveLastUpdated.textContent = 'Последнее обновление: ' + formatLastUpdatedTime(liveRefreshState.lastUpdatedAt);
+  elements.liveDataSource.textContent = 'Источник: ' + liveRefreshState.source;
+  elements.refreshDashboardButton.disabled = loading;
+  elements.refreshDashboardButton.textContent = loading ? 'Обновляем…' : 'Обновить';
+}
+
 function renderSummary() {
   if (dashboardState.status === 'loading') {
     elements.summaryCards.innerHTML = ['Открытые', 'Контроль', 'Блокеры', 'Отчёты'].map(function (label) {
@@ -1461,13 +1516,15 @@ function statusText() {
     return flashMessage;
   }
   if (dashboardState.status === 'loading') {
-    return 'Загружаю безопасный обзор...';
+    return 'Обновляем данные…';
   }
   if (dashboardState.status === 'error' || scaffoldState.status === 'error') {
-    return dashboardState.message || 'Ошибка чтения: рабочие данные не открыты, ниже показан demo-набор.';
+    return 'Не удалось обновить live-данные, показана последняя доступная версия / mock fallback.';
   }
   if (activeTab === 'dashboard') {
-    return 'Операционный обзор только для просмотра на демо-данных. Будущая схема командных задач здесь пока не читается и не изменяется.';
+    return dashboardState.isMock
+      ? 'Операционный обзор только для просмотра на демо-данных. Живой источник не меняется.'
+      : 'Операционный обзор только для просмотра. Live-данные могут обновляться с задержкой до 60 секунд.';
   }
   if (activeTab === 'myTasks') {
     return 'Личный вид Lisa: свои задачи, совместная работа, контрольные даты и задачи для отчётов.';
@@ -2731,6 +2788,7 @@ function render() {
   renderSidebarState();
   renderModeBanner();
   renderCreateTaskButton();
+  renderLiveDataStatus();
   renderSummary();
   renderPanel();
 }
@@ -3044,15 +3102,30 @@ async function handleCreateTaskSubmit(event) {
   }
 }
 
-async function loadDashboard() {
+async function loadDashboard(options) {
+  const settings = options || {};
+  const forceRefresh = Boolean(settings.forceRefresh);
+  liveRefreshState = Object.assign({}, liveRefreshState, {
+    status: 'loading',
+    message: 'Обновляем данные…',
+    isForced: forceRefresh,
+  });
   dashboardState = BAFoxClient.createLoadingState('dashboard');
   scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
   render();
-  const workspaceState = await BAFoxClient.getDashboard();
+  const workspaceState = await BAFoxClient.getDashboard(forceRefresh ? { refresh: '1' } : {});
   const data = workspaceState.data || {};
   dashboardState = stateFromFullDashboard(workspaceState, 'dashboard', data);
   scaffoldState = stateFromFullDashboard(workspaceState, 'scaffoldInfo', data.scaffoldInfo);
+  updateLiveRefreshStateFromDashboard(workspaceState, { isForced: forceRefresh });
   render();
+}
+
+async function handleManualRefresh() {
+  if (liveRefreshState.status === 'loading' || dashboardState.status === 'loading') {
+    return;
+  }
+  await loadDashboard({ forceRefresh: true });
 }
 
 async function refreshDashboardAfterAction(taskId, successMessage) {
@@ -3160,6 +3233,7 @@ elements.tabs.forEach(function (tab) {
 });
 
 elements.createTaskButton.addEventListener('click', openCreateTaskModal);
+elements.refreshDashboardButton.addEventListener('click', handleManualRefresh);
 elements.cancelCreateTask.addEventListener('click', closeCreateTaskModal);
 elements.cancelCreateTaskTop.addEventListener('click', closeCreateTaskModal);
 elements.closeEditTask.addEventListener('click', closeEditTaskModal);
