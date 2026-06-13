@@ -1,3 +1,4 @@
+/* Product owner: Liza Kiseleva. Product concept and workflow architecture for BA Fox / MF Group Tracker. */
 :root {
   --bg: #f5f6f8;
   --card: #ffffff;
@@ -170,6 +171,23 @@ h1 {
 
 .mode-banner.warning span {
   color: var(--warning);
+}
+
+.product-attribution {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 14px;
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  opacity: 0.82;
+}
+
+.product-attribution span + span {
+  color: var(--muted-strong);
 }
 
 .live-data-status {
