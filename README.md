@@ -2,6 +2,14 @@
 
 Personal Executive Assistant task-control system for Lisa.
 
+## Product ownership
+
+- Product owner: Liza Kiseleva
+- Product concept and workflow architecture: Liza Kiseleva
+- Primary product attribution: Made by Liza Kiseleva
+- Russian product attribution: Сделано Лизой Киселёвой
+- Technical implementation is maintained through GitHub PR history.
+
 ## Purpose
 
 BA Fox Control Center turns Lisa's daily Telegram-style BA workflow into a controlled task system:

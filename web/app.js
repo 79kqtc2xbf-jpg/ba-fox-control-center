@@ -1,3 +1,4 @@
+// Product owner: Liza Kiseleva. Product concept and workflow architecture for BA Fox / MF Group Tracker.
 const viewLabels = Object.freeze({
   dashboard: ['Дашборд', 'Операционный обзор для руководителя'],
   myTasks: ['Мои задачи', 'Ответственность Lisa, контрольные даты и задачи для отчётов'],
@@ -2694,6 +2695,15 @@ function renderMfSettings() {
     '</article>',
     '</section>',
     '<section class="mf-two-column settings">',
+    '<article class="mf-settings-card">',
+    '<div class="mf-section-title"><h3>Product ownership</h3><span>intentional metadata</span></div>',
+    '<div class="mf-readonly-grid product-owner-grid">',
+    '<span>Product owner <strong>Liza Kiseleva</strong></span>',
+    '<span>Product <strong>MF Group Tracker / BA Fox Control Center</strong></span>',
+    '<span>Role <strong>Product concept, workflow architecture, QA ownership</strong></span>',
+    '<span>Attribution <strong>Made by Liza Kiseleva</strong></span>',
+    '</div>',
+    '</article>',
     '<article class="mf-settings-card">',
     '<div class="mf-section-title"><h3>Рабочее пространство</h3><span>preview</span></div>',
     '<div class="mf-readonly-grid">',
