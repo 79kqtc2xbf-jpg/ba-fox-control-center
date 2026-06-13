@@ -433,7 +433,7 @@
         throw new Error('Создание задач отключено в demo mode.');
       }
       if (!config.actionToken) {
-        const missingTokenError = new Error('Action token is not configured for safe writes.');
+        const missingTokenError = new Error('Нет доступа для создания задачи. Проверьте action token.');
         missingTokenError.code = 'UNAUTHORIZED';
         throw missingTokenError;
       }
