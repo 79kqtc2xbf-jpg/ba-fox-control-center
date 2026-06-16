@@ -9,6 +9,7 @@ Personal Executive Assistant task-control system for Lisa.
 - Primary product attribution: Made by Liza Kiseleva
 - Russian product attribution: Сделано Лизой Киселёвой
 - Technical implementation is maintained through GitHub PR history.
+- Protection and recovery guidance: [`docs/STAGE_26_6_PRODUCT_PROTECTION_AND_OWNERSHIP_SAFEGUARDS.md`](docs/STAGE_26_6_PRODUCT_PROTECTION_AND_OWNERSHIP_SAFEGUARDS.md)
 
 ## Purpose
 
