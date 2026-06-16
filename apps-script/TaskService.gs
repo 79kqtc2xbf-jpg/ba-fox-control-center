@@ -354,7 +354,26 @@ function baFoxValidateCreateTaskStatus_(status) {
   if (!value) {
     return true;
   }
-  return ['Not Started', 'In Progress', 'Waiting Reply', 'Push', 'Done', 'В работе'].indexOf(value) !== -1;
+  return [
+    'Not Started',
+    'In Progress',
+    'Waiting',
+    'Waiting Reply',
+    'Push',
+    'Blocked',
+    'Blocker',
+    'Done',
+    'Completed',
+    'Не начато',
+    'В работе',
+    'Ждём',
+    'Ждем',
+    'Ждём ответ',
+    'Ждем ответ',
+    'Пуш',
+    'Блокер',
+    'Выполнено'
+  ].indexOf(value) !== -1;
 }
 
 function baFoxValidateCreateTaskPriority_(priority) {
@@ -377,6 +396,7 @@ function baFoxBuildSafeCreateTaskId_(now) {
 function baFoxSafeCreateTaskRow_(taskId, normalized, now) {
   var controlDate = baFoxSafeString(normalized.controlDate || normalized.deadline);
   var reminder = baFoxSafeString(normalized.reminder);
+  var status = baFoxSafeString(normalized.status || 'Не начато');
   return [
     taskId,
     '',
@@ -388,7 +408,7 @@ function baFoxSafeCreateTaskRow_(taskId, normalized, now) {
     baFoxSafeString(normalized.priority),
     controlDate,
     reminder ? 'date' : '',
-    baFoxSafeString(normalized.status || 'В работе'),
+    status,
     controlDate || reminder,
     baFoxSafeString(normalized.comment),
     'Web',
@@ -423,10 +443,13 @@ function baFoxSafeCreateTask(request) {
     });
   }
 
-  var missing = baFoxRequired(normalized, ['title', 'nextAction']);
+  var missing = baFoxRequired(normalized, ['title']);
   if (missing.length) {
     return baFoxError('VALIDATION_ERROR', 'Missing required fields.', { missing: missing });
   }
+
+  normalized.nextAction = baFoxSafeString(normalized.nextAction || normalized.title || 'Определить следующий шаг');
+  normalized.status = baFoxSafeString(normalized.status || 'Не начато');
 
   if (!baFoxValidateCreateTaskDeadline_(normalized.deadline)) {
     return baFoxError('VALIDATION_ERROR', 'Deadline must use YYYY-MM-DD format.', {
@@ -505,7 +528,7 @@ function baFoxSafeCreateTask(request) {
       title: normalized.title || '',
       organization: normalized.organization || '',
       category: normalized.category || '',
-      status: normalized.status || 'В работе',
+      status: normalized.status || 'Не начато',
       priority: normalized.priority || '',
       nextAction: normalized.nextAction || '',
       controlDate: normalized.controlDate || normalized.deadline || '',
@@ -516,7 +539,7 @@ function baFoxSafeCreateTask(request) {
 
   return baFoxOk({
     taskId: taskId,
-    status: normalized.status || 'В работе',
+    status: normalized.status || 'Не начато',
     source: 'BA Fox Web',
     createdAt: now,
     appendResult: appendResponse.data,

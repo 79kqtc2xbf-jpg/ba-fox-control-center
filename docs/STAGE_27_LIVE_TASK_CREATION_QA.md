@@ -8,6 +8,7 @@ This QA is intentionally manual because it writes a real test row. Do not change
 
 ## Preconditions
 
+- If Apps Script create-task compatibility changes have just merged, deploy a new Apps Script version before testing the live web UI.
 - Web config points to the live Apps Script deployment.
 - `USE_MOCK_DATA` is `false`.
 - `BA_FOX_ACTION_TOKEN` is configured in runtime/hosting config, not committed to the repo.
@@ -150,11 +151,11 @@ Stage 27 live write QA completed; test row safe to ignore/archive.
 
 ## Compatibility Review Result
 
-Reviewed on Stage 27:
+Reviewed on Stage 27 and Stage 27.2:
 
-- Frontend payload is compatible with the current Apps Script safe create route.
+- Frontend payload is compatible with the Apps Script safe create route after Stage 27.2 is deployed.
 - `Контакт` maps to the existing `organization` field and column D.
 - Date values use native date inputs and `YYYY-MM-DD`.
 - Duplicate submit is guarded by `createTaskState.status === 'loading'` and disabled submit button.
-- No Apps Script, Google Sheet schema, Telegram, auth, secrets, write behavior, or product attribution changes were required.
+- Stage 27.2 updates Apps Script create-task validation only; no Google Sheet schema, Telegram, auth, secrets, or product attribution changes are required.
 - Small frontend-only compatibility note: the task category dropdown includes `QA` so the exact Stage 27 test value can be selected without changing backend/schema behavior.
