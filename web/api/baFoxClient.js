@@ -26,12 +26,12 @@
     UNAUTHORIZED: 'Нет доступа для выполнения действия. Проверьте action token.',
   });
   const CREATE_TASK_MESSAGES = Object.freeze({
-    FIELDS_NOT_ALLOWED: 'Заполните название, контакт/компанию, следующее действие и контрольную дату.',
+    FIELDS_NOT_ALLOWED: 'Проверьте поля задачи: часть данных не поддерживается текущей схемой.',
     SAFE_WRITES_DISABLED: 'Безопасная запись выключена. Создание задач недоступно.',
     TASKS_SHEET_MISSING: 'Лист Tasks недоступен.',
     TASK_APPEND_FAILED: 'Не удалось добавить задачу в Tasks.',
     UNAUTHORIZED: 'Нет доступа для создания задачи. Проверьте action token.',
-    VALIDATION_ERROR: 'Заполните название задачи и следующее действие.',
+    VALIDATION_ERROR: 'Введите название задачи',
   });
   const EDIT_TASK_MESSAGES = Object.freeze({
     FIELDS_NOT_ALLOWED: 'Можно обновить только разрешённые поля задачи.',
