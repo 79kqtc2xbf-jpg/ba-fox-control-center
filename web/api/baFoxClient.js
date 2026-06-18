@@ -445,6 +445,12 @@
         if (error && error.code && CREATE_TASK_MESSAGES[error.code]) {
           error.message = CREATE_TASK_MESSAGES[error.code];
         }
+        if (global.console && typeof global.console.warn === 'function' && error && error.details) {
+          global.console.warn('BA Fox createTask rejected request details.', {
+            code: error.code,
+            details: error.details,
+          });
+        }
         throw error;
       }
     },
