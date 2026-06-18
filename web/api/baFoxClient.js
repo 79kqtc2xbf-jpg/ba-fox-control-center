@@ -145,6 +145,9 @@
       validateReadSafety(data.focus);
     }
     validateReadSafety(data && data.today);
+    if (data && data.all) {
+      validateReadSafety(data.all);
+    }
     validateReadSafety(data && data.open);
     validateReadSafety(data && data.pushes);
     if (data && data.completed) {
@@ -158,6 +161,7 @@
     validateReadSafety(data && data.inbox);
     validateReadSafety(data && data.focus);
     validateReadSafety(data && data.today);
+    validateReadSafety(data && data.all);
     validateReadSafety(data && data.open);
     validateReadSafety(data && data.pushes);
   }

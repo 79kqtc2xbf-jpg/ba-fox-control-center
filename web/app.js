@@ -16,7 +16,7 @@ const viewLabels = Object.freeze({
   presentations: ['Презентации', 'Деки, офферы и материалы'],
   brokers: ['Брокеры', 'Брокеры, партнёры и внешние касания'],
   waiting: ['⏰ Ждут ответа', 'Ожидания, контрольные даты и пуши'],
-  all: ['📋 Все задачи', 'Фокус, очередь и быстрые действия'],
+  all: ['📋 Все задачи', 'Все строки задач из dashboard/read API'],
   completed: ['Завершённые', 'Архив, история и память для отчётов'],
   calendar: ['Календарь', 'Задачи по срокам и напоминаниям'],
   legacyReports: ['📈 Отчёты', 'Дневной и недельный отчёт'],
@@ -641,6 +641,9 @@ function sectionTasks(section) {
 
 function allLoadedTasks() {
   const data = dashboardData();
+  if (data.all && Array.isArray(data.all.tasks)) {
+    return data.all.tasks;
+  }
   return uniqueTasks([]
     .concat(sectionTasks(data.inbox))
     .concat(sectionTasks(data.focus))
@@ -1558,7 +1561,7 @@ function statusText() {
     return 'Today показывает только просроченные, due today, control date today и reminder today задачи.';
   }
   if (activeTab === 'all') {
-    return 'Все задачи — главный рабочий экран: фокус дня, быстрые действия, поиск и фильтры категорий.';
+    return 'Все задачи показывают все строки из read API без фильтра по владельцу, фокусу, сроку или статусу.';
   }
   if (activeTab === 'reports') {
     return 'Отчёты генерируют локальный предпросмотр. PDF, запись в Sheets и отправка выполняются только отдельным подтверждённым шагом.';
@@ -1583,6 +1586,15 @@ function statusText() {
 }
 
 function renderEmpty() {
+  if (activeTab === 'all') {
+    elements.taskList.innerHTML = [
+      '<article class="empty-state">',
+      '<strong>Задач пока нет</strong>',
+      '<span>После создания задачи обновите данные, и она появится в этом разделе.</span>',
+      '</article>',
+    ].join('');
+    return;
+  }
   elements.taskList.innerHTML = [
     '<article class="empty-state">',
     '<strong>Очередь пуста</strong>',
@@ -1914,13 +1926,11 @@ function renderAllTasks(visibleTasks) {
       : taskGroupsHtml(visibleTasks)
     : [
       '<article class="empty-state">',
-      '<strong>Ничего не найдено</strong>',
-      '<span>Измените поиск или выберите другой фильтр.</span>',
+      '<strong>Нет задач для отображения</strong>',
+      '<span>Измените поиск или фильтр, чтобы снова увидеть задачи.</span>',
       '</article>',
     ].join('');
   elements.taskList.innerHTML = [
-    focusOfDayHtml(),
-    homeQuickActionsHtml(),
     '<section class="all-task-queue">',
     '<div class="task-group-header"><div><h3>Очередь задач</h3><span>Категории работают как фильтры, а не отдельные разделы.</span></div><strong>' + visibleTasks.length + '</strong></div>',
     queueHtml,
@@ -2182,7 +2192,9 @@ function renderTasks(options) {
     return;
   }
   const visibleTasks = tasks.filter(function (task) {
-    return taskMatchesFilter(task, activeTaskFilter) && taskMatchesSearch(task);
+    return taskMatchesFilter(task, activeTaskFilter)
+      && (!shouldShowWorkspaceControls() || taskMatchesCategoryFilter(task))
+      && taskMatchesSearch(task);
   });
   if (!tasks.length) {
     if (activeTab === 'completed') {
@@ -3111,7 +3123,11 @@ async function handleCreateTaskSubmit(event) {
     await BAFoxClient.createTask(payload);
     elements.createTaskForm.reset();
     createTaskState = { status: 'success', message: 'Задача добавлена' };
-    await loadDashboard();
+    activeTab = 'all';
+    activeTaskFilter = 'all';
+    activeCategoryFilter = 'all';
+    taskSearchQuery = '';
+    await loadDashboard({ forceRefresh: true });
     flashMessage = 'Задача добавлена';
     render();
     elements.createTaskModal.hidden = false;

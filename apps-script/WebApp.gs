@@ -125,6 +125,7 @@ function baFoxBuildTaskViewsFromRows_(parameters, storeResult) {
     inbox: baFoxListInboxTasks({ date: parameters.date }, storeResult),
     focus: baFoxListFocusTasks({ date: parameters.date }, storeResult),
     today: baFoxListTodayTasks({ date: parameters.date }, storeResult),
+    all: baFoxListAllTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult),
     completed: baFoxListCompletedTasks({ limit: parameters.completedLimit || 50 }, storeResult)
@@ -137,6 +138,7 @@ function baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult) {
     inbox: baFoxListInboxTasks({ date: parameters.date }, storeResult),
     focus: baFoxListFocusTasks({ date: parameters.date }, storeResult),
     today: baFoxListTodayTasks({ date: parameters.date }, storeResult),
+    all: baFoxListAllTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult)
   };
