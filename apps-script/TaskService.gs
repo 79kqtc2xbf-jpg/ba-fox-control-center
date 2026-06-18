@@ -188,6 +188,22 @@ function baFoxListOpenTasks(request, storeResult) {
   };
 }
 
+function baFoxListAllTasks(request, storeResult) {
+  var normalized = baFoxNormalizeRequest(request);
+  var taskType = baFoxSafeString(normalized.taskType || normalized.scope || 'all');
+  storeResult = storeResult || baFoxReadTasksRows();
+
+  return {
+    taskType: taskType,
+    dryRun: storeResult.dryRun,
+    readLive: storeResult.readLive,
+    warning: storeResult.warning,
+    tasks: baFoxNormalizeTaskRows_(storeResult).filter(function(task) {
+      return taskType === 'all' || task.taskType === taskType;
+    })
+  };
+}
+
 function baFoxListInboxTasks(request, storeResult) {
   var normalized = baFoxNormalizeRequest(request);
   var date = baFoxDateOrToday(normalized.date);

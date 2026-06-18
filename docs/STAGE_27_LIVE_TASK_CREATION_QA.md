@@ -15,6 +15,7 @@ This QA is intentionally manual because it writes a real test row. Do not change
 - Apps Script `SAFE_WRITE_MODE` is enabled for safe task creation.
 - The dashboard loads in live mode and the `Новая задача` button is enabled.
 - Google Sheet `Tasks` tab is open in a separate browser tab for verification.
+- The dashboard navigation includes `Все задачи`.
 
 ## Test Task Values
 
@@ -117,12 +118,15 @@ The expected `Tasks` row mapping is:
 7. Confirm the submit button shows `Сохраняем…` and is disabled while saving.
 8. Confirm the UI shows `Задача добавлена`.
 9. Confirm the form clears and offers `Добавить ещё`.
-10. Confirm the dashboard refreshes or the live status timestamp updates after save.
-11. Open the Google Sheet `Tasks` tab.
-12. Search for `TEST_STAGE_27_LIVE_WRITE_DO_NOT_USE`.
-13. Verify the row values against the expected mapping table above.
-14. Confirm only one row was created for the marker.
-15. Confirm an audit entry exists if `AuditLog` is available and safe to inspect.
+10. Confirm the dashboard refreshes with a live refresh/cache bypass after save.
+11. Open `Все задачи`.
+12. Search for `TEST_STAGE_27_LIVE_WRITE_DO_NOT_USE` in the dashboard.
+13. Confirm the task is visible in `Все задачи`.
+14. Open the Google Sheet `Tasks` tab.
+15. Search for `TEST_STAGE_27_LIVE_WRITE_DO_NOT_USE`.
+16. Verify the row values against the expected mapping table above.
+17. Confirm only one row was created for the marker.
+18. Confirm an audit entry exists if `AuditLog` is available and safe to inspect.
 
 ## Rollback / Cleanup
 
@@ -145,7 +149,8 @@ Stage 27 live write QA completed; test row safe to ignore/archive.
 
 - This QA creates a real Google Sheet row.
 - The web UI does not display the generated task id directly after save.
-- The dashboard may not immediately show the new row if Apps Script/dashboard cache is still fresh; manual refresh sends `refresh=1`.
+- After successful create, the web UI requests a cache-bypass dashboard refresh and opens `Все задачи`.
+- If the deployed Apps Script version is older than Stage 27.3, `Все задачи` may not include the unfiltered `all.tasks` payload.
 - The current frontend uses backend-compatible values internally while showing Russian-first labels.
 - If `SAFE_WRITE_MODE` or action token is not configured, the UI should show a friendly create-task error and no row should be created.
 
@@ -158,4 +163,5 @@ Reviewed on Stage 27 and Stage 27.2:
 - Date values use native date inputs and `YYYY-MM-DD`.
 - Duplicate submit is guarded by `createTaskState.status === 'loading'` and disabled submit button.
 - Stage 27.2 updates Apps Script create-task validation only; no Google Sheet schema, Telegram, auth, secrets, or product attribution changes are required.
+- Stage 27.3 adds a read-only `all.tasks` dashboard payload and the `Все задачи` frontend view so newly created tasks can be verified in the dashboard after a forced refresh.
 - Small frontend-only compatibility note: the task category dropdown includes `QA` so the exact Stage 27 test value can be selected without changing backend/schema behavior.
