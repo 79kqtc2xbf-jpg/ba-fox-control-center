@@ -1936,6 +1936,30 @@ h1 {
   margin-bottom: 16px;
 }
 
+.all-task-counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.all-task-counters span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 5px 9px;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--muted-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.all-task-counters strong {
+  color: var(--accent);
+}
+
 .task-search span,
 .form-field span {
   color: var(--muted-strong);

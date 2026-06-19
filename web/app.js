@@ -79,9 +79,11 @@ const severityRank = Object.freeze({
 });
 
 const taskFilters = Object.freeze([
+  { id: 'active', label: 'Активные' },
   { id: 'all', label: 'Все' },
+  { id: 'completed', label: 'Выполненные' },
+  { id: 'blocked', label: 'Блокеры' },
   { id: 'waiting', label: 'Ждут ответа' },
-  { id: 'completed', label: 'Завершённые' },
 ]);
 
 const categoryFilters = Object.freeze([
@@ -1017,6 +1019,12 @@ function completedTasks() {
   return allLoadedTasks().filter(isFinalTask);
 }
 
+function activeTasks() {
+  return allLoadedTasks().filter(function (task) {
+    return !isFinalTask(task);
+  });
+}
+
 function reportableCompletedTasks() {
   return completedTasks().filter(function (task) {
     return isCompletedStatus(task) && !isNonReportableFinal(task);
@@ -1233,7 +1241,7 @@ function navCountForTab(tabName) {
     presentations: presentationTasks().length,
     brokers: brokerTasks().length,
     waiting: waitListTasks().length,
-    all: allLoadedTasks().length,
+    all: activeTasks().length,
     completed: completedTasks().length,
     calendar: allLoadedTasks().length,
     legacyReports: completedThisWeekTasks().length,
@@ -1612,9 +1620,11 @@ function taskMeta(task) {
 }
 
 function taskMatchesFilter(task, filterId) {
+  if (filterId === 'active') return !isFinalTask(task);
   if (filterId === 'all') return true;
-  if (filterId === 'waiting') return isWaitingTask(task) || taskSectionKey(task) === 'waiting';
   if (filterId === 'completed') return isFinalTask(task);
+  if (filterId === 'blocked') return isBlockerTask(task);
+  if (filterId === 'waiting') return isWaitingTask(task) || taskSectionKey(task) === 'waiting';
   return true;
 }
 
@@ -1667,7 +1677,16 @@ function renderWorkspaceControls(tasks) {
     elements.workspaceControls.innerHTML = '';
     return;
   }
+  const activeCount = tasks.filter(function (task) { return taskMatchesFilter(task, 'active'); }).length;
+  const completedCount = tasks.filter(function (task) { return taskMatchesFilter(task, 'completed'); }).length;
+  const blockedCount = tasks.filter(function (task) { return taskMatchesFilter(task, 'blocked'); }).length;
   elements.workspaceControls.innerHTML = [
+    '<div class="all-task-counters" aria-label="Счётчики задач">',
+    '<span>Активные: <strong>' + activeCount + '</strong></span>',
+    '<span>Всего: <strong>' + tasks.length + '</strong></span>',
+    '<span>Выполнено: <strong>' + completedCount + '</strong></span>',
+    '<span>Блокеры: <strong>' + blockedCount + '</strong></span>',
+    '</div>',
     '<label class="task-search">',
     '<span>Поиск задач</span>',
     '<input type="search" id="taskSearchInput" placeholder="Поиск задач..." value="' + escapeHtml(taskSearchQuery) + '" autocomplete="off" />',
@@ -1920,14 +1939,30 @@ function focusOfDayHtml() {
 }
 
 function renderAllTasks(visibleTasks) {
+  const emptyTitle = taskSearchQuery
+    ? 'Ничего не найдено'
+    : activeTaskFilter === 'active'
+      ? 'Активных задач нет'
+      : activeTaskFilter === 'completed'
+        ? 'Выполненных задач нет'
+        : activeTaskFilter === 'blocked'
+          ? 'Блокеров нет'
+          : activeTaskFilter === 'waiting'
+            ? 'Задач, которые ждут ответа, нет'
+            : 'Нет задач для отображения';
+  const emptyText = taskSearchQuery
+    ? 'Измените поиск или фильтр, чтобы снова увидеть задачи.'
+    : activeTaskFilter === 'all'
+      ? 'После создания задачи обновите данные, и она появится в этом разделе.'
+      : 'Переключите фильтр или обновите данные.';
   const queueHtml = visibleTasks.length
     ? activeTaskFilter === 'completed'
       ? '<div class="task-group-list">' + visibleTasks.map(completedTaskCardHtml).join('') + '</div>'
       : taskGroupsHtml(visibleTasks)
     : [
       '<article class="empty-state">',
-      '<strong>Нет задач для отображения</strong>',
-      '<span>Измените поиск или фильтр, чтобы снова увидеть задачи.</span>',
+      '<strong>' + escapeHtml(emptyTitle) + '</strong>',
+      '<span>' + escapeHtml(emptyText) + '</span>',
       '</article>',
     ].join('');
   elements.taskList.innerHTML = [
@@ -2845,7 +2880,7 @@ function setTab(tabName) {
     return;
   }
   activeTab = tabName;
-  activeTaskFilter = 'all';
+  activeTaskFilter = tabName === 'all' ? 'active' : 'all';
   activeCategoryFilter = 'all';
   taskSearchQuery = '';
   flashMessage = '';
@@ -3124,7 +3159,7 @@ async function handleCreateTaskSubmit(event) {
     elements.createTaskForm.reset();
     createTaskState = { status: 'success', message: 'Задача добавлена' };
     activeTab = 'all';
-    activeTaskFilter = 'all';
+    activeTaskFilter = 'active';
     activeCategoryFilter = 'all';
     taskSearchQuery = '';
     await loadDashboard({ forceRefresh: true });
