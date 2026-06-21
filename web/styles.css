@@ -412,6 +412,47 @@ h1 {
   gap: 8px;
 }
 
+.success-confirmation-panel {
+  width: min(380px, 100%);
+}
+
+.success-confirmation {
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  padding: 30px 24px 24px;
+  text-align: center;
+}
+
+.success-confirmation-icon {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  border: 1px solid rgba(var(--accent-rgb), 0.34);
+  border-radius: 50%;
+  background: var(--accent-soft);
+  box-shadow: 0 18px 46px rgba(var(--accent-rgb), 0.18);
+  color: var(--accent);
+  font-size: 42px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.success-confirmation h2 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.success-confirmation-actions {
+  justify-content: center;
+  width: 100%;
+}
+
+.success-confirmation-actions .primary-button {
+  min-width: 120px;
+}
+
 .primary-button,
 .secondary-button {
   padding: 8px 13px;

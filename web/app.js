@@ -53,6 +53,8 @@ const elements = {
   submitCreateTask: document.querySelector('#submitCreateTask'),
   cancelCreateTask: document.querySelector('#cancelCreateTask'),
   cancelCreateTaskTop: document.querySelector('#cancelCreateTaskTop'),
+  createTaskSuccessModal: document.querySelector('#createTaskSuccessModal'),
+  closeCreateTaskSuccess: document.querySelector('#closeCreateTaskSuccess'),
   editTaskModal: document.querySelector('#editTaskModal'),
   editTaskForm: document.querySelector('#editTaskForm'),
   editTaskBody: document.querySelector('#editTaskBody'),
@@ -3007,6 +3009,16 @@ function closeCreateTaskModal() {
   renderCreateTaskModal();
 }
 
+function openCreateTaskSuccessModal() {
+  elements.createTaskSuccessModal.hidden = false;
+  elements.closeCreateTaskSuccess.focus();
+}
+
+function closeCreateTaskSuccessModal() {
+  elements.createTaskSuccessModal.hidden = true;
+  elements.createTaskButton.focus();
+}
+
 function findLoadedTask(taskId) {
   return allLoadedTasks().find(function (task) {
     return task.id === taskId;
@@ -3220,6 +3232,7 @@ async function handleCreateTaskSubmit(event) {
     await BAFoxClient.createTask(payload);
     elements.createTaskForm.reset();
     createTaskState = { status: 'success', message: 'Задача добавлена' };
+    elements.createTaskModal.hidden = true;
     activeTab = 'all';
     activeTaskFilter = 'active';
     activeCategoryFilter = 'all';
@@ -3228,9 +3241,8 @@ async function handleCreateTaskSubmit(event) {
     await loadDashboard({ forceRefresh: true });
     flashMessage = 'Задача добавлена';
     render();
-    elements.createTaskModal.hidden = false;
     renderCreateTaskModal();
-    elements.createTaskForm.elements.title.focus();
+    openCreateTaskSuccessModal();
   } catch (error) {
     createTaskState = {
       status: 'error',
@@ -3351,6 +3363,18 @@ elements.sidebarBackdrop.addEventListener('click', function () {
 });
 
 document.addEventListener('keydown', function (event) {
+  if (event.key === 'Escape' && !elements.createTaskSuccessModal.hidden) {
+    closeCreateTaskSuccessModal();
+    return;
+  }
+  if (event.key === 'Escape' && !elements.createTaskModal.hidden) {
+    closeCreateTaskModal();
+    return;
+  }
+  if (event.key === 'Escape' && !elements.editTaskModal.hidden) {
+    closeEditTaskModal();
+    return;
+  }
   if (event.key === 'Escape' && sidebarOpen) {
     setSidebarOpen(false);
   }
@@ -3376,6 +3400,7 @@ elements.createTaskButton.addEventListener('click', openCreateTaskModal);
 elements.refreshDashboardButton.addEventListener('click', handleManualRefresh);
 elements.cancelCreateTask.addEventListener('click', closeCreateTaskModal);
 elements.cancelCreateTaskTop.addEventListener('click', closeCreateTaskModal);
+elements.closeCreateTaskSuccess.addEventListener('click', closeCreateTaskSuccessModal);
 elements.closeEditTask.addEventListener('click', closeEditTaskModal);
 elements.closeEditTaskTop.addEventListener('click', closeEditTaskModal);
 elements.createTaskForm.addEventListener('submit', handleCreateTaskSubmit);
@@ -3391,6 +3416,11 @@ elements.createTaskModal.addEventListener('click', function (event) {
   const datePickerControl = event.target.closest('[data-date-picker-for]');
   if (datePickerControl && elements.createTaskModal.contains(datePickerControl)) {
     openCreateTaskDatePicker(datePickerControl.dataset.datePickerFor);
+  }
+});
+elements.createTaskSuccessModal.addEventListener('click', function (event) {
+  if (event.target === elements.createTaskSuccessModal) {
+    closeCreateTaskSuccessModal();
   }
 });
 elements.editTaskModal.addEventListener('click', function (event) {
