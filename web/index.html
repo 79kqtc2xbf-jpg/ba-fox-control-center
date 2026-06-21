@@ -180,6 +180,18 @@
     </section>
   </div>
 
+  <div class="modal-backdrop" id="createTaskSuccessModal" hidden>
+    <section class="modal-panel success-confirmation-panel" role="dialog" aria-modal="true" aria-labelledby="createTaskSuccessTitle">
+      <div class="success-confirmation">
+        <div class="success-confirmation-icon" aria-hidden="true">✓</div>
+        <h2 id="createTaskSuccessTitle">Задача добавлена</h2>
+        <div class="modal-actions success-confirmation-actions">
+          <button class="primary-button" type="button" id="closeCreateTaskSuccess">Окей</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
   <div class="modal-backdrop" id="editTaskModal" hidden>
     <section class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="editTaskTitle">
       <form id="editTaskForm" novalidate>
