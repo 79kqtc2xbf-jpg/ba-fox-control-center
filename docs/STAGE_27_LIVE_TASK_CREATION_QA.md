@@ -24,6 +24,7 @@ Use this exact marker so the row is easy to find and clean up:
 | UI field | Test value |
 | --- | --- |
 | Название задачи | `TEST_STAGE_27_LIVE_WRITE_DO_NOT_USE` |
+| Ответственный | `Лиза` |
 | Контакт | `QA / Liza` |
 | Следующее действие | `Проверить запись задачи в Google Sheet` |
 | Контрольная дата | Tomorrow's date in `YYYY-MM-DD` format |
@@ -46,6 +47,7 @@ The current frontend builds the payload in `web/app.js` from `createTaskPayloadF
 | UI field | Frontend payload key | Notes |
 | --- | --- | --- |
 | Название задачи | `title` | Required in UI. |
+| Ответственный | `owner` | Existing Owner field; maps to column P. |
 | Контакт | `organization` | Existing backend/sheet-compatible contact field; maps to column D. |
 | Следующее действие | `nextAction` | If left empty, frontend backfills it with `title` for backend compatibility. |
 | Контрольная дата | `controlDate` and `deadline` | Native date input; must be `YYYY-MM-DD`. |
@@ -74,7 +76,7 @@ WebApp.gs route=createTask -> WebApi.gs createTask(request) -> TaskService.gs ba
 `baFoxSafeCreateTask()` accepts only these create fields:
 
 ```text
-title, organization, nextAction, deadline, controlDate, reminder, status, priority, category, comment
+title, owner, organization, nextAction, deadline, controlDate, reminder, status, priority, category, comment
 ```
 
 The expected `Tasks` row mapping is:
@@ -96,7 +98,7 @@ The expected `Tasks` row mapping is:
 | M | Comment | `Stage 27 live write verification` |
 | N | Channel | `Web` |
 | O | Task type | `work` |
-| P | Owner | `Lisa` |
+| P | Owner | `Лиза` |
 | Q | Created at | Apps Script timestamp |
 | R | Updated at | Apps Script timestamp |
 | S | Completed at | Empty |
