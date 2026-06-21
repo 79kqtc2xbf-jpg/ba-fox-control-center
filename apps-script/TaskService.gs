@@ -35,7 +35,7 @@ function baFoxNormalizeTaskRow(row, headers) {
     comment: row[BA_FOX_CONFIG.TASK_COLUMNS.COMMENT - 1] || '',
     channel: row[BA_FOX_CONFIG.TASK_COLUMNS.CHANNEL - 1] || '',
     taskType: row[BA_FOX_CONFIG.TASK_COLUMNS.TASK_TYPE - 1] || 'work',
-    owner: row[BA_FOX_CONFIG.TASK_COLUMNS.OWNER - 1] || 'Lisa',
+    owner: row[BA_FOX_CONFIG.TASK_COLUMNS.OWNER - 1] || '',
     createdAt: row[BA_FOX_CONFIG.TASK_COLUMNS.CREATED_AT - 1] || '',
     updatedAt: row[BA_FOX_CONFIG.TASK_COLUMNS.UPDATED_AT - 1] || '',
     completedAt: row[BA_FOX_CONFIG.TASK_COLUMNS.COMPLETED_AT - 1] || '',
@@ -334,6 +334,7 @@ function baFoxCreateTaskAllowedKeys_() {
     'callback',
     'token',
     'title',
+    'owner',
     'organization',
     'nextAction',
     'deadline',
@@ -429,7 +430,7 @@ function baFoxSafeCreateTaskRow_(taskId, normalized, now) {
     baFoxSafeString(normalized.comment),
     'Web',
     'work',
-    'Lisa',
+    baFoxSafeString(normalized.owner || 'Лиза'),
     now,
     now,
     '',
@@ -451,7 +452,7 @@ function baFoxSafeCreateTask(request) {
     });
   }
 
-  var createFields = ['title', 'organization', 'nextAction', 'deadline', 'controlDate', 'reminder', 'status', 'priority', 'category', 'comment'];
+  var createFields = ['title', 'owner', 'organization', 'nextAction', 'deadline', 'controlDate', 'reminder', 'status', 'priority', 'category', 'comment'];
   var objectFields = baFoxValidateCreateTaskScalar_(normalized, createFields);
   if (objectFields.length) {
     return baFoxError('VALIDATION_ERROR', 'Create task fields must be simple text values.', {
@@ -465,6 +466,7 @@ function baFoxSafeCreateTask(request) {
   }
 
   normalized.nextAction = baFoxSafeString(normalized.nextAction || normalized.title || 'Определить следующий шаг');
+  normalized.owner = baFoxSafeString(normalized.owner || 'Лиза');
   normalized.status = baFoxSafeString(normalized.status || 'Не начато');
 
   if (!baFoxValidateCreateTaskDeadline_(normalized.deadline)) {
@@ -542,6 +544,7 @@ function baFoxSafeCreateTask(request) {
     errorCode: '',
     newValues: baFoxSafeJson_({
       title: normalized.title || '',
+      owner: normalized.owner || 'Лиза',
       organization: normalized.organization || '',
       category: normalized.category || '',
       status: normalized.status || 'Не начато',
@@ -556,6 +559,7 @@ function baFoxSafeCreateTask(request) {
   return baFoxOk({
     taskId: taskId,
     status: normalized.status || 'Не начато',
+    owner: normalized.owner || 'Лиза',
     source: 'BA Fox Web',
     createdAt: now,
     appendResult: appendResponse.data,

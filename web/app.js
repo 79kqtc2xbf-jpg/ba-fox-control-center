@@ -86,6 +86,14 @@ const taskFilters = Object.freeze([
   { id: 'waiting', label: 'Ждут ответа' },
 ]);
 
+const ownerFilters = Object.freeze([
+  { id: 'all', label: 'Все ответственные' },
+  { id: 'liza', label: 'Лиза' },
+  { id: 'employee_1', label: 'Сотрудник 1' },
+  { id: 'employee_2', label: 'Сотрудник 2' },
+  { id: 'unassigned', label: 'Не назначено' },
+]);
+
 const categoryFilters = Object.freeze([
   { id: 'all', label: 'Все категории' },
   { id: 'documents', label: 'Документы' },
@@ -526,6 +534,7 @@ const todaySectionLabels = Object.freeze({
 let activeTab = 'dashboard';
 let activeTaskFilter = 'all';
 let activeCategoryFilter = 'all';
+let activeOwnerFilter = 'all';
 let taskSearchQuery = '';
 let activeAuditFilter = 'all';
 let sidebarOpen = false;
@@ -678,6 +687,28 @@ function addDaysIso(dateIso, days) {
 
 function normalizeText(value) {
   return String(value == null ? '' : value).trim().toLowerCase();
+}
+
+function ownerKey(value) {
+  const owner = normalizeText(value);
+  if (!owner) return 'unassigned';
+  if (['не назначено', 'не назначен', 'unassigned'].some(function (signal) { return owner === signal; })) return 'unassigned';
+  if (['lisa', 'liza kiseleva', 'лиза'].some(function (signal) { return owner === signal; })) return 'liza';
+  if (['сотрудник 1', 'employee 1', 'employee_1'].some(function (signal) { return owner === signal; })) return 'employee_1';
+  if (['сотрудник 2', 'employee 2', 'employee_2'].some(function (signal) { return owner === signal; })) return 'employee_2';
+  return owner;
+}
+
+function ownerLabel(value) {
+  const key = ownerKey(value);
+  const option = ownerFilters.find(function (filter) {
+    return filter.id === key;
+  });
+  return option && key !== 'all' ? option.label : (String(value || '').trim() || 'Не назначено');
+}
+
+function taskOwnerLabel(task) {
+  return ownerLabel(task && task.owner);
 }
 
 const statusLabels = Object.freeze({
@@ -860,6 +891,8 @@ function taskSearchText(task) {
     task.id,
     task.title,
     task.organization,
+    task.owner,
+    taskOwnerLabel(task),
     task.nextAction,
     task.steps,
     task.comment,
@@ -1613,6 +1646,7 @@ function renderEmpty() {
 
 function taskMeta(task) {
   return [
+    'Ответственный: ' + taskOwnerLabel(task),
     task.organization || 'Без компании',
     taskDueDate(task) ? 'Срок: ' + humanDate(taskDueDate(task)) : 'Без срока',
     taskControlDate(task) ? 'Контроль: ' + humanDate(taskControlDate(task)) : '',
@@ -1633,6 +1667,13 @@ function taskMatchesCategoryFilter(task) {
     return true;
   }
   return taskSectionKey(task) === activeCategoryFilter;
+}
+
+function taskMatchesOwnerFilter(task) {
+  if (activeOwnerFilter === 'all') {
+    return true;
+  }
+  return ownerKey(task && task.owner) === activeOwnerFilter;
 }
 
 function taskMatchesSearch(task) {
@@ -1663,8 +1704,19 @@ function taskFilterHtml(tasks) {
     const selected = filter.id === activeCategoryFilter ? ' selected' : '';
     return '<option value="' + escapeHtml(filter.id) + '"' + selected + '>' + escapeHtml(filter.label) + ' · ' + count + '</option>';
   }).join('');
+  const ownerOptionsHtml = ownerFilters.map(function (filter) {
+    const count = filter.id === 'all'
+      ? tasks.length
+      : tasks.filter(function (task) { return ownerKey(task.owner) === filter.id; }).length;
+    const selected = filter.id === activeOwnerFilter ? ' selected' : '';
+    return '<option value="' + escapeHtml(filter.id) + '"' + selected + '>' + escapeHtml(filter.label) + ' · ' + count + '</option>';
+  }).join('');
   return [
     primaryFiltersHtml,
+    '<label class="owner-filter">',
+    '<span>Ответственный</span>',
+    '<select id="ownerFilterSelect">' + ownerOptionsHtml + '</select>',
+    '</label>',
     '<label class="category-filter">',
     '<span>Категория</span>',
     '<select id="categoryFilterSelect">' + categoryOptionsHtml + '</select>',
@@ -1680,12 +1732,18 @@ function renderWorkspaceControls(tasks) {
   const activeCount = tasks.filter(function (task) { return taskMatchesFilter(task, 'active'); }).length;
   const completedCount = tasks.filter(function (task) { return taskMatchesFilter(task, 'completed'); }).length;
   const blockedCount = tasks.filter(function (task) { return taskMatchesFilter(task, 'blocked'); }).length;
+  const lizaCount = tasks.filter(function (task) { return ownerKey(task.owner) === 'liza' && taskMatchesFilter(task, 'active'); }).length;
+  const employeeOneCount = tasks.filter(function (task) { return ownerKey(task.owner) === 'employee_1' && taskMatchesFilter(task, 'active'); }).length;
+  const employeeTwoCount = tasks.filter(function (task) { return ownerKey(task.owner) === 'employee_2' && taskMatchesFilter(task, 'active'); }).length;
   elements.workspaceControls.innerHTML = [
     '<div class="all-task-counters" aria-label="Счётчики задач">',
     '<span>Активные: <strong>' + activeCount + '</strong></span>',
     '<span>Всего: <strong>' + tasks.length + '</strong></span>',
     '<span>Выполнено: <strong>' + completedCount + '</strong></span>',
     '<span>Блокеры: <strong>' + blockedCount + '</strong></span>',
+    '<span>Лиза: <strong>' + lizaCount + '</strong></span>',
+    '<span>Сотрудник 1: <strong>' + employeeOneCount + '</strong></span>',
+    '<span>Сотрудник 2: <strong>' + employeeTwoCount + '</strong></span>',
     '</div>',
     '<label class="task-search">',
     '<span>Поиск задач</span>',
@@ -1807,6 +1865,7 @@ function completedTaskCardHtml(task) {
     '</div>',
     '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title)) + '</div>',
     '<div class="task-meta">' + [
+      'Ответственный: ' + taskOwnerLabel(task),
       task.organization || 'Без компании',
       task.source || task.appSource || task.channel || '',
       task.id ? 'ID: ' + task.id : '',
@@ -2229,6 +2288,7 @@ function renderTasks(options) {
   const visibleTasks = tasks.filter(function (task) {
     return taskMatchesFilter(task, activeTaskFilter)
       && (!shouldShowWorkspaceControls() || taskMatchesCategoryFilter(task))
+      && (!shouldShowWorkspaceControls() || taskMatchesOwnerFilter(task))
       && taskMatchesSearch(task);
   });
   if (!tasks.length) {
@@ -2882,6 +2942,7 @@ function setTab(tabName) {
   activeTab = tabName;
   activeTaskFilter = tabName === 'all' ? 'active' : 'all';
   activeCategoryFilter = 'all';
+  activeOwnerFilter = 'all';
   taskSearchQuery = '';
   flashMessage = '';
   elements.tabs.forEach(function (tab) {
@@ -3098,6 +3159,7 @@ function createTaskPayloadFromForm() {
   const controlDate = String(formData.get('controlDate') || '').trim();
   return {
     title: String(formData.get('title') || '').trim(),
+    owner: String(formData.get('owner') || '').trim(),
     organization: String(formData.get('organization') || '').trim(),
     category: String(formData.get('category') || '').trim(),
     status: String(formData.get('status') || '').trim(),
@@ -3161,6 +3223,7 @@ async function handleCreateTaskSubmit(event) {
     activeTab = 'all';
     activeTaskFilter = 'active';
     activeCategoryFilter = 'all';
+    activeOwnerFilter = 'all';
     taskSearchQuery = '';
     await loadDashboard({ forceRefresh: true });
     flashMessage = 'Задача добавлена';
@@ -3344,6 +3407,11 @@ elements.workspaceControls.addEventListener('input', function (event) {
 });
 
 elements.workspaceControls.addEventListener('change', function (event) {
+  if (event.target && event.target.id === 'ownerFilterSelect') {
+    activeOwnerFilter = event.target.value || 'all';
+    renderTasks();
+    return;
+  }
   if (event.target && event.target.id === 'categoryFilterSelect') {
     activeCategoryFilter = event.target.value || 'all';
     renderTasks();

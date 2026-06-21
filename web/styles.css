@@ -2975,18 +2975,21 @@ h1 {
   order: 2;
 }
 
-.category-filter {
+.category-filter,
+.owner-filter {
   display: grid;
   gap: 7px;
 }
 
-.category-filter span {
+.category-filter span,
+.owner-filter span {
   color: var(--muted-strong);
   font-size: 13px;
   font-weight: 800;
 }
 
-.category-filter select {
+.category-filter select,
+.owner-filter select {
   min-height: 42px;
   border: 1px solid var(--line);
   border-radius: 8px;
