@@ -4,6 +4,7 @@ var BA_FOX_CONFIG = {
   READ_LIVE_SHEETS: true,
   SAFE_WRITE_MODE: true,
   ACTION_TOKEN: '',
+  ALLOWED_WORKSPACE_DOMAIN: 'mfstream.io',
   TIMEZONE: 'Asia/Bangkok',
   SHEETS: {
     TASKS: 'Tasks',
@@ -11,7 +12,22 @@ var BA_FOX_CONFIG = {
     AUDIT_LOG: 'AuditLog',
     REPORTS: 'Reports',
     NOTIFICATION_QUEUE: 'NotificationQueue',
-    CONTACTS: 'Contacts'
+    CONTACTS: 'Contacts',
+    USERS: 'Users'
+  },
+  USERS_COLUMNS: {
+    USER_ID: 1,
+    EMAIL: 2,
+    DISPLAY_NAME: 3,
+    TITLE: 4,
+    ACCESS_ROLE: 5,
+    STATUS: 6,
+    DEPARTMENT: 7,
+    DEFAULT_OWNER_LABEL: 8,
+    ACCENT_COLOR: 9,
+    CAN_SEE_ALL: 10,
+    CREATED_AT: 11,
+    UPDATED_AT: 12
   },
   TASK_COLUMNS: {
     ID: 1,
