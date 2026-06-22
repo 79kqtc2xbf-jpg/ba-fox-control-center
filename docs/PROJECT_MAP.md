@@ -53,6 +53,7 @@ docs/REMINDER_RULES.md
 docs/SETUP_CHAT_RESPONSE_RULES.md
 docs/STAGE_4_GMAIL_RECONCILIATION_ARCHITECTURE.md
 docs/BA_FOX_V2_APPS_SCRIPT_WEB_CHAT_PLAN.md
+docs/STAGE_29_2_USER_PILOT_QA_PACKAGE.md
 docs/PROJECT_MAP.md
 ```
 
@@ -436,6 +437,7 @@ V2.1 — Apps Script / Web / Google Chat plan: in progress.
 V2.2 — Apps Script backend MVP: pending.
 V2.3 — Web/PWA MVP connection: pending.
 V2.4 — Google Chat notification MVP: pending.
+Stage 29 — 2-user pilot QA package: ready for controlled pilot.
 Telegram/Railway — legacy/paused.
 ```
 
