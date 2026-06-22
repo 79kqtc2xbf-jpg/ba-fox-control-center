@@ -1,5 +1,7 @@
 window.BA_FOX_CONFIG = {
   APPS_SCRIPT_ENDPOINT: '',
   BA_FOX_ACTION_TOKEN: '',
+  GOOGLE_CLIENT_ID: '',
+  GOOGLE_ALLOWED_DOMAIN: 'mfstream.io',
   USE_MOCK_DATA: true,
 };

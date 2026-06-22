@@ -195,9 +195,157 @@ const workflowGroupLabels = Object.freeze({
   review: ['Нужен разбор', 'Требуется разбор или очистка'],
 });
 
+const allowedWorkspaceDomain = 'mfstream.io';
+
+const usersSheetColumns = Object.freeze([
+  'userId',
+  'email',
+  'displayName',
+  'title',
+  'accessRole',
+  'status',
+  'department',
+  'defaultOwnerLabel',
+  'accentColor',
+  'canSeeAll',
+  'createdAt',
+  'updatedAt',
+]);
+
+const accessRoleLabels = Object.freeze({
+  admin: 'admin · полный доступ / системная настройка',
+  executive: 'executive · полная видимость',
+  member: 'member · свои задачи и участие',
+  viewer: 'viewer · только просмотр',
+});
+
+const usersRegistry = Object.freeze([
+  {
+    userId: 'user_liza_kiseleva',
+    email: 'TODO_LIZA@mfstream.io',
+    displayName: 'Liza Kiseleva',
+    title: 'Executive Support',
+    accessRole: 'admin',
+    status: 'active',
+    department: 'Админ / EA',
+    defaultOwnerLabel: 'Лиза',
+    accentColor: 'green',
+    canSeeAll: true,
+  },
+  {
+    userId: 'user_andrey_zaytsev',
+    email: 'TODO_ANDREY_ZAYTSEV@mfstream.io',
+    displayName: 'Andrey Zaytsev',
+    title: 'HRG',
+    accessRole: 'member',
+    status: 'active',
+    department: 'Операции',
+    defaultOwnerLabel: 'Андрей',
+    accentColor: 'blue',
+    canSeeAll: false,
+  },
+  {
+    userId: 'user_teodor_shoshiashvili',
+    email: 'TODO_TEODOR@mfstream.io',
+    displayName: 'Teodor Shoshiashvili',
+    title: 'Co-founder, CEO',
+    accessRole: 'executive',
+    status: 'active',
+    department: 'Руководство',
+    defaultOwnerLabel: 'Teodor',
+    accentColor: 'cyan',
+    canSeeAll: true,
+  },
+  {
+    userId: 'user_andrey_branov',
+    email: 'TODO_ANDREY_BRANOV@mfstream.io',
+    displayName: 'Andrey Branov',
+    title: 'Co-founder, Grusha Strategic',
+    accessRole: 'executive',
+    status: 'active',
+    department: 'Руководство',
+    defaultOwnerLabel: 'Andrey Branov',
+    accentColor: 'violet',
+    canSeeAll: true,
+  },
+  {
+    userId: 'user_aleksandra_pamukhina',
+    email: 'TODO_ALEKSANDRA@mfstream.io',
+    displayName: 'Aleksandra Pamukhina',
+    title: 'CBDO',
+    accessRole: 'member',
+    status: 'active',
+    department: 'Продажи / партнёры',
+    defaultOwnerLabel: 'Aleksandra',
+    accentColor: 'magenta',
+    canSeeAll: false,
+  },
+  {
+    userId: 'user_daniil_lebedev',
+    email: 'TODO_DANIIL@mfstream.io',
+    displayName: 'Daniil Lebedev',
+    title: 'Analyst & Engineer',
+    accessRole: 'member',
+    status: 'active',
+    department: 'Продукт / IT',
+    defaultOwnerLabel: 'Даниил',
+    accentColor: 'cyan',
+    canSeeAll: false,
+  },
+  {
+    userId: 'user_karim_amirov',
+    email: 'TODO_KARIM@mfstream.io',
+    displayName: 'Karim Amirov',
+    title: 'Product Owner · Grusha',
+    accessRole: 'member',
+    status: 'active',
+    department: 'Продукт / IT',
+    defaultOwnerLabel: 'Karim',
+    accentColor: 'orange',
+    canSeeAll: false,
+  },
+  {
+    userId: 'user_ani_gevorgyan',
+    email: 'TODO_ANI@mfstream.io',
+    displayName: 'Ani Gevorgyan',
+    title: 'Head of Operations',
+    accessRole: 'member',
+    status: 'active',
+    department: 'Операции',
+    defaultOwnerLabel: 'Ani',
+    accentColor: 'green',
+    canSeeAll: false,
+  },
+  {
+    userId: 'user_vitaliy_sushkov',
+    email: 'TODO_VITALIY@mfstream.io',
+    displayName: 'Vitaliy Sushkov',
+    title: 'CFO',
+    accessRole: 'member',
+    status: 'active',
+    department: 'Финансы / платежи',
+    defaultOwnerLabel: 'Vitaliy',
+    accentColor: 'yellow',
+    canSeeAll: false,
+  },
+  {
+    userId: 'user_asya_sundareva',
+    email: 'TODO_ASYA@mfstream.io',
+    displayName: 'Asya Sundareva',
+    title: 'Junior Operations · High Risk',
+    accessRole: 'member',
+    status: 'active',
+    department: 'Операции',
+    defaultOwnerLabel: 'Asya',
+    accentColor: 'blue',
+    canSeeAll: false,
+  },
+]);
+
 const mfCurrentUserId = 'emp_lisa';
 
-const personalizationStorageKey = 'mfGroupTracker.personalizationPreview';
+const identityStorageKey = 'mfGroupTracker.identityPrepared';
+const personalizationStoragePrefix = 'mfGroupTracker.personalizationPreview';
 
 const mfThemePresets = Object.freeze([
   { id: 'neon_dark', label: 'Neon dark', description: 'Тёмная операционная тема с неоновыми акцентами.' },
@@ -291,6 +439,7 @@ const mfDepartments = Object.freeze([
   { id: 'dept_compliance', name: 'Комплаенс / онбординг', leadId: 'emp_compliance', status: 'Активен', mission: 'KYB, пакеты онбординга и проверки источников средств.' },
 ]);
 
+let identityState = loadIdentityState();
 let personalizationState = loadPersonalizationState();
 
 const mfTasks = Object.freeze([
@@ -1216,6 +1365,82 @@ function mfDepartment(departmentId) {
   }) || {};
 }
 
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function emailDomain(value) {
+  const normalized = normalizeEmail(value);
+  const parts = normalized.split('@');
+  return parts.length === 2 ? parts[1] : '';
+}
+
+function findRegistryUserByEmail(email) {
+  const normalized = normalizeEmail(email);
+  return usersRegistry.find(function (user) {
+    return normalizeEmail(user.email) === normalized;
+  }) || null;
+}
+
+function identityStorageProfileKey() {
+  return normalizeEmail(identityState && identityState.email) || 'not_signed_in';
+}
+
+function personalizationStorageKey() {
+  return personalizationStoragePrefix + '.' + identityStorageProfileKey();
+}
+
+function loadIdentityState() {
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(identityStorageKey) || '{}');
+    const email = normalizeEmail(stored.email);
+    const registryUser = findRegistryUserByEmail(email);
+    if (!email || emailDomain(email) !== allowedWorkspaceDomain || !registryUser) {
+      return {
+        status: 'prepared',
+        email: '',
+        displayName: '',
+        registryUser: null,
+        message: 'Google-вход готовится. Доступ пока не защищён этим экраном.',
+      };
+    }
+    return {
+      status: 'signed_in_preview',
+      email: email,
+      displayName: registryUser.displayName,
+      registryUser: registryUser,
+      message: 'Профиль найден локально. Backend enforcement ещё не включён.',
+    };
+  } catch (error) {
+    return {
+      status: 'prepared',
+      email: '',
+      displayName: '',
+      registryUser: null,
+      message: 'Google-вход готовится. Доступ пока не защищён этим экраном.',
+    };
+  }
+}
+
+function identityDisplayProfile() {
+  const fallbackUser = usersRegistry[0];
+  const registryUser = identityState.registryUser || fallbackUser;
+  return {
+    isSignedIn: identityState.status === 'signed_in_preview',
+    email: identityState.email || 'не выполнен вход',
+    domain: identityState.email ? emailDomain(identityState.email) : allowedWorkspaceDomain,
+    displayName: identityState.displayName || registryUser.displayName,
+    title: registryUser.title,
+    accessRole: registryUser.accessRole,
+    status: registryUser.status,
+    department: registryUser.department,
+    defaultOwnerLabel: registryUser.defaultOwnerLabel,
+    accentColor: registryUser.accentColor,
+    canSeeAll: registryUser.canSeeAll === true,
+    message: identityState.message,
+  };
+}
+
 function isAllowedPersonalizationValue(options, value) {
   return options.some(function (option) {
     return option.id === value;
@@ -1223,12 +1448,13 @@ function isAllowedPersonalizationValue(options, value) {
 }
 
 function loadPersonalizationState() {
+  const profile = identityDisplayProfile();
   const fallback = {
     theme: 'neon_dark',
-    accent: 'cyan',
+    accent: isAllowedPersonalizationValue(mfAccentColors, profile.accentColor) ? profile.accentColor : 'cyan',
   };
   try {
-    const stored = JSON.parse(window.localStorage.getItem(personalizationStorageKey) || '{}');
+    const stored = JSON.parse(window.localStorage.getItem(personalizationStorageKey()) || '{}');
     return {
       theme: isAllowedPersonalizationValue(mfThemePresets, stored.theme) ? stored.theme : fallback.theme,
       accent: isAllowedPersonalizationValue(mfAccentColors, stored.accent) ? stored.accent : fallback.accent,
@@ -1240,7 +1466,7 @@ function loadPersonalizationState() {
 
 function savePersonalizationState() {
   try {
-    window.localStorage.setItem(personalizationStorageKey, JSON.stringify(personalizationState));
+    window.localStorage.setItem(personalizationStorageKey(), JSON.stringify(personalizationState));
   } catch (error) {
     // Preview persistence is optional; the mock should still work without storage.
   }
@@ -2967,44 +3193,80 @@ function renderMfReports() {
   ].join('');
 }
 
+function usersRegistryRowsHtml() {
+  return usersRegistry.map(function (user) {
+    return [
+      '<article class="mf-settings-row">',
+      '<strong>' + escapeHtml(user.displayName) + '</strong>',
+      '<span>' + escapeHtml(user.title) + ' · ' + escapeHtml(user.accessRole) + ' · ' + escapeHtml(user.email) + '</span>',
+      '</article>',
+    ].join('');
+  }).join('');
+}
+
+function usersSheetColumnsHtml() {
+  return usersSheetColumns.map(function (column) {
+    return '<span>' + escapeHtml(column) + '</span>';
+  }).join('');
+}
+
 function renderMfSettings() {
-  const currentUser = mfEmployee(mfCurrentUserId);
-  const currentDepartment = mfDepartment(currentUser.departmentId);
+  const config = BAFoxConfig.getConfig();
+  const profile = identityDisplayProfile();
   const workspaceName = 'MF Group';
-  const roleRows = [
-    ['employee', 'Свои задачи, свои отчёты и разрешённая совместная работа'],
-    ['department_lead', 'Задачи отдела, назначения и проверка отчётов'],
-    ['manager', 'Все отделы, блокеры и управленческие отчёты'],
-    ['admin', 'Настройки, связка идентичности, аудит и восстановление'],
-  ].map(function (row) {
-    return '<article class="mf-settings-row"><strong>' + escapeHtml(row[0]) + '</strong><span>' + escapeHtml(row[1]) + '</span></article>';
+  const roleRows = Object.keys(accessRoleLabels).map(function (role) {
+    const visibility = role === 'admin' || role === 'executive'
+      ? 'Видит все задачи после backend enforcement.'
+      : role === 'viewer'
+        ? 'Только просмотр после backend enforcement.'
+        : 'Видит свои задачи, участие и созданные задачи после добавления identity fields.';
+    return '<article class="mf-settings-row"><strong>' + escapeHtml(role) + '</strong><span>' + escapeHtml(accessRoleLabels[role]) + ' · ' + escapeHtml(visibility) + '</span></article>';
   }).join('');
-  const identityRows = mfEmployees.map(function (employee) {
-    return '<article class="mf-settings-row"><strong>' + escapeHtml(employee.name) + '</strong><span>Telegram: ' + escapeHtml(employee.telegram) + ' · Роль: ' + escapeHtml(employee.role) + '</span></article>';
-  }).join('');
+  const googleStatus = config.hasGoogleClientId
+    ? 'Google Client ID задан, backend-проверка ещё не включена'
+    : 'Google-вход готовится';
+  const signInDisabled = ' disabled title="Google Identity Services будет включён после OAuth/runtime config и backend token verification"';
+  const signOutDisabled = profile.isSignedIn ? '' : ' disabled';
   elements.taskList.innerHTML = [
     '<section class="mf-settings-page">',
     '<section class="mf-two-column settings">',
     '<article class="mf-settings-card mf-profile-card">',
-    '<div class="mf-section-title"><h3>Мой профиль</h3><span>preview</span></div>',
-    '<div class="mf-profile-head"><div class="mf-avatar" aria-hidden="true">' + escapeHtml(mfInitials(currentUser.name)) + '</div><div><strong>' + escapeHtml(currentUser.name) + '</strong><span>lisa@example.com</span></div></div>',
+    '<div class="mf-section-title"><h3>Профиль</h3><span>' + escapeHtml(profile.isSignedIn ? 'local preview' : 'готовится') + '</span></div>',
+    '<div class="mf-profile-head"><div class="mf-avatar" aria-hidden="true">' + escapeHtml(mfInitials(profile.displayName)) + '</div><div><strong>' + escapeHtml(profile.displayName) + '</strong><span>' + escapeHtml(profile.email) + '</span></div></div>',
     '<div class="mf-readonly-grid">',
-    '<span>Роль / должность <strong>' + escapeHtml(currentUser.role || 'Операционный участник') + '</strong></span>',
-    '<span>Отдел <strong>' + escapeHtml(currentDepartment.name || 'Операции') + '</strong></span>',
+    '<span>Рабочий аккаунт <strong>' + escapeHtml(profile.domain) + '</strong></span>',
+    '<span>Роль доступа <strong>' + escapeHtml(profile.accessRole) + '</strong></span>',
+    '<span>Должность <strong>' + escapeHtml(profile.title) + '</strong></span>',
+    '<span>Отдел / направление <strong>' + escapeHtml(profile.department) + '</strong></span>',
+    '<span>Owner label <strong>' + escapeHtml(profile.defaultOwnerLabel) + '</strong></span>',
+    '<span>Полная видимость <strong>' + escapeHtml(profile.canSeeAll ? 'да' : 'нет') + '</strong></span>',
     '<span>Текущий workspace <strong>' + workspaceName + '</strong></span>',
-    '<span>Права доступа <strong>Не меняются от цвета профиля</strong></span>',
+    '<span>Статус защиты <strong>Подготовлено, не enforced</strong></span>',
     '</div>',
     '</article>',
     '<article class="mf-settings-card">',
-    '<div class="mf-section-title"><h3>Персонализация</h3><span>локально</span></div>',
-    '<label class="mf-form-control" for="personalizationThemeSelect"><span>Тема интерфейса</span><select id="personalizationThemeSelect" data-personalization-setting="theme">' + mfSelectOptions(mfThemePresets, personalizationState.theme) + '</select></label>',
-    '<label class="mf-form-control" for="personalizationAccentSelect"><span>Акцентный цвет</span><select id="personalizationAccentSelect" data-personalization-setting="accent">' + mfSelectOptions(mfAccentColors, personalizationState.accent) + '</select></label>',
-    '<div class="mf-theme-preview"><span>Текущий preview</span><strong>' + escapeHtml(mfThemeDescription(personalizationState.theme)) + '</strong><div class="mf-accent-row">' + mfAccentColors.map(function (color) {
-      return '<span class="mf-color-dot' + (color.id === personalizationState.accent ? ' active' : '') + '" data-color="' + escapeHtml(color.id) + '" title="' + escapeHtml(color.label) + '"></span>';
-    }).join('') + '</div><p>Цвет профиля не влияет на права доступа.</p></div>',
+    '<div class="mf-section-title"><h3>Вход через Google</h3><span>' + escapeHtml(googleStatus) + '</span></div>',
+    '<div class="mf-readonly-grid">',
+    '<span>Разрешённый домен <strong>' + escapeHtml(config.googleAllowedDomain || allowedWorkspaceDomain) + '</strong></span>',
+    '<span>OAuth Client ID <strong>' + escapeHtml(config.hasGoogleClientId ? 'задан в runtime config' : 'не задан') + '</strong></span>',
+    '<span>Backend enforcement <strong>не включён</strong></span>',
+    '<span>Текущий статус <strong>' + escapeHtml(profile.message) + '</strong></span>',
+    '</div>',
+    '<div class="mf-action-row">',
+    '<button class="secondary-button" type="button" data-identity-action="signin"' + signInDisabled + '>Войти через Google</button>',
+    '<button class="secondary-button" type="button" data-identity-action="signout"' + signOutDisabled + '>Выйти</button>',
+    '</div>',
     '</article>',
     '</section>',
     '<section class="mf-two-column settings">',
+    '<article class="mf-settings-card">',
+    '<div class="mf-section-title"><h3>Цвет интерфейса</h3><span>localStorage fallback</span></div>',
+    '<label class="mf-form-control" for="personalizationThemeSelect"><span>Тема интерфейса</span><select id="personalizationThemeSelect" data-personalization-setting="theme">' + mfSelectOptions(mfThemePresets, personalizationState.theme) + '</select></label>',
+    '<label class="mf-form-control" for="personalizationAccentSelect"><span>Цвет интерфейса</span><select id="personalizationAccentSelect" data-personalization-setting="accent">' + mfSelectOptions(mfAccentColors, personalizationState.accent) + '</select></label>',
+    '<div class="mf-theme-preview"><span>Текущий preview</span><strong>' + escapeHtml(mfThemeDescription(personalizationState.theme)) + '</strong><div class="mf-accent-row">' + mfAccentColors.map(function (color) {
+      return '<span class="mf-color-dot' + (color.id === personalizationState.accent ? ' active' : '') + '" data-color="' + escapeHtml(color.id) + '" title="' + escapeHtml(color.label) + '"></span>';
+    }).join('') + '</div><p>Сейчас цвет хранится только в этом браузере. В Users sheet он должен стать account-level настройкой.</p></div>',
+    '</article>',
     '<article class="mf-settings-card">',
     '<div class="mf-section-title"><h3>Product ownership</h3><span>intentional metadata</span></div>',
     '<div class="mf-readonly-grid product-owner-grid">',
@@ -3014,24 +3276,30 @@ function renderMfSettings() {
     '<span>Attribution <strong>Made by Liza Kiseleva</strong></span>',
     '</div>',
     '</article>',
+    '</section>',
+    '<section class="mf-two-column settings">',
     '<article class="mf-settings-card">',
     '<div class="mf-section-title"><h3>Рабочее пространство</h3><span>preview</span></div>',
     '<div class="mf-readonly-grid">',
     '<span>Название <strong>' + workspaceName + '</strong></span>',
-    '<span>Тема по умолчанию <strong>Neon dark</strong></span>',
-    '<span>Участники <strong>' + mfEmployees.length + ' сотрудников</strong></span>',
-    '<span>Настройки workspace <strong>Роли, отделы, Telegram mapping, аудит</strong></span>',
+    '<span>Allowed domain <strong>' + escapeHtml(allowedWorkspaceDomain) + '</strong></span>',
+    '<span>Users registry <strong>' + usersRegistry.length + ' пользователей</strong></span>',
+    '<span>Настройки workspace <strong>Роли, Users sheet, Telegram mapping, аудит</strong></span>',
     '</div>',
     '</article>',
     '<article class="mf-settings-card mf-external-card">',
-    '<div class="mf-section-title"><h3>Внешние зависимости</h3><span class="mf-external-marker">Единый маркер</span></div>',
-    '<p>Внешние задачи всегда отмечаются единым янтарным маркером. Это означает внешний контрагент, внешний блокер или зависимость вне компании.</p>',
-    '<p>Маркер не настраивается пользователем и не является логикой прав доступа.</p>',
+    '<div class="mf-section-title"><h3>Модель видимости</h3><span class="mf-external-marker">prepared only</span></div>',
+    '<p>admin и executive должны видеть все задачи после backend enforcement. member видит свои задачи, участие и, возможно, созданные им задачи.</p>',
+    '<p>Текущий dashboard пока не фильтрует live-данные по пользователю, потому что Apps Script ещё не проверяет Google identity token.</p>',
     '</article>',
     '</section>',
     '<section class="mf-two-column settings">',
-    '<section><div class="mf-section-title"><h3>Участники и роли</h3><span>preview</span></div><div class="mf-settings-list">' + roleRows + '</div></section>',
-    '<section><div class="mf-section-title"><h3>Связка Telegram</h3><span>preview</span></div><div class="mf-settings-list">' + identityRows + '</div></section>',
+    '<section><div class="mf-section-title"><h3>Роли доступа</h3><span>model</span></div><div class="mf-settings-list">' + roleRows + '</div></section>',
+    '<section><div class="mf-section-title"><h3>Users registry</h3><span>Users sheet draft</span></div><div class="mf-settings-list">' + usersRegistryRowsHtml() + '</div></section>',
+    '</section>',
+    '<section class="mf-settings-card">',
+    '<div class="mf-section-title"><h3>Users sheet columns</h3><span>schema draft</span></div>',
+    '<div class="mf-column-list">' + usersSheetColumnsHtml() + '</div>',
     '</section>',
     '</section>',
   ].join('');
@@ -3268,6 +3536,26 @@ function closeEditTaskModal() {
   elements.editTaskBody.innerHTML = '';
   editTaskState = { status: 'idle', message: '', taskId: '' };
   renderEditTaskModal();
+}
+
+function handleIdentityAction(action) {
+  if (action === 'signout') {
+    try {
+      window.localStorage.removeItem(identityStorageKey);
+    } catch (error) {
+      // Local identity preview is optional.
+    }
+    identityState = loadIdentityState();
+    personalizationState = loadPersonalizationState();
+    applyPersonalizationState();
+    flashMessage = 'Выход выполнен локально. Google-вход пока не enforced.';
+    render();
+    return;
+  }
+  if (action === 'signin') {
+    flashMessage = 'Google-вход готовится: нужен OAuth Client ID и backend token verification.';
+    render();
+  }
 }
 
 function editTaskPayloadFromForm() {
@@ -3658,6 +3946,12 @@ elements.workspaceControls.addEventListener('click', function (event) {
 });
 
 elements.taskList.addEventListener('click', function (event) {
+  const identityActionButton = event.target.closest('[data-identity-action]');
+  if (identityActionButton) {
+    handleIdentityAction(identityActionButton.dataset.identityAction);
+    return;
+  }
+
   const quickActionButton = event.target.closest('[data-quick-action]');
   if (quickActionButton) {
     const action = quickActionButton.dataset.quickAction;

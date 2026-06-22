@@ -55,6 +55,7 @@ docs/STAGE_4_GMAIL_RECONCILIATION_ARCHITECTURE.md
 docs/BA_FOX_V2_APPS_SCRIPT_WEB_CHAT_PLAN.md
 docs/STAGE_29_2_USER_PILOT_QA_PACKAGE.md
 docs/STAGE_30_TEAM_DASHBOARD_ARCHITECTURE.md
+docs/STAGE_31_IDENTITY_USERS_ROLES_PROFILE.md
 docs/PROJECT_MAP.md
 ```
 
@@ -440,6 +441,7 @@ V2.3 — Web/PWA MVP connection: pending.
 V2.4 — Google Chat notification MVP: pending.
 Stage 29 — 2-user pilot QA package: ready for controlled pilot.
 Stage 30 — team dashboard architecture overhaul: frontend/dashboard logic in progress.
+Stage 31 — identity/users/roles/profile foundation: prepared, not enforced.
 Telegram/Railway — legacy/paused.
 ```
 
