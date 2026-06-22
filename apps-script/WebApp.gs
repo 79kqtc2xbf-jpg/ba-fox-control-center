@@ -277,6 +277,10 @@ function baFoxBuildRouteResponse_(route, parameters) {
     case 'safetyStatus':
       response = baFoxGetSafetyStatus_();
       break;
+    case 'profile':
+    case 'me':
+      response = getProfile(parameters);
+      break;
     case 'taskAction':
       response = taskAction(parameters);
       break;

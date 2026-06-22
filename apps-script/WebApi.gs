@@ -46,6 +46,10 @@ function taskAction(request) {
   return baFoxTaskAction(request);
 }
 
+function getProfile(request) {
+  return baFoxGetProfile(request);
+}
+
 function buildDailyReportDraft(request) {
   return baFoxBuildDailyReportDraft(request);
 }

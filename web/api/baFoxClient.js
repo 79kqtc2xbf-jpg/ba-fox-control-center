@@ -12,6 +12,8 @@
     'fullDashboard',
     'cleanupAudit',
     'safetyStatus',
+    'profile',
+    'me',
   ]);
   const WRITE_ROUTES = Object.freeze([
     'taskAction',
@@ -133,6 +135,19 @@
 
     if (!isValid) {
       throw new Error('Safety status response shape is incomplete.');
+    }
+  }
+
+  function validateProfile(data) {
+    const isValid = data
+      && typeof data.identityMode === 'string'
+      && data.profile
+      && typeof data.allowedDomain === 'string'
+      && typeof data.isBackendEnforced === 'boolean'
+      && Array.isArray(data.limitations);
+
+    if (!isValid) {
+      throw new Error('Profile response shape is incomplete.');
     }
   }
 
@@ -306,6 +321,12 @@
       return safetyStatus;
     }
 
+    if (route === 'profile' || route === 'me') {
+      const profile = await getJsonp(route, params);
+      validateProfile(profile);
+      return profile;
+    }
+
     const scaffoldInfo = await getJsonp('scaffoldInfo', {});
     validateScaffoldSafety(scaffoldInfo);
     const data = await getJsonp(route, params);
@@ -409,6 +430,9 @@
     },
     getSafetyStatus: function () {
       return readRoute('safetyStatus', {});
+    },
+    getProfile: function () {
+      return readRoute('profile', {});
     },
     runTaskAction: async function (options) {
       const config = global.BAFoxConfig.getConfig();

@@ -320,6 +320,52 @@
     };
   }
 
+  const profileData = {
+    identityMode: 'mock_profile_route',
+    profile: {
+      userId: 'identity_missing',
+      email: '',
+      displayName: 'Не выполнен вход',
+      title: '',
+      accessRole: 'viewer',
+      status: 'identity_missing',
+      department: '',
+      defaultOwnerLabel: '',
+      accentColor: 'green',
+      canSeeAll: false,
+      isAuthenticated: false,
+      isRegistered: false,
+      isAllowedDomain: false,
+    },
+    allowedDomain: 'mfstream.io',
+    isBackendEnforced: false,
+    usersSheet: {
+      sheet: 'Users',
+      exists: false,
+      status: 'mock_missing',
+      headerColumns: 0,
+      dataRows: 0,
+      expectedHeaders: [
+        'userId',
+        'email',
+        'displayName',
+        'title',
+        'accessRole',
+        'status',
+        'department',
+        'defaultOwnerLabel',
+        'accentColor',
+        'canSeeAll',
+        'createdAt',
+        'updatedAt',
+      ],
+    },
+    limitations: [
+      'Mock profile route only. Backend Apps Script deployment is required for real active user email detection.',
+      'Dashboard visibility is not filtered yet.',
+    ],
+  };
+
   function getResponse(route, params) {
     const input = params || {};
 
@@ -363,6 +409,9 @@
         return success(clone(cleanupAudit));
       case 'safetyStatus':
         return success(clone(safetyStatus));
+      case 'profile':
+      case 'me':
+        return success(clone(profileData));
       default:
         return {
           ok: false,

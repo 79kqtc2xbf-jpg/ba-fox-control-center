@@ -439,6 +439,9 @@ const mfDepartments = Object.freeze([
   { id: 'dept_compliance', name: 'Комплаенс / онбординг', leadId: 'emp_compliance', status: 'Активен', mission: 'KYB, пакеты онбординга и проверки источников средств.' },
 ]);
 
+let profileState = BAFoxClient.createLoadingState('profile');
+profileState.status = 'idle';
+
 let identityState = loadIdentityState();
 let personalizationState = loadPersonalizationState();
 
@@ -1424,20 +1427,26 @@ function loadIdentityState() {
 
 function identityDisplayProfile() {
   const fallbackUser = usersRegistry[0];
+  const backendProfileData = profileState.status === 'success' && profileState.data ? profileState.data : null;
+  const backendProfile = backendProfileData && backendProfileData.profile ? backendProfileData.profile : null;
   const registryUser = identityState.registryUser || fallbackUser;
+  const profileEmail = backendProfile && backendProfile.email ? backendProfile.email : identityState.email;
   return {
-    isSignedIn: identityState.status === 'signed_in_preview',
-    email: identityState.email || 'не выполнен вход',
-    domain: identityState.email ? emailDomain(identityState.email) : allowedWorkspaceDomain,
-    displayName: identityState.displayName || registryUser.displayName,
-    title: registryUser.title,
-    accessRole: registryUser.accessRole,
-    status: registryUser.status,
-    department: registryUser.department,
-    defaultOwnerLabel: registryUser.defaultOwnerLabel,
-    accentColor: registryUser.accentColor,
-    canSeeAll: registryUser.canSeeAll === true,
-    message: identityState.message,
+    isSignedIn: Boolean(backendProfile && backendProfile.isAuthenticated) || identityState.status === 'signed_in_preview',
+    email: profileEmail || 'не выполнен вход',
+    domain: profileEmail ? emailDomain(profileEmail) : (backendProfileData && backendProfileData.allowedDomain) || allowedWorkspaceDomain,
+    displayName: backendProfile && backendProfile.displayName ? backendProfile.displayName : identityState.displayName || registryUser.displayName,
+    title: backendProfile && backendProfile.title ? backendProfile.title : registryUser.title,
+    accessRole: backendProfile && backendProfile.accessRole ? backendProfile.accessRole : registryUser.accessRole,
+    status: backendProfile && backendProfile.status ? backendProfile.status : registryUser.status,
+    department: backendProfile && backendProfile.department ? backendProfile.department : registryUser.department,
+    defaultOwnerLabel: backendProfile && backendProfile.defaultOwnerLabel ? backendProfile.defaultOwnerLabel : registryUser.defaultOwnerLabel,
+    accentColor: backendProfile && backendProfile.accentColor ? backendProfile.accentColor : registryUser.accentColor,
+    canSeeAll: backendProfile ? backendProfile.canSeeAll === true : registryUser.canSeeAll === true,
+    message: backendProfileData
+      ? 'Backend profile route: ' + backendProfileData.identityMode + '. Enforcement: ' + (backendProfileData.isBackendEnforced ? 'on' : 'not complete')
+      : identityState.message,
+    backendProfileData: backendProfileData,
   };
 }
 
@@ -3213,6 +3222,8 @@ function usersSheetColumnsHtml() {
 function renderMfSettings() {
   const config = BAFoxConfig.getConfig();
   const profile = identityDisplayProfile();
+  const backendProfile = profile.backendProfileData;
+  const usersSheet = backendProfile && backendProfile.usersSheet ? backendProfile.usersSheet : null;
   const workspaceName = 'MF Group';
   const roleRows = Object.keys(accessRoleLabels).map(function (role) {
     const visibility = role === 'admin' || role === 'executive'
@@ -3225,6 +3236,11 @@ function renderMfSettings() {
   const googleStatus = config.hasGoogleClientId
     ? 'Google Client ID задан, backend-проверка ещё не включена'
     : 'Google-вход готовится';
+  const profileRouteStatus = profileState.status === 'success'
+    ? 'profile route: ' + (backendProfile.identityMode || 'unknown')
+    : profileState.status === 'error'
+      ? 'profile route недоступен'
+      : 'profile route готовится';
   const signInDisabled = ' disabled title="Google Identity Services будет включён после OAuth/runtime config и backend token verification"';
   const signOutDisabled = profile.isSignedIn ? '' : ' disabled';
   elements.taskList.innerHTML = [
@@ -3245,11 +3261,13 @@ function renderMfSettings() {
     '</div>',
     '</article>',
     '<article class="mf-settings-card">',
-    '<div class="mf-section-title"><h3>Вход через Google</h3><span>' + escapeHtml(googleStatus) + '</span></div>',
+    '<div class="mf-section-title"><h3>Вход через Google</h3><span>' + escapeHtml(profileRouteStatus) + '</span></div>',
     '<div class="mf-readonly-grid">',
     '<span>Разрешённый домен <strong>' + escapeHtml(config.googleAllowedDomain || allowedWorkspaceDomain) + '</strong></span>',
     '<span>OAuth Client ID <strong>' + escapeHtml(config.hasGoogleClientId ? 'задан в runtime config' : 'не задан') + '</strong></span>',
-    '<span>Backend enforcement <strong>не включён</strong></span>',
+    '<span>Backend enforcement <strong>' + escapeHtml(backendProfile && backendProfile.isBackendEnforced ? 'включён' : 'не завершён') + '</strong></span>',
+    '<span>Identity mode <strong>' + escapeHtml(backendProfile && backendProfile.identityMode ? backendProfile.identityMode : googleStatus) + '</strong></span>',
+    '<span>Users sheet <strong>' + escapeHtml(usersSheet ? usersSheet.status + ' · rows: ' + usersSheet.dataRows : 'не проверен') + '</strong></span>',
     '<span>Текущий статус <strong>' + escapeHtml(profile.message) + '</strong></span>',
     '</div>',
     '<div class="mf-action-row">',
@@ -3762,11 +3780,23 @@ async function loadDashboard(options) {
   render();
 }
 
+async function loadProfile() {
+  profileState = BAFoxClient.createLoadingState('profile');
+  if (activeTab === 'settings') {
+    renderPanel();
+  }
+  profileState = await BAFoxClient.getProfile();
+  if (activeTab === 'settings') {
+    renderPanel();
+  }
+}
+
 async function handleManualRefresh() {
   if (liveRefreshState.status === 'loading' || dashboardState.status === 'loading') {
     return;
   }
   await loadDashboard({ forceRefresh: true });
+  loadProfile();
 }
 
 async function refreshDashboardAfterAction(taskId, successMessage) {
@@ -4225,7 +4255,10 @@ async function initializeDashboard() {
   setInterval(formatBangkokTime, 30000);
   render();
   await loadOptionalLocalConfig();
-  await loadDashboard();
+  await Promise.all([
+    loadDashboard(),
+    loadProfile(),
+  ]);
 }
 
 initializeDashboard();
