@@ -36,6 +36,13 @@ function baFoxNormalizeTaskRow(row, headers) {
     channel: row[BA_FOX_CONFIG.TASK_COLUMNS.CHANNEL - 1] || '',
     taskType: row[BA_FOX_CONFIG.TASK_COLUMNS.TASK_TYPE - 1] || 'work',
     owner: row[BA_FOX_CONFIG.TASK_COLUMNS.OWNER - 1] || '',
+    ownerEmail: baFoxTaskOptionalValue_(row, headers, 'OWNER_EMAIL'),
+    ownerUserId: baFoxTaskOptionalValue_(row, headers, 'OWNER_USER_ID'),
+    collaboratorEmails: baFoxTaskOptionalValue_(row, headers, 'COLLABORATOR_EMAILS'),
+    collaboratorUserIds: baFoxTaskOptionalValue_(row, headers, 'COLLABORATOR_USER_IDS'),
+    createdByEmail: baFoxTaskOptionalValue_(row, headers, 'CREATED_BY_EMAIL'),
+    createdByUserId: baFoxTaskOptionalValue_(row, headers, 'CREATED_BY_USER_ID'),
+    visibility: baFoxTaskOptionalValue_(row, headers, 'VISIBILITY'),
     createdAt: row[BA_FOX_CONFIG.TASK_COLUMNS.CREATED_AT - 1] || '',
     updatedAt: row[BA_FOX_CONFIG.TASK_COLUMNS.UPDATED_AT - 1] || '',
     completedAt: row[BA_FOX_CONFIG.TASK_COLUMNS.COMPLETED_AT - 1] || '',
@@ -333,6 +340,10 @@ function baFoxCreateTaskAllowedKeys_() {
     'route',
     'callback',
     'token',
+    'idToken',
+    'identityToken',
+    'credential',
+    'googleCredential',
     'title',
     'owner',
     'organization',
@@ -512,17 +523,24 @@ function baFoxSafeCreateTask(request) {
     return baFoxUnauthorized_();
   }
 
+  var identityCheck = requireVerifiedProfile_(normalized, { requireRegistered: true, requireWrite: true });
+  if (!identityCheck.ok) {
+    return identityCheck.error;
+  }
+
   if (BA_FOX_CONFIG.SAFE_WRITE_MODE !== true) {
     return baFoxError('SAFE_WRITES_DISABLED', 'Safe task creation is disabled.', {});
   }
 
   var now = baFoxIsoNow();
   var taskId = baFoxBuildSafeCreateTaskId_(now);
+  var actorProfile = identityCheck.profile || {};
+  var actorLabel = actorProfile.email || actorProfile.displayName || 'BA Fox Web';
   var appendResponse = baFoxAppendSafeCreateTaskRow(baFoxSafeCreateTaskRow_(taskId, normalized, now));
   if (!appendResponse.ok) {
     baFoxAuditTaskAction({
       timestamp: now,
-      actor: 'BA Fox Web',
+      actor: actorLabel,
       taskId: taskId,
       action: 'createTask',
       routeAction: 'createTask',
@@ -535,7 +553,7 @@ function baFoxSafeCreateTask(request) {
 
   var auditResult = baFoxAuditTaskAction({
     timestamp: now,
-    actor: 'BA Fox Web',
+    actor: actorLabel,
     taskId: taskId,
     action: 'createTask',
     routeAction: 'createTask',
@@ -553,7 +571,9 @@ function baFoxSafeCreateTask(request) {
       controlDate: normalized.controlDate || normalized.deadline || '',
       reminder: normalized.reminder || '',
       comment: normalized.comment || ''
-    })
+    }),
+    identityMode: identityCheck.identity && identityCheck.identity.identityMode,
+    enforcementMode: identityCheck.identity && identityCheck.identity.enforcementMode
   });
 
   return baFoxOk({
@@ -680,6 +700,11 @@ function baFoxTaskAction(request) {
     return baFoxUnauthorized_();
   }
 
+  var identityCheck = requireVerifiedProfile_(normalized, { requireRegistered: true, requireWrite: true });
+  if (!identityCheck.ok) {
+    return identityCheck.error;
+  }
+
   if (BA_FOX_CONFIG.SAFE_WRITE_MODE !== true) {
     return baFoxError('SAFE_WRITES_DISABLED', 'Safe task actions are disabled.', {});
   }
@@ -700,7 +725,7 @@ function baFoxTaskAction(request) {
   if (!match.ok) {
     baFoxAuditTaskAction({
       timestamp: baFoxIsoNow(),
-      actor: 'BA Fox Web',
+      actor: identityCheck.profile && identityCheck.profile.email ? identityCheck.profile.email : 'BA Fox Web',
       taskId: normalized.taskId,
       action: normalized.action,
       routeAction: 'taskAction/' + normalized.action,
@@ -734,7 +759,7 @@ function baFoxTaskAction(request) {
   if (!updateResponse.ok) {
     baFoxAuditTaskAction({
       timestamp: now,
-      actor: 'BA Fox Web',
+      actor: identityCheck.profile && identityCheck.profile.email ? identityCheck.profile.email : 'BA Fox Web',
       taskId: normalized.taskId,
       action: normalized.action,
       previousStatus: previous.status,
@@ -749,7 +774,7 @@ function baFoxTaskAction(request) {
 
   var auditResult = baFoxAuditTaskAction({
     timestamp: now,
-    actor: 'BA Fox Web',
+    actor: identityCheck.profile && identityCheck.profile.email ? identityCheck.profile.email : 'BA Fox Web',
     taskId: normalized.taskId,
     action: normalized.action,
     previousStatus: previous.status,
@@ -779,6 +804,10 @@ function baFoxEditTaskAllowedKeys_() {
     'route',
     'callback',
     'token',
+    'idToken',
+    'identityToken',
+    'credential',
+    'googleCredential',
     'taskId',
     'title',
     'organization',
@@ -885,6 +914,11 @@ function baFoxSafeEditTask(request) {
     return baFoxUnauthorized_();
   }
 
+  var identityCheck = requireVerifiedProfile_(normalized, { requireRegistered: true, requireWrite: true });
+  if (!identityCheck.ok) {
+    return identityCheck.error;
+  }
+
   if (BA_FOX_CONFIG.SAFE_WRITE_MODE !== true) {
     return baFoxError('SAFE_WRITES_DISABLED', 'Safe task editing is disabled.', {});
   }
@@ -936,7 +970,7 @@ function baFoxSafeEditTask(request) {
   if (!match.ok) {
     baFoxAuditTaskAction({
       timestamp: baFoxIsoNow(),
-      actor: 'BA Fox Web',
+      actor: identityCheck.profile && identityCheck.profile.email ? identityCheck.profile.email : 'BA Fox Web',
       taskId: normalized.taskId,
       action: 'editTask',
       routeAction: 'editTask',
@@ -950,7 +984,7 @@ function baFoxSafeEditTask(request) {
   if (baFoxTaskIdMatchCount_(match.sheet, normalized.taskId) !== 1) {
     baFoxAuditTaskAction({
       timestamp: baFoxIsoNow(),
-      actor: 'BA Fox Web',
+      actor: identityCheck.profile && identityCheck.profile.email ? identityCheck.profile.email : 'BA Fox Web',
       taskId: normalized.taskId,
       action: 'editTask',
       routeAction: 'editTask',
@@ -1013,7 +1047,7 @@ function baFoxSafeEditTask(request) {
   if (!updateResponse.ok) {
     baFoxAuditTaskAction({
       timestamp: patch.UPDATED_AT,
-      actor: 'BA Fox Web',
+      actor: identityCheck.profile && identityCheck.profile.email ? identityCheck.profile.email : 'BA Fox Web',
       taskId: normalized.taskId,
       action: 'editTask',
       routeAction: 'editTask',
@@ -1029,7 +1063,7 @@ function baFoxSafeEditTask(request) {
 
   var auditResult = baFoxAuditTaskAction({
     timestamp: patch.UPDATED_AT,
-    actor: 'BA Fox Web',
+    actor: identityCheck.profile && identityCheck.profile.email ? identityCheck.profile.email : 'BA Fox Web',
     taskId: normalized.taskId,
     action: 'editTask',
     routeAction: 'editTask',

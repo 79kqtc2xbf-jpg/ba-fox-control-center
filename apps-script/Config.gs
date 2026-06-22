@@ -5,6 +5,10 @@ var BA_FOX_CONFIG = {
   SAFE_WRITE_MODE: true,
   ACTION_TOKEN: '',
   ALLOWED_WORKSPACE_DOMAIN: 'mfstream.io',
+  GOOGLE_CLIENT_ID: '',
+  IDENTITY_ENFORCEMENT_MODE: 'profile_only',
+  PROFILE_ROUTE_MODE: 'profile_only',
+  VISIBILITY_ENFORCEMENT: false,
   TIMEZONE: 'Asia/Bangkok',
   SHEETS: {
     TASKS: 'Tasks',

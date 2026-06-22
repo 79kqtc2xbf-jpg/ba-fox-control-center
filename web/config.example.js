@@ -3,5 +3,7 @@ window.BA_FOX_CONFIG = {
   BA_FOX_ACTION_TOKEN: '',
   GOOGLE_CLIENT_ID: '',
   GOOGLE_ALLOWED_DOMAIN: 'mfstream.io',
+  IDENTITY_ENFORCEMENT_MODE: 'profile_only',
+  VISIBILITY_ENFORCEMENT: false,
   USE_MOCK_DATA: true,
 };
