@@ -25,6 +25,9 @@
     SAFE_WRITES_DISABLED: 'Безопасная запись выключена. Действия доступны только для просмотра.',
     TASK_NOT_FOUND: 'Задача не найдена в таблице.',
     VALIDATION_ERROR: 'Не хватает данных для безопасного действия.',
+    GOOGLE_TOKEN_REQUIRED: 'Нужен подтверждённый Google-вход.',
+    IDENTITY_REQUIRED: 'Нужен подтверждённый рабочий профиль.',
+    WRITE_FORBIDDEN: 'У этого профиля нет прав на запись.',
     UNAUTHORIZED: 'Нет доступа для выполнения действия. Проверьте action token.',
   });
   const CREATE_TASK_MESSAGES = Object.freeze({
@@ -32,6 +35,9 @@
     SAFE_WRITES_DISABLED: 'Безопасная запись выключена. Создание задач недоступно.',
     TASKS_SHEET_MISSING: 'Лист Tasks недоступен.',
     TASK_APPEND_FAILED: 'Не удалось добавить задачу в Tasks.',
+    GOOGLE_TOKEN_REQUIRED: 'Нужен подтверждённый Google-вход.',
+    IDENTITY_REQUIRED: 'Нужен подтверждённый рабочий профиль.',
+    WRITE_FORBIDDEN: 'У этого профиля нет прав на создание задач.',
     UNAUTHORIZED: 'Нет доступа для создания задачи. Проверьте action token.',
     VALIDATION_ERROR: 'Введите название задачи',
   });
@@ -43,6 +49,9 @@
     SAFE_WRITES_DISABLED: 'Безопасная запись выключена. Обновление этапа недоступно.',
     TASK_NOT_FOUND: 'Задача не найдена в таблице.',
     TASKS_SHEET_MISSING: 'Лист Tasks недоступен.',
+    GOOGLE_TOKEN_REQUIRED: 'Нужен подтверждённый Google-вход.',
+    IDENTITY_REQUIRED: 'Нужен подтверждённый рабочий профиль.',
+    WRITE_FORBIDDEN: 'У этого профиля нет прав на обновление задач.',
     UNAUTHORIZED: 'Нет доступа для обновления задачи. Проверьте action token.',
     VALIDATION_ERROR: 'Проверьте поля обновления этапа.',
   });
@@ -144,6 +153,8 @@
       && data.profile
       && typeof data.allowedDomain === 'string'
       && typeof data.isBackendEnforced === 'boolean'
+      && typeof data.enforcementMode === 'string'
+      && data.permissions
       && Array.isArray(data.limitations);
 
     if (!isValid) {
@@ -431,8 +442,8 @@
     getSafetyStatus: function () {
       return readRoute('safetyStatus', {});
     },
-    getProfile: function () {
-      return readRoute('profile', {});
+    getProfile: function (options) {
+      return readRoute('profile', options || {});
     },
     runTaskAction: async function (options) {
       const config = global.BAFoxConfig.getConfig();

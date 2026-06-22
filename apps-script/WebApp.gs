@@ -50,7 +50,7 @@ function baFoxIsCacheBypass_(parameters) {
 }
 
 function baFoxHasUserScopedParameters_(parameters) {
-  return ['user', 'userId', 'employeeId', 'ownerId', 'telegramUserId', 'email'].some(function(name) {
+  return ['user', 'userId', 'employeeId', 'ownerId', 'telegramUserId', 'email', 'idToken', 'identityToken', 'credential', 'googleCredential'].some(function(name) {
     return parameters && parameters[name];
   });
 }
@@ -128,7 +128,8 @@ function baFoxBuildTaskViewsFromRows_(parameters, storeResult) {
     all: baFoxListAllTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult),
-    completed: baFoxListCompletedTasks({ limit: parameters.completedLimit || 50 }, storeResult)
+    completed: baFoxListCompletedTasks({ limit: parameters.completedLimit || 50 }, storeResult),
+    identity: identityDashboardMetadata_(parameters, 'fullDashboard')
   };
 }
 
@@ -140,21 +141,34 @@ function baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult) {
     today: baFoxListTodayTasks({ date: parameters.date }, storeResult),
     all: baFoxListAllTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
-    pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult)
+    pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult),
+    identity: identityDashboardMetadata_(parameters, 'dashboard')
   };
 }
 
 function baFoxGetDashboard_(parameters) {
+  var identityCheck = requireVerifiedProfile_(parameters, { requireRegistered: true });
+  if (!identityCheck.ok) {
+    return identityCheck.error;
+  }
   var storeResult = baFoxReadTasksRows();
   return baFoxOk(baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult));
 }
 
 function baFoxGetWorkspaceDashboard_(parameters) {
+  var identityCheck = requireVerifiedProfile_(parameters, { requireRegistered: true });
+  if (!identityCheck.ok) {
+    return identityCheck.error;
+  }
   var storeResult = baFoxReadTasksRows();
   return baFoxOk(baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult));
 }
 
 function baFoxGetFullDashboard_(parameters) {
+  var identityCheck = requireVerifiedProfile_(parameters, { requireRegistered: true });
+  if (!identityCheck.ok) {
+    return identityCheck.error;
+  }
   var storeResult = baFoxReadTasksRows();
   var dashboard = baFoxBuildTaskViewsFromRows_(parameters, storeResult);
   var auditResponse = baFoxBuildCleanupAuditDryRun(storeResult);

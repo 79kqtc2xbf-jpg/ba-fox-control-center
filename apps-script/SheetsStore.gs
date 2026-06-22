@@ -67,7 +67,14 @@ function baFoxFindHeaderColumn_(headers, names) {
 function baFoxOptionalTaskFieldNames_(field) {
   var names = {
     CONTROL_DATE: ['controlDate', 'control_date', 'Control Date', 'Контрольная дата', 'Дата контроля'],
-    FOCUS: ['focus', 'isFocus', 'manualFocus', 'Focus', 'Фокус']
+    FOCUS: ['focus', 'isFocus', 'manualFocus', 'Focus', 'Фокус'],
+    OWNER_EMAIL: ['ownerEmail', 'owner_email', 'Owner Email', 'Email ответственного'],
+    OWNER_USER_ID: ['ownerUserId', 'owner_user_id', 'Owner User ID', 'ID ответственного'],
+    COLLABORATOR_EMAILS: ['collaboratorEmails', 'collaborator_emails', 'Collaborator Emails', 'Участники email'],
+    COLLABORATOR_USER_IDS: ['collaboratorUserIds', 'collaborator_user_ids', 'Collaborator User IDs', 'Участники userId'],
+    CREATED_BY_EMAIL: ['createdByEmail', 'created_by_email', 'Created By Email', 'Создал email'],
+    CREATED_BY_USER_ID: ['createdByUserId', 'created_by_user_id', 'Created By User ID', 'Создал userId'],
+    VISIBILITY: ['visibility', 'Visibility', 'Видимость']
   };
   return names[field] || [];
 }

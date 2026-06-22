@@ -345,6 +345,7 @@ const usersRegistry = Object.freeze([
 const mfCurrentUserId = 'emp_lisa';
 
 const identityStorageKey = 'mfGroupTracker.identityPrepared';
+const identityTokenStorageKey = 'mfGroupTracker.googleIdentityToken';
 const personalizationStoragePrefix = 'mfGroupTracker.personalizationPreview';
 
 const mfThemePresets = Object.freeze([
@@ -1378,6 +1379,94 @@ function emailDomain(value) {
   return parts.length === 2 ? parts[1] : '';
 }
 
+function getStoredIdentityToken() {
+  try {
+    return window.sessionStorage.getItem(identityTokenStorageKey) || '';
+  } catch (error) {
+    return '';
+  }
+}
+
+function setStoredIdentityToken(token) {
+  try {
+    if (token) {
+      window.sessionStorage.setItem(identityTokenStorageKey, token);
+    } else {
+      window.sessionStorage.removeItem(identityTokenStorageKey);
+    }
+  } catch (error) {
+    // Session token persistence is optional; the current sign-in attempt can still continue.
+  }
+}
+
+function identityRequestParams() {
+  const token = getStoredIdentityToken();
+  return token ? { idToken: token } : {};
+}
+
+function googleIdentityScriptLoaded() {
+  return Boolean(window.google && window.google.accounts && window.google.accounts.id);
+}
+
+function loadGoogleIdentityScript() {
+  if (googleIdentityScriptLoaded()) {
+    return Promise.resolve();
+  }
+  return new Promise(function (resolve, reject) {
+    const existingScript = document.querySelector('script[data-google-identity-services="true"]');
+    if (existingScript) {
+      existingScript.addEventListener('load', function () { resolve(); }, { once: true });
+      existingScript.addEventListener('error', function () { reject(new Error('Google Identity Services не загрузился.')); }, { once: true });
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = 'https://accounts.google.com/gsi/client';
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleIdentityServices = 'true';
+    script.onload = function () { resolve(); };
+    script.onerror = function () { reject(new Error('Google Identity Services не загрузился.')); };
+    document.head.appendChild(script);
+  });
+}
+
+async function requestGoogleIdentityCredential() {
+  const config = BAFoxConfig.getConfig();
+  if (!config.hasGoogleClientId) {
+    throw new Error('Google-вход готовится: OAuth Client ID не задан.');
+  }
+  await loadGoogleIdentityScript();
+  if (!googleIdentityScriptLoaded()) {
+    throw new Error('Google Identity Services недоступен.');
+  }
+  return new Promise(function (resolve, reject) {
+    let resolved = false;
+    window.google.accounts.id.initialize({
+      client_id: config.googleClientId,
+      auto_select: false,
+      callback: function (response) {
+        const credential = response && response.credential ? response.credential : '';
+        if (!credential) {
+          reject(new Error('Google не вернул identity credential.'));
+          return;
+        }
+        resolved = true;
+        resolve(credential);
+      },
+    });
+    window.google.accounts.id.prompt(function (notification) {
+      if (resolved) {
+        return;
+      }
+      if (notification && notification.isNotDisplayed && notification.isNotDisplayed()) {
+        reject(new Error('Google-вход не показан. Проверьте OAuth Client ID и домен приложения.'));
+      } else if (notification && notification.isSkippedMoment && notification.isSkippedMoment()) {
+        reject(new Error('Google-вход отменён или пропущен.'));
+      }
+    });
+  });
+}
+
 function findRegistryUserByEmail(email) {
   const normalized = normalizeEmail(email);
   return usersRegistry.find(function (user) {
@@ -1429,10 +1518,15 @@ function identityDisplayProfile() {
   const fallbackUser = usersRegistry[0];
   const backendProfileData = profileState.status === 'success' && profileState.data ? profileState.data : null;
   const backendProfile = backendProfileData && backendProfileData.profile ? backendProfileData.profile : null;
+  const backendPermissions = backendProfileData && backendProfileData.permissions ? backendProfileData.permissions : {};
   const registryUser = identityState.registryUser || fallbackUser;
   const profileEmail = backendProfile && backendProfile.email ? backendProfile.email : identityState.email;
+  const verifiedByGoogle = backendProfileData && backendProfileData.identityMode === 'google_token_verified';
+  const deniedByDomain = backendProfileData && backendProfileData.identityMode === 'domain_not_allowed';
   return {
     isSignedIn: Boolean(backendProfile && backendProfile.isAuthenticated) || identityState.status === 'signed_in_preview',
+    isVerifiedByGoogle: Boolean(verifiedByGoogle),
+    isDeniedByDomain: Boolean(deniedByDomain),
     email: profileEmail || 'не выполнен вход',
     domain: profileEmail ? emailDomain(profileEmail) : (backendProfileData && backendProfileData.allowedDomain) || allowedWorkspaceDomain,
     displayName: backendProfile && backendProfile.displayName ? backendProfile.displayName : identityState.displayName || registryUser.displayName,
@@ -1443,8 +1537,9 @@ function identityDisplayProfile() {
     defaultOwnerLabel: backendProfile && backendProfile.defaultOwnerLabel ? backendProfile.defaultOwnerLabel : registryUser.defaultOwnerLabel,
     accentColor: backendProfile && backendProfile.accentColor ? backendProfile.accentColor : registryUser.accentColor,
     canSeeAll: backendProfile ? backendProfile.canSeeAll === true : registryUser.canSeeAll === true,
+    permissions: backendPermissions,
     message: backendProfileData
-      ? 'Backend profile route: ' + backendProfileData.identityMode + '. Enforcement: ' + (backendProfileData.isBackendEnforced ? 'on' : 'not complete')
+      ? 'Backend profile route: ' + backendProfileData.identityMode + '. Enforcement mode: ' + (backendProfileData.enforcementMode || 'profile_only')
       : identityState.message,
     backendProfileData: backendProfileData,
   };
@@ -3234,20 +3329,41 @@ function renderMfSettings() {
     return '<article class="mf-settings-row"><strong>' + escapeHtml(role) + '</strong><span>' + escapeHtml(accessRoleLabels[role]) + ' · ' + escapeHtml(visibility) + '</span></article>';
   }).join('');
   const googleStatus = config.hasGoogleClientId
-    ? 'Google Client ID задан, backend-проверка ещё не включена'
+    ? 'Google Client ID задан'
     : 'Google-вход готовится';
   const profileRouteStatus = profileState.status === 'success'
     ? 'profile route: ' + (backendProfile.identityMode || 'unknown')
     : profileState.status === 'error'
       ? 'profile route недоступен'
       : 'profile route готовится';
-  const signInDisabled = ' disabled title="Google Identity Services будет включён после OAuth/runtime config и backend token verification"';
-  const signOutDisabled = profile.isSignedIn ? '' : ' disabled';
+  const signInDisabled = config.hasGoogleClientId
+    ? ''
+    : ' disabled title="Нужен GOOGLE_CLIENT_ID в runtime config"';
+  const signOutDisabled = (profile.isSignedIn || getStoredIdentityToken()) ? '' : ' disabled';
+  const profileBadge = profile.isDeniedByDomain
+    ? 'Доступ запрещён'
+    : profile.isVerifiedByGoogle
+      ? 'Профиль подтверждён'
+      : profile.isSignedIn
+        ? 'профиль найден'
+        : 'готовится';
+  const verifiedStatus = profile.isDeniedByDomain
+    ? 'Доступ запрещён: нужен аккаунт mfstream.io'
+    : profile.isVerifiedByGoogle
+      ? 'Проверено через Google'
+      : 'Не завершён';
+  const enforcementLabel = backendProfile && backendProfile.isBackendEnforced
+    ? 'включён'
+    : 'Не завершён';
+  const enforcementModeLabel = backendProfile && backendProfile.enforcementMode
+    ? backendProfile.enforcementMode
+    : config.identityEnforcementMode;
+  const permissions = profile.permissions || {};
   elements.taskList.innerHTML = [
     '<section class="mf-settings-page">',
     '<section class="mf-two-column settings">',
     '<article class="mf-settings-card mf-profile-card">',
-    '<div class="mf-section-title"><h3>Профиль</h3><span>' + escapeHtml(profile.isSignedIn ? 'local preview' : 'готовится') + '</span></div>',
+    '<div class="mf-section-title"><h3>Профиль</h3><span>' + escapeHtml(profileBadge) + '</span></div>',
     '<div class="mf-profile-head"><div class="mf-avatar" aria-hidden="true">' + escapeHtml(mfInitials(profile.displayName)) + '</div><div><strong>' + escapeHtml(profile.displayName) + '</strong><span>' + escapeHtml(profile.email) + '</span></div></div>',
     '<div class="mf-readonly-grid">',
     '<span>Рабочий аккаунт <strong>' + escapeHtml(profile.domain) + '</strong></span>',
@@ -3256,8 +3372,9 @@ function renderMfSettings() {
     '<span>Отдел / направление <strong>' + escapeHtml(profile.department) + '</strong></span>',
     '<span>Owner label <strong>' + escapeHtml(profile.defaultOwnerLabel) + '</strong></span>',
     '<span>Полная видимость <strong>' + escapeHtml(profile.canSeeAll ? 'да' : 'нет') + '</strong></span>',
+    '<span>Проверка Google <strong>' + escapeHtml(verifiedStatus) + '</strong></span>',
     '<span>Текущий workspace <strong>' + workspaceName + '</strong></span>',
-    '<span>Статус защиты <strong>Подготовлено, не enforced</strong></span>',
+    '<span>Статус защиты <strong>' + escapeHtml(enforcementLabel) + '</strong></span>',
     '</div>',
     '</article>',
     '<article class="mf-settings-card">',
@@ -3265,9 +3382,14 @@ function renderMfSettings() {
     '<div class="mf-readonly-grid">',
     '<span>Разрешённый домен <strong>' + escapeHtml(config.googleAllowedDomain || allowedWorkspaceDomain) + '</strong></span>',
     '<span>OAuth Client ID <strong>' + escapeHtml(config.hasGoogleClientId ? 'задан в runtime config' : 'не задан') + '</strong></span>',
-    '<span>Backend enforcement <strong>' + escapeHtml(backendProfile && backendProfile.isBackendEnforced ? 'включён' : 'не завершён') + '</strong></span>',
+    '<span>Google-вход <strong>' + escapeHtml(config.hasGoogleClientId ? 'готов к проверке' : 'Google-вход готовится') + '</strong></span>',
+    '<span>Backend enforcement <strong>' + escapeHtml(enforcementLabel) + '</strong></span>',
+    '<span>Enforcement mode <strong>' + escapeHtml(enforcementModeLabel || 'profile_only') + '</strong></span>',
     '<span>Identity mode <strong>' + escapeHtml(backendProfile && backendProfile.identityMode ? backendProfile.identityMode : googleStatus) + '</strong></span>',
     '<span>Users sheet <strong>' + escapeHtml(usersSheet ? usersSheet.status + ' · rows: ' + usersSheet.dataRows : 'не проверен') + '</strong></span>',
+    '<span>Dashboard <strong>' + escapeHtml(permissions.canUseDashboard ? 'доступен' : 'не подтверждён') + '</strong></span>',
+    '<span>Создание задач <strong>' + escapeHtml(permissions.canCreateTasks ? 'разрешено профилем' : 'action token / не подтверждено') + '</strong></span>',
+    '<span>Управление Users <strong>' + escapeHtml(permissions.canManageUsers ? 'да' : 'нет') + '</strong></span>',
     '<span>Текущий статус <strong>' + escapeHtml(profile.message) + '</strong></span>',
     '</div>',
     '<div class="mf-action-row">',
@@ -3308,7 +3430,7 @@ function renderMfSettings() {
     '<article class="mf-settings-card mf-external-card">',
     '<div class="mf-section-title"><h3>Модель видимости</h3><span class="mf-external-marker">prepared only</span></div>',
     '<p>admin и executive должны видеть все задачи после backend enforcement. member видит свои задачи, участие и, возможно, созданные им задачи.</p>',
-    '<p>Текущий dashboard пока не фильтрует live-данные по пользователю, потому что Apps Script ещё не проверяет Google identity token.</p>',
+    '<p>Текущий dashboard пока не фильтрует live-данные по пользователю в profile_only/soft режиме. Полная фильтрация включается только после отдельного enforced QA.</p>',
     '</article>',
     '</section>',
     '<section class="mf-two-column settings">',
@@ -3556,23 +3678,44 @@ function closeEditTaskModal() {
   renderEditTaskModal();
 }
 
-function handleIdentityAction(action) {
+async function handleIdentityAction(action) {
   if (action === 'signout') {
+    setStoredIdentityToken('');
     try {
       window.localStorage.removeItem(identityStorageKey);
     } catch (error) {
       // Local identity preview is optional.
     }
     identityState = loadIdentityState();
+    await loadProfile();
     personalizationState = loadPersonalizationState();
     applyPersonalizationState();
-    flashMessage = 'Выход выполнен локально. Google-вход пока не enforced.';
+    flashMessage = 'Выход выполнен. Google-профиль очищен в этом браузере.';
     render();
     return;
   }
   if (action === 'signin') {
-    flashMessage = 'Google-вход готовится: нужен OAuth Client ID и backend token verification.';
-    render();
+    const config = BAFoxConfig.getConfig();
+    if (!config.hasGoogleClientId) {
+      flashMessage = 'Google-вход готовится: нужен OAuth Client ID.';
+      render();
+      return;
+    }
+    try {
+      flashMessage = 'Открываем Google-вход...';
+      render();
+      const credential = await requestGoogleIdentityCredential();
+      setStoredIdentityToken(credential);
+      await loadProfile();
+      const profile = identityDisplayProfile();
+      flashMessage = profile.isVerifiedByGoogle
+        ? 'Профиль подтверждён через Google.'
+        : 'Google credential получен, но backend профиль не подтверждён.';
+      render();
+    } catch (error) {
+      flashMessage = error && error.message ? error.message : 'Google-вход не выполнен.';
+      render();
+    }
   }
 }
 
@@ -3637,7 +3780,10 @@ async function handleEditTaskSubmit(event) {
     return;
   }
 
-  const compactPayload = compactEditTaskPayload(editTaskPayloadFromForm());
+  const compactPayload = Object.assign(
+    compactEditTaskPayload(editTaskPayloadFromForm()),
+    identityRequestParams()
+  );
   const errors = validateEditTaskPayload(compactPayload);
   if (errors.length) {
     editTaskState = {
@@ -3736,7 +3882,7 @@ async function handleCreateTaskSubmit(event) {
   renderCreateTaskModal();
 
   try {
-    await BAFoxClient.createTask(payload);
+    await BAFoxClient.createTask(Object.assign({}, payload, identityRequestParams()));
     elements.createTaskForm.reset();
     createTaskState = { status: 'success', message: 'Задача добавлена' };
     elements.createTaskModal.hidden = true;
@@ -3772,7 +3918,11 @@ async function loadDashboard(options) {
   dashboardState = BAFoxClient.createLoadingState('dashboard');
   scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
   render();
-  const workspaceState = await BAFoxClient.getDashboard(forceRefresh ? { refresh: '1' } : {});
+  const workspaceState = await BAFoxClient.getDashboard(Object.assign(
+    {},
+    identityRequestParams(),
+    forceRefresh ? { refresh: '1' } : {}
+  ));
   const data = workspaceState.data || {};
   dashboardState = stateFromFullDashboard(workspaceState, 'dashboard', data);
   scaffoldState = stateFromFullDashboard(workspaceState, 'scaffoldInfo', data.scaffoldInfo);
@@ -3785,7 +3935,7 @@ async function loadProfile() {
   if (activeTab === 'settings') {
     renderPanel();
   }
-  profileState = await BAFoxClient.getProfile();
+  profileState = await BAFoxClient.getProfile(identityRequestParams());
   if (activeTab === 'settings') {
     renderPanel();
   }
@@ -4113,10 +4263,10 @@ async function handleFocusToggle(taskId) {
   }
 
   try {
-    await BAFoxClient.editTask({
+    await BAFoxClient.editTask(Object.assign({
       taskId: taskId,
       focus: nextFocus ? 'true' : 'false',
-    });
+    }, identityRequestParams()));
     await refreshDashboardAfterAction(taskId, nextFocus ? 'Задача добавлена в фокус.' : 'Задача убрана из фокуса.');
   } catch (error) {
     if (error && error.code === 'SCHEMA_FIELD_MISSING') {
@@ -4218,7 +4368,7 @@ async function handleTaskAction(button) {
   renderPanel();
 
   try {
-    const actionData = await BAFoxClient.runTaskAction(payload);
+    const actionData = await BAFoxClient.runTaskAction(Object.assign({}, payload, identityRequestParams()));
     applyTaskActionResult(taskId, action, Object.assign({
       newStatus: actionStatusUpdates[action],
       newNextReminder: payload.action === 'snoozeTask' ? payload.nextReminder : undefined,

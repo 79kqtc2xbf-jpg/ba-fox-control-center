@@ -57,6 +57,7 @@ docs/STAGE_29_2_USER_PILOT_QA_PACKAGE.md
 docs/STAGE_30_TEAM_DASHBOARD_ARCHITECTURE.md
 docs/STAGE_31_IDENTITY_USERS_ROLES_PROFILE.md
 docs/STAGE_32_APPS_SCRIPT_IDENTITY_USERS_READ_MODEL.md
+docs/STAGE_33_GOOGLE_IDENTITY_ENFORCEMENT_AND_VISIBILITY.md
 docs/PROJECT_MAP.md
 ```
 
@@ -444,6 +445,7 @@ Stage 29 — 2-user pilot QA package: ready for controlled pilot.
 Stage 30 — team dashboard architecture overhaul: frontend/dashboard logic in progress.
 Stage 31 — identity/users/roles/profile foundation: prepared, not enforced.
 Stage 32 — Apps Script identity/users read model: profile route implemented, enforcement partial.
+Stage 33 — Google identity verification/enforcement foundation: profile token verification prepared, dashboard filtering not enabled by default.
 Telegram/Railway — legacy/paused.
 ```
 

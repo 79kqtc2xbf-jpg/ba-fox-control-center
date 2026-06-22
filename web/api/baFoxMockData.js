@@ -339,6 +339,8 @@
     },
     allowedDomain: 'mfstream.io',
     isBackendEnforced: false,
+    enforcementMode: 'profile_only',
+    backendEnforcementStatus: 'partial',
     usersSheet: {
       sheet: 'Users',
       exists: false,
@@ -364,6 +366,36 @@
       'Mock profile route only. Backend Apps Script deployment is required for real active user email detection.',
       'Dashboard visibility is not filtered yet.',
     ],
+    permissions: {
+      canSeeAll: false,
+      canCreateTasks: false,
+      canUseDashboard: true,
+      canManageUsers: false,
+      canWrite: false,
+    },
+    canSeeAll: false,
+    canCreateTasks: false,
+    canUseDashboard: true,
+    canManageUsers: false,
+    tokenVerification: {
+      ok: false,
+      mode: 'missing_token',
+      error: '',
+    },
+  };
+
+  const dashboardIdentity = {
+    identityMode: 'mock_profile_route',
+    enforcementMode: 'profile_only',
+    visibilityMode: 'profile_only',
+    filteredByUser: false,
+    effectiveRole: 'viewer',
+    canSeeAll: false,
+    canCreateTasks: false,
+    canUseDashboard: true,
+    canManageUsers: false,
+    route: 'dashboard',
+    limitations: profileData.limitations,
   };
 
   function getResponse(route, params) {
@@ -393,6 +425,7 @@
           today: clone(getTodayData(input.date)),
           open: clone(getOpenData(input.taskType)),
           pushes: clone(getPushData(input.dateRange)),
+          identity: clone(dashboardIdentity),
         });
       case 'fullDashboard':
         return success({
@@ -404,6 +437,7 @@
           pushes: clone(getPushData(input.dateRange)),
           completed: clone(getCompletedData()),
           cleanupAudit: clone(cleanupAudit),
+          identity: clone(Object.assign({}, dashboardIdentity, { route: 'fullDashboard' })),
         });
       case 'cleanupAudit':
         return success(clone(cleanupAudit));
