@@ -1156,6 +1156,20 @@ h1 {
   background: var(--overdue-soft);
 }
 
+.summary-card.critical {
+  background: var(--danger-soft);
+}
+
+.summary-card.waiting,
+.summary-card.neutral {
+  background: var(--warning-soft);
+}
+
+.summary-card.active,
+.summary-card.done {
+  background: var(--accent-soft);
+}
+
 .content-panel {
   padding: 0;
   border: 0;
@@ -3531,6 +3545,10 @@ h1 {
   color: var(--danger);
 }
 
+.mf-mini-stat.neutral strong {
+  color: var(--warning);
+}
+
 .mf-two-column {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -3553,6 +3571,24 @@ h1 {
 .mf-section-title span {
   color: var(--accent);
   font-weight: 900;
+}
+
+.mf-section-title.compact {
+  margin: 2px 0 0;
+}
+
+.mf-section-title.compact h3 {
+  font-size: 14px;
+}
+
+.stage30-dashboard .mf-mini-grid,
+.risks-dashboard .mf-mini-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.risk-group {
+  display: grid;
+  gap: 10px;
 }
 
 .mf-task-list,
@@ -3724,7 +3760,7 @@ h1 {
 
 .mf-person-stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -4118,6 +4154,8 @@ body[data-mf-theme="light"] .home-action:hover strong {
 @media (max-width: 780px) {
   .dashboard-grid,
   .mf-mini-grid,
+  .stage30-dashboard .mf-mini-grid,
+  .risks-dashboard .mf-mini-grid,
   .mf-card-grid,
   .mf-card-grid.departments,
   .mf-card-grid.reports,
