@@ -40,13 +40,13 @@
           <strong>MF OPS</strong>
         </div>
         <nav class="tabs" aria-label="MF Group Tracker sections">
-          <button class="tab active" type="button" data-tab="dashboard" aria-selected="true">Дашборд</button>
+          <button class="tab active" type="button" data-tab="dashboard" aria-selected="true">Обзор</button>
           <button class="tab" type="button" data-tab="myTasks" aria-selected="false">Мои задачи</button>
           <button class="tab" type="button" data-tab="myFocus" aria-selected="false">Мой фокус</button>
           <button class="tab" type="button" data-tab="all" aria-selected="false">Все задачи</button>
-          <button class="tab" type="button" data-tab="team" aria-selected="false">Команда</button>
-          <button class="tab" type="button" data-tab="departments" aria-selected="false">Отделы</button>
-          <button class="tab" type="button" data-tab="dependencies" aria-selected="false">Зависимости / блокеры</button>
+          <button class="tab" type="button" data-tab="team" aria-selected="false">Кто чем занят</button>
+          <button class="tab" type="button" data-tab="departments" aria-selected="false">Отделы / направления</button>
+          <button class="tab" type="button" data-tab="dependencies" aria-selected="false">Риски и зависшие</button>
           <button class="tab" type="button" data-tab="reports" aria-selected="false">Отчёты</button>
           <button class="tab" type="button" data-tab="settings" aria-selected="false">Настройки</button>
         </nav>
@@ -108,8 +108,8 @@
             <span>Ответственный</span>
             <select name="owner">
               <option value="Лиза" selected>Лиза</option>
-              <option value="Сотрудник 1">Сотрудник 1</option>
-              <option value="Сотрудник 2">Сотрудник 2</option>
+              <option value="Андрей">Андрей</option>
+              <option value="Даниил">Даниил</option>
               <option value="Не назначено">Не назначено</option>
             </select>
           </label>
@@ -154,15 +154,18 @@
             </select>
           </label>
           <label class="form-field">
-            <span>Категория</span>
+            <span>Отдел / направление</span>
             <select name="category">
-              <option value="">Без категории</option>
-              <option value="Documents">Документы</option>
-              <option value="Communication">Коммуникация</option>
-              <option value="Presentations">Презентации</option>
-              <option value="Brokers">Брокеры</option>
+              <option value="">Не назначено</option>
+              <option value="Руководство">Руководство</option>
+              <option value="Операции">Операции</option>
+              <option value="Финансы / платежи">Финансы / платежи</option>
+              <option value="Юридическое / compliance">Юридическое / compliance</option>
+              <option value="Продажи / партнёры">Продажи / партнёры</option>
+              <option value="Маркетинг / презентации">Маркетинг / презентации</option>
+              <option value="Продукт / IT">Продукт / IT</option>
+              <option value="Админ / EA">Админ / EA</option>
               <option value="QA">QA</option>
-              <option value="Waiting">Ждут ответа</option>
             </select>
           </label>
           <label class="form-field form-field-wide">
