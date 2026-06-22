@@ -70,7 +70,7 @@ Visible labels:
 | `Маркетинг / презентации` | Decks, offers, presentation materials. |
 | `Продукт / IT` | Product, web app, technical or QA work. |
 | `Админ / EA` | EA/admin work, reporting, reminders. |
-| `Не назначено` | Existing blank category/direction values. |
+| `Не назначено` | Existing blank category/direction values and unknown legacy values. |
 
 These are not final company departments. They are a dashboard grouping model that can be renamed later.
 
@@ -94,6 +94,23 @@ Compatibility:
 - Apps Script write behavior is unchanged.
 - Google Sheet schema is unchanged.
 - Existing blank direction/category values remain visible as `Не назначено`.
+- Unknown non-empty category/direction values also fall back to `Не назначено`, not `Админ / EA`, to avoid misleading management metrics.
+
+## Legacy Category Mapping
+
+Stage 30 keeps legacy task categories readable while the final team model is still undecided.
+
+| Legacy value | Temporary dashboard direction |
+| --- | --- |
+| `Communication` / `Коммуникация` | `Операции` |
+| `Documents` / `Документы` | `Юридическое / compliance` |
+| `Presentations` / `Презентации` | `Маркетинг / презентации` |
+| `Brokers` / `Брокеры` | `Продажи / партнёры` |
+| `Waiting` / `Ждут ответа` | `Админ / EA` |
+| `QA` | `Продукт / IT` |
+| blank / `Без категории` / unknown values | `Не назначено` |
+
+Unknown values intentionally fall back to `Не назначено` so the `Без отдела / направления` metric remains honest and old data does not silently inflate `Админ / EA`.
 
 ## Current Limitations
 
