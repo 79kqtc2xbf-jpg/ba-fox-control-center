@@ -3314,6 +3314,55 @@ function usersSheetColumnsHtml() {
   }).join('');
 }
 
+function diagnosticValueLabel(value) {
+  if (value === true) return 'да';
+  if (value === false) return 'нет';
+  if (value === '' || value === null || value === undefined) return 'не передано';
+  return String(value);
+}
+
+function renderGoogleTokenDiagnosticsHtml(backendProfile) {
+  const tokenVerification = backendProfile && backendProfile.tokenVerification ? backendProfile.tokenVerification : null;
+  const shouldShow = backendProfile && (
+    backendProfile.identityMode === 'google_token_invalid'
+    || (tokenVerification && tokenVerification.error && tokenVerification.error !== 'MISSING_TOKEN')
+  );
+  if (!shouldShow || !tokenVerification) {
+    return '';
+  }
+
+  const rows = [
+    ['Код ошибки', tokenVerification.error],
+    ['Режим проверки', tokenVerification.mode],
+    ['Сообщение', tokenVerification.message],
+    ['Client ID задан в Apps Script', tokenVerification.expectedAudienceConfigured],
+    ['Audience совпадает', tokenVerification.audienceMatches],
+    ['Token audience', tokenVerification.tokenAudience],
+    ['Email из токена', tokenVerification.email],
+    ['Email подтверждён', tokenVerification.emailVerified],
+    ['Домен mfstream.io', tokenVerification.domainAllowed],
+    ['Пользователь есть в Users', tokenVerification.userRegistered],
+    ['Identity mode', backendProfile.identityMode],
+    ['Enforcement mode', backendProfile.enforcementMode],
+  ].filter(function (row) {
+    return row[1] !== '' && row[1] !== null && row[1] !== undefined;
+  }).map(function (row) {
+    return '<span>' + escapeHtml(row[0]) + ' <strong>' + escapeHtml(diagnosticValueLabel(row[1])) + '</strong></span>';
+  }).join('');
+
+  return [
+    '<div class="mf-token-diagnostics">',
+    '<div class="mf-section-title"><h3>Ошибка проверки Google-токена</h3><span>OAuth live QA</span></div>',
+    '<div class="mf-readonly-grid">',
+    rows,
+    '</div>',
+    '<p>Проверьте совпадение Client ID в GitHub runtime config и Apps Script Script Properties.</p>',
+    '<p>Проверьте Authorized JavaScript origins в Google Cloud.</p>',
+    '<p>Проверьте, что выбран рабочий аккаунт mfstream.io.</p>',
+    '</div>',
+  ].join('');
+}
+
 function renderMfSettings() {
   const config = BAFoxConfig.getConfig();
   const profile = identityDisplayProfile();
@@ -3396,6 +3445,7 @@ function renderMfSettings() {
     '<button class="secondary-button" type="button" data-identity-action="signin"' + signInDisabled + '>Войти через Google</button>',
     '<button class="secondary-button" type="button" data-identity-action="signout"' + signOutDisabled + '>Выйти</button>',
     '</div>',
+    renderGoogleTokenDiagnosticsHtml(backendProfile),
     '</article>',
     '</section>',
     '<section class="mf-two-column settings">',

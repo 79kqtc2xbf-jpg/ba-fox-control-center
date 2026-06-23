@@ -167,13 +167,15 @@ function activeUserEmail_() {
 function verifyGoogleIdentityToken_(idToken) {
   var token = baFoxSafeString(idToken);
   var clientId = configuredGoogleClientId_();
+  var clientIdConfigured = Boolean(clientId);
   if (!token) {
     return {
       ok: false,
       mode: 'missing_token',
       claims: null,
       error: 'MISSING_TOKEN',
-      message: 'Google identity token is missing.'
+      message: 'Google identity token is missing.',
+      clientIdConfigured: clientIdConfigured
     };
   }
   if (typeof UrlFetchApp === 'undefined') {
@@ -182,7 +184,8 @@ function verifyGoogleIdentityToken_(idToken) {
       mode: 'google_token_invalid',
       claims: null,
       error: 'URL_FETCH_UNAVAILABLE',
-      message: 'Apps Script UrlFetchApp is not available for token verification.'
+      message: 'Apps Script UrlFetchApp is not available for token verification.',
+      clientIdConfigured: clientIdConfigured
     };
   }
 
@@ -200,7 +203,9 @@ function verifyGoogleIdentityToken_(idToken) {
         mode: 'google_token_invalid',
         claims: claims,
         error: claims.error || 'TOKENINFO_REJECTED',
-        message: claims.error_description || 'Google tokeninfo rejected the identity token.'
+        message: claims.error_description || 'Google tokeninfo rejected the identity token.',
+        email: normalizeWorkspaceEmail_(claims.email),
+        clientIdConfigured: clientIdConfigured
       };
     }
     if (clientId && claims.aud !== clientId) {
@@ -209,7 +214,9 @@ function verifyGoogleIdentityToken_(idToken) {
         mode: 'google_token_invalid',
         claims: claims,
         error: 'AUDIENCE_MISMATCH',
-        message: 'Google identity token audience does not match configured client ID.'
+        message: 'Google identity token audience does not match configured client ID.',
+        email: normalizeWorkspaceEmail_(claims.email),
+        clientIdConfigured: clientIdConfigured
       };
     }
     if (!baFoxSafeString(claims.email)) {
@@ -218,7 +225,8 @@ function verifyGoogleIdentityToken_(idToken) {
         mode: 'google_token_invalid',
         claims: claims,
         error: 'EMAIL_MISSING',
-        message: 'Google identity token does not include email.'
+        message: 'Google identity token does not include email.',
+        clientIdConfigured: clientIdConfigured
       };
     }
     if (claims.email_verified !== undefined && String(claims.email_verified) !== 'true') {
@@ -227,7 +235,9 @@ function verifyGoogleIdentityToken_(idToken) {
         mode: 'google_token_invalid',
         claims: claims,
         error: 'EMAIL_NOT_VERIFIED',
-        message: 'Google identity token email is not verified.'
+        message: 'Google identity token email is not verified.',
+        email: normalizeWorkspaceEmail_(claims.email),
+        clientIdConfigured: clientIdConfigured
       };
     }
     return {
@@ -235,7 +245,7 @@ function verifyGoogleIdentityToken_(idToken) {
       mode: 'google_token_verified',
       claims: claims,
       email: normalizeWorkspaceEmail_(claims.email),
-      clientIdConfigured: Boolean(clientId)
+      clientIdConfigured: clientIdConfigured
     };
   } catch (err) {
     return {
@@ -243,9 +253,49 @@ function verifyGoogleIdentityToken_(idToken) {
       mode: 'google_token_invalid',
       claims: null,
       error: 'TOKEN_VERIFICATION_FAILED',
-      message: err && err.message ? err.message : 'Google identity token verification failed.'
+      message: err && err.message ? err.message : 'Google identity token verification failed.',
+      clientIdConfigured: clientIdConfigured
     };
   }
+}
+
+function safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, overrides) {
+  var result = tokenResult || {};
+  var claims = result.claims || {};
+  var clientId = configuredGoogleClientId_();
+  var expectedAudienceConfigured = Boolean(clientId || result.clientIdConfigured);
+  var tokenAudience = baFoxSafeString(claims.aud);
+  var audienceMatches = '';
+  if (expectedAudienceConfigured && tokenAudience) {
+    audienceMatches = tokenAudience === clientId;
+  }
+  var email = normalizeWorkspaceEmail_(result.email || claims.email);
+  var domainAllowed = email ? isAllowedWorkspaceEmail_(email) : false;
+  var userRegistered = false;
+  if (email && domainAllowed && usersSheetStatus && usersSheetStatus.exists) {
+    userRegistered = Boolean(findUserByEmail_(email));
+  }
+  var emailVerified = '';
+  if (claims.email_verified !== undefined) {
+    emailVerified = String(claims.email_verified) === 'true';
+  }
+  var diagnostics = {
+    ok: result.ok === true,
+    mode: result.mode || 'missing_token',
+    error: result.error || '',
+    message: result.message || '',
+    audienceMatches: audienceMatches,
+    expectedAudienceConfigured: expectedAudienceConfigured,
+    tokenAudience: tokenAudience,
+    email: email,
+    emailVerified: emailVerified,
+    domainAllowed: domainAllowed,
+    userRegistered: userRegistered
+  };
+  Object.keys(overrides || {}).forEach(function(key) {
+    diagnostics[key] = overrides[key];
+  });
+  return diagnostics;
 }
 
 function getIdentityFromRequest_(request) {
@@ -367,6 +417,7 @@ function getCurrentUserProfile_(request, context) {
   var enforcementMode = identityEnforcementMode_();
   var tokenResult = identity.tokenVerification || {};
   var limitations = identityResponseLimitations_(tokenResult);
+  var tokenDiagnostics = safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, {});
 
   if (!activeEmail) {
     var missingProfile = getFallbackUserProfile_();
@@ -385,11 +436,7 @@ function getCurrentUserProfile_(request, context) {
       canCreateTasks: false,
       canUseDashboard: enforcementMode !== 'enforced',
       canManageUsers: false,
-      tokenVerification: {
-        ok: tokenResult.ok === true,
-        mode: tokenResult.mode || 'missing_token',
-        error: tokenResult.error || ''
-      }
+      tokenVerification: tokenDiagnostics
     };
   }
 
@@ -412,11 +459,11 @@ function getCurrentUserProfile_(request, context) {
       canCreateTasks: false,
       canUseDashboard: enforcementMode !== 'enforced',
       canManageUsers: false,
-      tokenVerification: {
-        ok: tokenResult.ok === true,
-        mode: tokenResult.mode || 'missing_token',
-        error: tokenResult.error || ''
-      }
+      tokenVerification: safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, {
+        email: activeEmail,
+        domainAllowed: false,
+        userRegistered: false
+      })
     };
   }
 
@@ -441,11 +488,11 @@ function getCurrentUserProfile_(request, context) {
       canCreateTasks: false,
       canUseDashboard: enforcementMode !== 'enforced',
       canManageUsers: false,
-      tokenVerification: {
-        ok: tokenResult.ok === true,
-        mode: tokenResult.mode || 'missing_token',
-        error: tokenResult.error || ''
-      }
+      tokenVerification: safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, {
+        email: activeEmail,
+        domainAllowed: true,
+        userRegistered: false
+      })
     };
   }
 
@@ -466,11 +513,11 @@ function getCurrentUserProfile_(request, context) {
       canCreateTasks: false,
       canUseDashboard: enforcementMode !== 'enforced',
       canManageUsers: false,
-      tokenVerification: {
-        ok: tokenResult.ok === true,
-        mode: tokenResult.mode || 'missing_token',
-        error: tokenResult.error || ''
-      }
+      tokenVerification: safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, {
+        email: activeEmail,
+        domainAllowed: true,
+        userRegistered: true
+      })
     };
   }
 
@@ -492,11 +539,11 @@ function getCurrentUserProfile_(request, context) {
     canCreateTasks: permissions.canCreateTasks,
     canUseDashboard: permissions.canUseDashboard,
     canManageUsers: permissions.canManageUsers,
-    tokenVerification: {
-      ok: tokenResult.ok === true,
-      mode: tokenResult.mode || 'missing_token',
-      error: tokenResult.error || ''
-    }
+    tokenVerification: safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, {
+      email: activeEmail,
+      domainAllowed: true,
+      userRegistered: true
+    })
   };
 }
 
