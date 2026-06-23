@@ -33,6 +33,7 @@ jobs:
         env:
           BA_FOX_APPS_SCRIPT_ENDPOINT: ${{ secrets.BA_FOX_APPS_SCRIPT_ENDPOINT }}
           BA_FOX_ACTION_TOKEN: ${{ secrets.BA_FOX_ACTION_TOKEN }}
+          BA_FOX_GOOGLE_CLIENT_ID: ${{ secrets.BA_FOX_GOOGLE_CLIENT_ID }}
         run: |
           set -euo pipefail
           rm -rf dist
@@ -49,16 +50,19 @@ jobs:
             echo "BA_FOX_APPS_SCRIPT_ENDPOINT must contain a published Apps Script /exec URL." >&2
             exit 1
           fi
-          python3 - "${endpoint}" "${BA_FOX_ACTION_TOKEN:-}" > dist/config.runtime.js <<'PY'
+          python3 - "${endpoint}" "${BA_FOX_ACTION_TOKEN:-}" "${BA_FOX_GOOGLE_CLIENT_ID:-}" > dist/config.runtime.js <<'PY'
           import json
           import sys
 
           endpoint = sys.argv[1].strip()
           action_token = sys.argv[2].strip()
+          google_client_id = sys.argv[3].strip()
           payload = {
               "BA_FOX_APPS_SCRIPT_ENDPOINT": endpoint,
               "APPS_SCRIPT_ENDPOINT": endpoint,
               "BA_FOX_ACTION_TOKEN": action_token,
+              "GOOGLE_CLIENT_ID": google_client_id,
+              "BA_FOX_GOOGLE_CLIENT_ID": google_client_id,
               "USE_MOCK_DATA": False,
           }
           print("window.BA_FOX_RUNTIME_CONFIG = " + json.dumps(payload, separators=(",", ":")) + ";")
