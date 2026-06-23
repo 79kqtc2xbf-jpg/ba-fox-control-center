@@ -64,17 +64,115 @@ function baFoxFindHeaderColumn_(headers, names) {
   return 0;
 }
 
+function baFoxTaskIdentityColumnDefinitions_() {
+  return [
+    { field: 'OWNER_EMAIL', key: 'ownerEmail', header: 'Owner Email', aliases: ['Owner Email', 'ownerEmail', 'owner_email', 'Email ответственного'] },
+    { field: 'OWNER_USER_ID', key: 'ownerUserId', header: 'Owner User ID', aliases: ['Owner User ID', 'ownerUserId', 'owner_user_id', 'ID ответственного'] },
+    { field: 'COLLABORATOR_EMAILS', key: 'collaboratorEmails', header: 'Collaborator Emails', aliases: ['Collaborator Emails', 'collaboratorEmails', 'collaborator_emails', 'Участники email'] },
+    { field: 'COLLABORATOR_USER_IDS', key: 'collaboratorUserIds', header: 'Collaborator User IDs', aliases: ['Collaborator User IDs', 'collaboratorUserIds', 'collaborator_user_ids', 'Участники userId'] },
+    { field: 'CREATED_BY_EMAIL', key: 'createdByEmail', header: 'Created By Email', aliases: ['Created By Email', 'createdByEmail', 'created_by_email', 'Создал email'] },
+    { field: 'CREATED_BY_USER_ID', key: 'createdByUserId', header: 'Created By User ID', aliases: ['Created By User ID', 'createdByUserId', 'created_by_user_id', 'Создал userId'] },
+    { field: 'VISIBILITY', key: 'visibility', header: 'Visibility', aliases: ['Visibility', 'visibility', 'Видимость'] }
+  ];
+}
+
+function getTaskHeaderMap_(sheetOrHeaders) {
+  var headers = Array.isArray(sheetOrHeaders)
+    ? sheetOrHeaders
+    : baFoxReadSheetHeaders_(sheetOrHeaders);
+  var byName = {};
+  headers.forEach(function(header, index) {
+    var normalized = baFoxSafeString(header).toLowerCase();
+    if (normalized && !byName[normalized]) {
+      byName[normalized] = index + 1;
+    }
+  });
+  return {
+    headers: headers,
+    byName: byName,
+    columnCount: headers.length
+  };
+}
+
+function getOptionalColumnIndex_(headerMap, aliases) {
+  var map = headerMap || { byName: {} };
+  var names = aliases || [];
+  for (var index = 0; index < names.length; index += 1) {
+    var column = map.byName[baFoxSafeString(names[index]).toLowerCase()];
+    if (column) {
+      return column;
+    }
+  }
+  return 0;
+}
+
+function readOptionalCell_(row, headerMap, aliases) {
+  var column = getOptionalColumnIndex_(headerMap, aliases);
+  return column ? row[column - 1] : '';
+}
+
+function writeOptionalCell_(rowValues, headerMap, aliases, value) {
+  var column = getOptionalColumnIndex_(headerMap, aliases);
+  if (!column) {
+    return false;
+  }
+  while (rowValues.length < column) {
+    rowValues.push('');
+  }
+  rowValues[column - 1] = value;
+  return true;
+}
+
+function baFoxRecommendedTaskIdentityColumns_() {
+  return baFoxTaskIdentityColumnDefinitions_().map(function(definition) {
+    return definition.header;
+  });
+}
+
+function baFoxTaskIdentitySchemaStatus_(sheetOrHeaders) {
+  var sheet = Array.isArray(sheetOrHeaders) ? null : (sheetOrHeaders || baFoxGetSheetByName_(BA_FOX_CONFIG.SHEETS.TASKS));
+  var headerMap = getTaskHeaderMap_(Array.isArray(sheetOrHeaders) ? sheetOrHeaders : sheet);
+  var columns = {};
+  var present = [];
+  var missing = [];
+  baFoxTaskIdentityColumnDefinitions_().forEach(function(definition) {
+    var column = getOptionalColumnIndex_(headerMap, definition.aliases);
+    columns[definition.key] = {
+      header: definition.header,
+      aliases: definition.aliases,
+      present: Boolean(column),
+      column: column || null
+    };
+    if (column) {
+      present.push(definition.header);
+    } else {
+      missing.push(definition.header);
+    }
+  });
+  return {
+    sheet: BA_FOX_CONFIG.SHEETS.TASKS,
+    exists: Array.isArray(sheetOrHeaders) ? true : Boolean(sheet),
+    status: missing.length ? (present.length ? 'partial' : 'missing') : 'ready',
+    allPresent: missing.length === 0,
+    anyPresent: present.length > 0,
+    presentColumns: present,
+    missingColumns: missing,
+    columns: columns,
+    recommendedTaskIdentityColumns: baFoxRecommendedTaskIdentityColumns_()
+  };
+}
+
 function baFoxOptionalTaskFieldNames_(field) {
   var names = {
     CONTROL_DATE: ['controlDate', 'control_date', 'Control Date', 'Контрольная дата', 'Дата контроля'],
     FOCUS: ['focus', 'isFocus', 'manualFocus', 'Focus', 'Фокус'],
-    OWNER_EMAIL: ['ownerEmail', 'owner_email', 'Owner Email', 'Email ответственного'],
-    OWNER_USER_ID: ['ownerUserId', 'owner_user_id', 'Owner User ID', 'ID ответственного'],
-    COLLABORATOR_EMAILS: ['collaboratorEmails', 'collaborator_emails', 'Collaborator Emails', 'Участники email'],
-    COLLABORATOR_USER_IDS: ['collaboratorUserIds', 'collaborator_user_ids', 'Collaborator User IDs', 'Участники userId'],
-    CREATED_BY_EMAIL: ['createdByEmail', 'created_by_email', 'Created By Email', 'Создал email'],
-    CREATED_BY_USER_ID: ['createdByUserId', 'created_by_user_id', 'Created By User ID', 'Создал userId'],
-    VISIBILITY: ['visibility', 'Visibility', 'Видимость']
+    OWNER_EMAIL: ['Owner Email', 'ownerEmail', 'owner_email', 'Email ответственного'],
+    OWNER_USER_ID: ['Owner User ID', 'ownerUserId', 'owner_user_id', 'ID ответственного'],
+    COLLABORATOR_EMAILS: ['Collaborator Emails', 'collaboratorEmails', 'collaborator_emails', 'Участники email'],
+    COLLABORATOR_USER_IDS: ['Collaborator User IDs', 'collaboratorUserIds', 'collaborator_user_ids', 'Участники userId'],
+    CREATED_BY_EMAIL: ['Created By Email', 'createdByEmail', 'created_by_email', 'Создал email'],
+    CREATED_BY_USER_ID: ['Created By User ID', 'createdByUserId', 'created_by_user_id', 'Создал userId'],
+    VISIBILITY: ['Visibility', 'visibility', 'Видимость']
   };
   return names[field] || [];
 }
@@ -158,18 +256,35 @@ function baFoxAppendTaskRow(rowValues) {
   };
 }
 
-function baFoxAppendSafeCreateTaskRow(rowValues) {
+function baFoxAppendSafeCreateTaskRow(rowValues, identityMetadata) {
   var sheet = baFoxGetSheetByName_(BA_FOX_CONFIG.SHEETS.TASKS);
   if (!sheet) {
     return baFoxError('TASKS_SHEET_MISSING', 'Tasks sheet is not available.', {});
   }
 
   try {
-    sheet.appendRow(rowValues);
+    var headerMap = getTaskHeaderMap_(sheet);
+    var schema = baFoxTaskIdentitySchemaStatus_(headerMap.headers);
+    var finalRowValues = rowValues.slice();
+    while (finalRowValues.length < sheet.getLastColumn()) {
+      finalRowValues.push('');
+    }
+    if (identityMetadata) {
+      writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('OWNER_EMAIL'), identityMetadata.ownerEmail || '');
+      writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('OWNER_USER_ID'), identityMetadata.ownerUserId || '');
+      writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('CREATED_BY_EMAIL'), identityMetadata.createdByEmail || '');
+      writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('CREATED_BY_USER_ID'), identityMetadata.createdByUserId || '');
+      writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('VISIBILITY'), identityMetadata.visibility || 'team');
+    }
+    sheet.appendRow(finalRowValues);
     return baFoxOk({
       dryRun: false,
       appended: true,
-      rowNumber: sheet.getLastRow()
+      rowNumber: sheet.getLastRow(),
+      taskIdentitySchema: schema,
+      optionalIdentityColumnsPresent: schema.anyPresent,
+      identityColumnsApplied: identityMetadata ? schema.presentColumns : [],
+      identityColumnsMissing: schema.missingColumns
     });
   } catch (err) {
     return baFoxError(

@@ -153,6 +153,49 @@ function findUserByEmail_(email) {
   return null;
 }
 
+function findUserByUserId_(userId) {
+  var normalized = baFoxSafeString(userId).toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  var users = getUsers_();
+  for (var index = 0; index < users.length; index += 1) {
+    if (baFoxSafeString(users[index].userId).toLowerCase() === normalized) {
+      return users[index];
+    }
+  }
+  return null;
+}
+
+function findUserByOwnerLabel_(label) {
+  var normalized = baFoxSafeString(label).toLowerCase();
+  if (!normalized) {
+    return {
+      user: null,
+      matches: [],
+      ambiguous: false,
+      warning: 'OWNER_LABEL_MISSING'
+    };
+  }
+  var matches = getUsers_().filter(function(user) {
+    return baFoxSafeString(user.defaultOwnerLabel).toLowerCase() === normalized;
+  });
+  if (matches.length === 1) {
+    return {
+      user: matches[0],
+      matches: matches,
+      ambiguous: false,
+      warning: ''
+    };
+  }
+  return {
+    user: null,
+    matches: matches,
+    ambiguous: matches.length > 1,
+    warning: matches.length > 1 ? 'OWNER_LABEL_AMBIGUOUS' : 'OWNER_LABEL_NOT_FOUND'
+  };
+}
+
 function activeUserEmail_() {
   if (typeof Session === 'undefined' || !Session.getActiveUser) {
     return '';
@@ -581,43 +624,72 @@ function isUserAllowedForRoute_(profile, routeName, action) {
   return true;
 }
 
-function taskIdentityValues_(task) {
-  return [
-    task.ownerEmail,
-    task.ownerUserId,
-    task.createdByEmail,
-    task.createdByUserId,
-    task.collaboratorEmails,
-    task.collaboratorUserIds,
-    task.owner
-  ].map(function(value) {
-    return baFoxSafeString(value).toLowerCase();
-  }).join(' ');
+function identityArrayContains_(items, value, normalizeEmail) {
+  var target = normalizeEmail ? normalizeWorkspaceEmail_(value) : baFoxSafeString(value).toLowerCase();
+  if (!target) {
+    return false;
+  }
+  return (items || []).some(function(item) {
+    var normalized = normalizeEmail ? normalizeWorkspaceEmail_(item) : baFoxSafeString(item).toLowerCase();
+    return normalized === target;
+  });
+}
+
+function taskIdentityList_(task, fieldName, normalizeEmail) {
+  if (!task) {
+    return [];
+  }
+  if (Array.isArray(task[fieldName])) {
+    return task[fieldName];
+  }
+  return baFoxSplitIdentityList_(task[fieldName], normalizeEmail);
 }
 
 function profileCanSeeTask_(profile, task) {
-  if (!profileCanUseDashboard_(profile)) {
+  if (!profileCanUseDashboard_(profile) || profile.status !== 'active' || profile.isRegistered !== true) {
     return false;
   }
   if (profileCanSeeAll_(profile)) {
     return true;
   }
-  var haystack = taskIdentityValues_(task || {});
-  return Boolean(haystack) && (
-    haystack.indexOf(normalizeWorkspaceEmail_(profile.email)) !== -1
-    || haystack.indexOf(baFoxSafeString(profile.userId).toLowerCase()) !== -1
-    || haystack.indexOf(baFoxSafeString(profile.defaultOwnerLabel).toLowerCase()) !== -1
+  var normalizedEmail = normalizeWorkspaceEmail_(profile.email);
+  var userId = baFoxSafeString(profile.userId).toLowerCase();
+  var ownerLabel = baFoxSafeString(profile.defaultOwnerLabel).toLowerCase();
+  var normalizedTask = task || {};
+  return Boolean(
+    (normalizedEmail && normalizeWorkspaceEmail_(normalizedTask.ownerEmail) === normalizedEmail)
+    || (userId && baFoxSafeString(normalizedTask.ownerUserId).toLowerCase() === userId)
+    || (ownerLabel && baFoxSafeString(normalizedTask.ownerLabel || normalizedTask.owner).toLowerCase() === ownerLabel)
+    || identityArrayContains_(taskIdentityList_(normalizedTask, 'collaboratorEmailList', true), normalizedEmail, true)
+    || identityArrayContains_(taskIdentityList_(normalizedTask, 'collaboratorEmails', true), normalizedEmail, true)
+    || identityArrayContains_(taskIdentityList_(normalizedTask, 'collaboratorUserIdList', false), userId, false)
+    || identityArrayContains_(taskIdentityList_(normalizedTask, 'collaboratorUserIds', false), userId, false)
+    || (normalizedEmail && normalizeWorkspaceEmail_(normalizedTask.createdByEmail) === normalizedEmail)
+    || (userId && baFoxSafeString(normalizedTask.createdByUserId).toLowerCase() === userId)
   );
 }
 
 function identityDashboardMetadata_(request, routeName) {
   var identity = getCurrentUserProfile_(request || {}, {});
   var permissions = identity.permissions || profilePermissions_(identity.profile);
+  var taskIdentitySchema = baFoxTaskIdentitySchemaStatus_();
+  var visibilityMode = identityVisibilityMode_();
+  var identityWarnings = [];
+  if (!taskIdentitySchema.allPresent) {
+    identityWarnings.push('TASK_IDENTITY_COLUMNS_OPTIONAL_OR_MISSING');
+  }
+  if (visibilityMode !== 'enforced') {
+    identityWarnings.push('TASK_VISIBILITY_NOT_ENFORCED');
+  }
   return {
     identityMode: identity.identityMode,
     enforcementMode: identity.enforcementMode,
-    visibilityMode: identityVisibilityMode_(),
+    visibilityMode: visibilityMode,
     filteredByUser: false,
+    taskIdentitySchema: taskIdentitySchema,
+    optionalIdentityColumnsPresent: taskIdentitySchema.anyPresent,
+    identityWarnings: identityWarnings,
+    recommendedTaskIdentityColumns: taskIdentitySchema.recommendedTaskIdentityColumns,
     effectiveRole: identity.profile && identity.profile.accessRole ? identity.profile.accessRole : 'viewer',
     canSeeAll: permissions.canSeeAll === true,
     canCreateTasks: permissions.canCreateTasks === true,
