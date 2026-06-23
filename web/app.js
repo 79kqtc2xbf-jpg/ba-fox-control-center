@@ -3408,6 +3408,22 @@ function renderMfSettings() {
     ? backendProfile.enforcementMode
     : config.identityEnforcementMode;
   const permissions = profile.permissions || {};
+  const dashboardIdentity = dashboardData().identity || {};
+  const taskIdentitySchema = dashboardIdentity.taskIdentitySchema || {};
+  const recommendedTaskIdentityColumns = dashboardIdentity.recommendedTaskIdentityColumns
+    || taskIdentitySchema.recommendedTaskIdentityColumns
+    || [];
+  const missingTaskIdentityColumns = taskIdentitySchema.missingColumns || [];
+  const presentTaskIdentityColumns = taskIdentitySchema.presentColumns || [];
+  const taskIdentitySchemaLabel = taskIdentitySchema.status === 'ready'
+    ? 'поля готовы'
+    : taskIdentitySchema.status === 'partial'
+      ? 'часть полей найдена'
+      : 'Поля участников пока не заполнены';
+  const visibilityFilterLabel = dashboardIdentity.filteredByUser
+    ? 'Фильтрация по пользователю включена'
+    : 'Фильтрация по пользователю не включена';
+  const pilotStatusLabel = 'Пилот не запущен';
   elements.taskList.innerHTML = [
     '<section class="mf-settings-page">',
     '<section class="mf-two-column settings">',
@@ -3478,9 +3494,18 @@ function renderMfSettings() {
     '</div>',
     '</article>',
     '<article class="mf-settings-card mf-external-card">',
-    '<div class="mf-section-title"><h3>Модель видимости</h3><span class="mf-external-marker">prepared only</span></div>',
+    '<div class="mf-section-title"><h3>Права доступа</h3><span class="mf-external-marker">' + escapeHtml(pilotStatusLabel) + '</span></div>',
     '<p>admin и executive должны видеть все задачи после backend enforcement. member видит свои задачи, участие и, возможно, созданные им задачи.</p>',
     '<p>Текущий dashboard пока не фильтрует live-данные по пользователю в profile_only/soft режиме. Полная фильтрация включается только после отдельного enforced QA.</p>',
+    '<div class="mf-readonly-grid">',
+    '<span>Поля видимости задач <strong>' + escapeHtml(taskIdentitySchemaLabel) + '</strong></span>',
+    '<span>Visibility mode <strong>' + escapeHtml(dashboardIdentity.visibilityMode || enforcementModeLabel || 'profile_only') + '</strong></span>',
+    '<span>Фильтрация <strong>' + escapeHtml(visibilityFilterLabel) + '</strong></span>',
+    '<span>Статус пилота <strong>' + escapeHtml(pilotStatusLabel) + '</strong></span>',
+    '<span>Найдено полей <strong>' + escapeHtml(String(presentTaskIdentityColumns.length || 0)) + '</strong></span>',
+    '<span>Не хватает полей <strong>' + escapeHtml(String(missingTaskIdentityColumns.length || 0)) + '</strong></span>',
+    '<span>Следующие поля <strong>' + escapeHtml(recommendedTaskIdentityColumns.join(', ') || 'Owner Email, Owner User ID, Collaborator Emails, Collaborator User IDs, Created By Email, Created By User ID, Visibility') + '</strong></span>',
+    '</div>',
     '</article>',
     '</section>',
     '<section class="mf-two-column settings">',
