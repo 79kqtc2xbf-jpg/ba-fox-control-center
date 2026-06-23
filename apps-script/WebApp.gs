@@ -42,7 +42,7 @@ function baFoxCacheKey_(route, parameters) {
 }
 
 function baFoxIsWriteRoute_(route) {
-  return ['taskAction', 'createTask', 'editTask'].indexOf(route) !== -1;
+  return ['taskAction', 'createTask', 'editTask', 'prepareTaskIdentityColumns'].indexOf(route) !== -1;
 }
 
 function baFoxIsCacheBypass_(parameters) {
@@ -120,6 +120,10 @@ function baFoxPutCachedResponse_(route, parameters, response) {
 }
 
 function baFoxBuildTaskViewsFromRows_(parameters, storeResult) {
+  var normalizedTasks = baFoxNormalizeTaskRows_(storeResult);
+  var identityParameters = Object.assign({}, parameters || {}, {
+    __normalizedTasks: normalizedTasks
+  });
   return {
     scaffoldInfo: baFoxScaffoldInfo().data,
     inbox: baFoxListInboxTasks({ date: parameters.date }, storeResult),
@@ -129,11 +133,15 @@ function baFoxBuildTaskViewsFromRows_(parameters, storeResult) {
     open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult),
     completed: baFoxListCompletedTasks({ limit: parameters.completedLimit || 50 }, storeResult),
-    identity: identityDashboardMetadata_(parameters, 'fullDashboard')
+    identity: identityDashboardMetadata_(identityParameters, 'fullDashboard')
   };
 }
 
 function baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult) {
+  var normalizedTasks = baFoxNormalizeTaskRows_(storeResult);
+  var identityParameters = Object.assign({}, parameters || {}, {
+    __normalizedTasks: normalizedTasks
+  });
   return {
     scaffoldInfo: baFoxScaffoldInfo().data,
     inbox: baFoxListInboxTasks({ date: parameters.date }, storeResult),
@@ -142,33 +150,53 @@ function baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult) {
     all: baFoxListAllTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult),
-    identity: identityDashboardMetadata_(parameters, 'dashboard')
+    identity: identityDashboardMetadata_(identityParameters, 'dashboard')
   };
 }
 
 function baFoxGetDashboard_(parameters) {
+  var startedAt = new Date().getTime();
   var identityCheck = requireVerifiedProfile_(parameters, { requireRegistered: true });
   if (!identityCheck.ok) {
     return identityCheck.error;
   }
+  var readStartedAt = new Date().getTime();
   var storeResult = baFoxReadTasksRows();
-  return baFoxOk(baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult));
+  var dashboard = baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult);
+  dashboard.performance = {
+    operation: 'dashboard',
+    durationMs: new Date().getTime() - startedAt,
+    sheetReadMs: new Date().getTime() - readStartedAt,
+    timestamp: baFoxIsoNow()
+  };
+  return baFoxOk(dashboard);
 }
 
 function baFoxGetWorkspaceDashboard_(parameters) {
+  var startedAt = new Date().getTime();
   var identityCheck = requireVerifiedProfile_(parameters, { requireRegistered: true });
   if (!identityCheck.ok) {
     return identityCheck.error;
   }
+  var readStartedAt = new Date().getTime();
   var storeResult = baFoxReadTasksRows();
-  return baFoxOk(baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult));
+  var dashboard = baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult);
+  dashboard.performance = {
+    operation: 'workspaceDashboard',
+    durationMs: new Date().getTime() - startedAt,
+    sheetReadMs: new Date().getTime() - readStartedAt,
+    timestamp: baFoxIsoNow()
+  };
+  return baFoxOk(dashboard);
 }
 
 function baFoxGetFullDashboard_(parameters) {
+  var startedAt = new Date().getTime();
   var identityCheck = requireVerifiedProfile_(parameters, { requireRegistered: true });
   if (!identityCheck.ok) {
     return identityCheck.error;
   }
+  var readStartedAt = new Date().getTime();
   var storeResult = baFoxReadTasksRows();
   var dashboard = baFoxBuildTaskViewsFromRows_(parameters, storeResult);
   var auditResponse = baFoxBuildCleanupAuditDryRun(storeResult);
@@ -176,6 +204,12 @@ function baFoxGetFullDashboard_(parameters) {
     return auditResponse;
   }
   dashboard.cleanupAudit = auditResponse.data;
+  dashboard.performance = {
+    operation: 'fullDashboard',
+    durationMs: new Date().getTime() - startedAt,
+    sheetReadMs: new Date().getTime() - readStartedAt,
+    timestamp: baFoxIsoNow()
+  };
   return baFoxOk(dashboard);
 }
 
@@ -294,6 +328,18 @@ function baFoxBuildRouteResponse_(route, parameters) {
     case 'profile':
     case 'me':
       response = getProfile(parameters);
+      break;
+    case 'taskIdentitySchema':
+      response = getTaskIdentitySchema(parameters);
+      break;
+    case 'prepareTaskIdentityColumns':
+      response = baFoxPrepareTaskIdentityColumns(parameters);
+      break;
+    case 'activeUsers':
+      response = getActiveUsersForPreview(parameters);
+      break;
+    case 'visibilityPreview':
+      response = getVisibilityPreview(parameters);
       break;
     case 'taskAction':
       response = taskAction(parameters);

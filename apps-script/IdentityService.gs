@@ -326,6 +326,32 @@ function profileCanUseDashboard_(profile) {
     && ['admin', 'executive', 'member', 'viewer'].indexOf(role) !== -1;
 }
 
+function safeUserSummary_(user) {
+  return {
+    userId: baFoxSafeString(user && user.userId),
+    email: normalizeWorkspaceEmail_(user && user.email),
+    displayName: baFoxSafeString(user && user.displayName),
+    accessRole: baFoxSafeString(user && user.accessRole),
+    defaultOwnerLabel: baFoxSafeString(user && user.defaultOwnerLabel),
+    department: baFoxSafeString(user && user.department),
+    status: baFoxSafeString(user && user.status)
+  };
+}
+
+function getSafeActiveUsersForPreview_(request) {
+  var identity = getCurrentUserProfile_(request || {}, {});
+  if (identity.identityMode !== 'google_token_verified' || !profileCanManageUsers_(identity.profile)) {
+    return baFoxError('ADMIN_REQUIRED', 'Admin profile is required for active user preview list.', {
+      identityMode: identity.identityMode
+    });
+  }
+  return baFoxOk({
+    users: getUsers_().filter(function(user) {
+      return user.status === 'active';
+    }).map(safeUserSummary_)
+  });
+}
+
 function profilePermissions_(profile) {
   return {
     canSeeAll: profileCanSeeAll_(profile),
@@ -610,9 +636,161 @@ function profileCanSeeTask_(profile, task) {
   );
 }
 
+function baFoxSplitIdentityList_(value) {
+  return baFoxSafeString(value).toLowerCase().split(/[,\n;]/).map(function(item) {
+    return baFoxSafeString(item);
+  }).filter(Boolean);
+}
+
+function buildTaskVisibilityReason_(profile, task) {
+  if (!profileCanUseDashboard_(profile)) {
+    return {
+      visible: false,
+      reason: 'dashboard_forbidden',
+      legacyUnclassified: false
+    };
+  }
+  if (profileCanSeeAll_(profile)) {
+    return {
+      visible: true,
+      reason: 'canSeeAll',
+      legacyUnclassified: !baFoxSafeString(task.ownerEmail)
+        && !baFoxSafeString(task.ownerUserId)
+        && !baFoxSafeString(task.createdByEmail)
+        && !baFoxSafeString(task.createdByUserId)
+        && !baFoxSafeString(task.collaboratorEmails)
+        && !baFoxSafeString(task.collaboratorUserIds)
+    };
+  }
+
+  var email = normalizeWorkspaceEmail_(profile.email);
+  var userId = baFoxSafeString(profile.userId).toLowerCase();
+  var ownerLabel = baFoxSafeString(profile.defaultOwnerLabel).toLowerCase();
+  var taskOwnerLabel = baFoxSafeString(task.owner).toLowerCase();
+  var legacyUnclassified = !baFoxSafeString(task.ownerEmail)
+    && !baFoxSafeString(task.ownerUserId)
+    && !baFoxSafeString(task.createdByEmail)
+    && !baFoxSafeString(task.createdByUserId)
+    && !baFoxSafeString(task.collaboratorEmails)
+    && !baFoxSafeString(task.collaboratorUserIds);
+
+  if (email && normalizeWorkspaceEmail_(task.ownerEmail) === email) {
+    return { visible: true, reason: 'ownerEmail', legacyUnclassified: legacyUnclassified };
+  }
+  if (userId && baFoxSafeString(task.ownerUserId).toLowerCase() === userId) {
+    return { visible: true, reason: 'ownerUserId', legacyUnclassified: legacyUnclassified };
+  }
+  if (ownerLabel && taskOwnerLabel === ownerLabel) {
+    return { visible: true, reason: 'ownerLabel', legacyUnclassified: legacyUnclassified };
+  }
+  if (email && baFoxSplitIdentityList_(task.collaboratorEmails).indexOf(email) !== -1) {
+    return { visible: true, reason: 'collaboratorEmail', legacyUnclassified: legacyUnclassified };
+  }
+  if (userId && baFoxSplitIdentityList_(task.collaboratorUserIds).indexOf(userId) !== -1) {
+    return { visible: true, reason: 'collaboratorUserId', legacyUnclassified: legacyUnclassified };
+  }
+  if (email && normalizeWorkspaceEmail_(task.createdByEmail) === email) {
+    return { visible: true, reason: 'createdBy', legacyUnclassified: legacyUnclassified };
+  }
+  if (userId && baFoxSafeString(task.createdByUserId).toLowerCase() === userId) {
+    return { visible: true, reason: 'createdBy', legacyUnclassified: legacyUnclassified };
+  }
+  return {
+    visible: false,
+    reason: legacyUnclassified ? 'legacy_unclassified' : 'no_match',
+    legacyUnclassified: legacyUnclassified
+  };
+}
+
+function buildVisibilityPreview_(profile, tasks, options) {
+  var settings = options || {};
+  var reasonCounts = {
+    canSeeAll: 0,
+    ownerEmail: 0,
+    ownerUserId: 0,
+    ownerLabel: 0,
+    collaboratorEmail: 0,
+    collaboratorUserId: 0,
+    createdBy: 0,
+    legacyUnclassified: 0,
+    noMatch: 0
+  };
+  var visible = 0;
+  var legacyUnclassified = 0;
+  (tasks || []).forEach(function(task) {
+    var reason = buildTaskVisibilityReason_(profile, task);
+    if (reason.visible) {
+      visible += 1;
+      if (reasonCounts[reason.reason] !== undefined) {
+        reasonCounts[reason.reason] += 1;
+      }
+    } else if (reason.reason === 'no_match') {
+      reasonCounts.noMatch += 1;
+    }
+    if (reason.legacyUnclassified) {
+      legacyUnclassified += 1;
+      reasonCounts.legacyUnclassified += 1;
+    }
+  });
+
+  return {
+    mode: 'dry_run',
+    filteredByUser: false,
+    wouldFilterInEnforcedMode: !profileCanSeeAll_(profile),
+    effectiveUser: profile && (profile.email || profile.displayName || profile.userId) || '',
+    effectiveUserId: profile && profile.userId || '',
+    effectiveRole: profile && profile.accessRole || 'viewer',
+    previewedByAdmin: settings.previewedByAdmin === true,
+    totalTasks: (tasks || []).length,
+    visibleIfEnforced: visible,
+    hiddenIfEnforced: Math.max((tasks || []).length - visible, 0),
+    legacyUnclassified: legacyUnclassified,
+    reasonCounts: reasonCounts
+  };
+}
+
+function getVisibleTasksForProfileDryRun_(profile, tasks) {
+  return (tasks || []).filter(function(task) {
+    return buildTaskVisibilityReason_(profile, task).visible;
+  });
+}
+
+function baFoxGetVisibilityPreview(request) {
+  var normalized = baFoxNormalizeRequest(request || {});
+  var identity = getCurrentUserProfile_(normalized, {});
+  var profile = identity.profile || getFallbackUserProfile_();
+  var previewedByAdmin = false;
+  if (baFoxSafeString(normalized.previewUserId || normalized.userId || normalized.email)) {
+    if (identity.identityMode !== 'google_token_verified' || !profileCanManageUsers_(profile)) {
+      return baFoxError('ADMIN_REQUIRED', 'Admin profile is required for impersonated visibility preview.', {
+        identityMode: identity.identityMode
+      });
+    }
+    var lookup = baFoxSafeString(normalized.previewUserId || normalized.userId).toLowerCase();
+    var lookupEmail = normalizeWorkspaceEmail_(normalized.email);
+    var users = getUsers_();
+    for (var index = 0; index < users.length; index += 1) {
+      if ((lookup && baFoxSafeString(users[index].userId).toLowerCase() === lookup)
+        || (lookupEmail && users[index].email === lookupEmail)) {
+        profile = applyRegisteredProfileFlags_(users[index], 'admin_visibility_preview');
+        previewedByAdmin = true;
+        break;
+      }
+    }
+  }
+  var storeResult = baFoxReadTasksRows();
+  var tasks = baFoxNormalizeTaskRows_(storeResult);
+  return baFoxOk({
+    visibilityPreview: buildVisibilityPreview_(profile, tasks, {
+      previewedByAdmin: previewedByAdmin
+    })
+  });
+}
+
 function identityDashboardMetadata_(request, routeName) {
   var identity = getCurrentUserProfile_(request || {}, {});
   var permissions = identity.permissions || profilePermissions_(identity.profile);
+  var storeTasks = request && request.__normalizedTasks ? request.__normalizedTasks : null;
   return {
     identityMode: identity.identityMode,
     enforcementMode: identity.enforcementMode,
@@ -624,6 +802,8 @@ function identityDashboardMetadata_(request, routeName) {
     canUseDashboard: permissions.canUseDashboard === true,
     canManageUsers: permissions.canManageUsers === true,
     route: routeName || '',
-    limitations: identity.limitations || []
+    limitations: identity.limitations || [],
+    taskIdentitySchema: getTaskIdentitySchemaStatus_(),
+    visibilityPreview: storeTasks ? buildVisibilityPreview_(identity.profile, storeTasks, {}) : null
   };
 }

@@ -384,6 +384,103 @@
     },
   };
 
+  const taskIdentitySchema = {
+    taskIdentitySchema: {
+      status: 'partial',
+      requiredLegacyColumnsOk: true,
+      optionalColumnsPresent: {
+        ownerEmail: true,
+        ownerUserId: true,
+        collaboratorEmails: false,
+        collaboratorUserIds: false,
+        createdByEmail: true,
+        createdByUserId: true,
+        visibility: true,
+      },
+      optionalColumns: {
+        ownerEmail: { present: true, header: 'Owner Email', recommendedHeader: 'Owner Email', column: 26 },
+        ownerUserId: { present: true, header: 'Owner User ID', recommendedHeader: 'Owner User ID', column: 27 },
+        collaboratorEmails: { present: false, header: '', recommendedHeader: 'Collaborator Emails', column: 0 },
+        collaboratorUserIds: { present: false, header: '', recommendedHeader: 'Collaborator User IDs', column: 0 },
+        createdByEmail: { present: true, header: 'Created By Email', recommendedHeader: 'Created By Email', column: 28 },
+        createdByUserId: { present: true, header: 'Created By User ID', recommendedHeader: 'Created By User ID', column: 29 },
+        visibility: { present: true, header: 'Visibility', recommendedHeader: 'Visibility', column: 30 },
+      },
+      missingColumns: ['Collaborator Emails', 'Collaborator User IDs'],
+      recommendedColumns: [
+        'Owner Email',
+        'Owner User ID',
+        'Collaborator Emails',
+        'Collaborator User IDs',
+        'Created By Email',
+        'Created By User ID',
+        'Visibility',
+      ],
+      canSafelyMigrate: true,
+      migrationAlreadyDone: false,
+      optionalIdentityWriteActive: true,
+    },
+  };
+
+  const activeUsers = {
+    users: [
+      {
+        userId: 'user_liza_kiseleva',
+        email: 'liza@mfstream.io',
+        displayName: 'Liza Kiseleva',
+        accessRole: 'admin',
+        defaultOwnerLabel: 'Лиза',
+        department: 'Админ / EA',
+        status: 'active',
+      },
+      {
+        userId: 'user_andrey_zaytsev',
+        email: 'andrey.zaytsev@mfstream.io',
+        displayName: 'Andrey Zaytsev',
+        accessRole: 'member',
+        defaultOwnerLabel: 'Андрей',
+        department: 'Операции',
+        status: 'active',
+      },
+      {
+        userId: 'user_daniil_lebedev',
+        email: 'daniil.lebedev@mfstream.io',
+        displayName: 'Daniil Lebedev',
+        accessRole: 'member',
+        defaultOwnerLabel: 'Даниил',
+        department: 'Продукт / IT',
+        status: 'active',
+      },
+    ],
+  };
+
+  const visibilityPreview = {
+    visibilityPreview: {
+      mode: 'dry_run',
+      filteredByUser: false,
+      wouldFilterInEnforcedMode: true,
+      effectiveUser: 'andrey.zaytsev@mfstream.io',
+      effectiveUserId: 'user_andrey_zaytsev',
+      effectiveRole: 'member',
+      previewedByAdmin: true,
+      totalTasks: tasks.length,
+      visibleIfEnforced: 2,
+      hiddenIfEnforced: tasks.length - 2,
+      legacyUnclassified: 4,
+      reasonCounts: {
+        canSeeAll: 0,
+        ownerEmail: 0,
+        ownerUserId: 0,
+        ownerLabel: 2,
+        collaboratorEmail: 0,
+        collaboratorUserId: 0,
+        createdBy: 0,
+        legacyUnclassified: 4,
+        noMatch: tasks.length - 2,
+      },
+    },
+  };
+
   const dashboardIdentity = {
     identityMode: 'mock_profile_route',
     enforcementMode: 'profile_only',
@@ -396,6 +493,8 @@
     canManageUsers: false,
     route: 'dashboard',
     limitations: profileData.limitations,
+    taskIdentitySchema: clone(taskIdentitySchema.taskIdentitySchema),
+    visibilityPreview: clone(visibilityPreview.visibilityPreview),
   };
 
   function getResponse(route, params) {
@@ -446,6 +545,12 @@
       case 'profile':
       case 'me':
         return success(clone(profileData));
+      case 'taskIdentitySchema':
+        return success(clone(taskIdentitySchema));
+      case 'activeUsers':
+        return success(clone(activeUsers));
+      case 'visibilityPreview':
+        return success(clone(visibilityPreview));
       default:
         return {
           ok: false,

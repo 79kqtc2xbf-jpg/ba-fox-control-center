@@ -421,11 +421,71 @@ function baFoxBuildSafeCreateTaskId_(now) {
   return 'BA-WEB-' + compactNow + '-' + suffix;
 }
 
-function baFoxSafeCreateTaskRow_(taskId, normalized, now) {
+function findUserByOwnerLabel_(ownerLabel) {
+  var normalizedOwner = baFoxSafeString(ownerLabel).toLowerCase();
+  if (!normalizedOwner) {
+    return null;
+  }
+  var users = getUsers_();
+  for (var index = 0; index < users.length; index += 1) {
+    var user = users[index];
+    if (baFoxSafeString(user.defaultOwnerLabel).toLowerCase() === normalizedOwner
+      || baFoxSafeString(user.displayName).toLowerCase() === normalizedOwner
+      || normalizeWorkspaceEmail_(user.email) === normalizeWorkspaceEmail_(ownerLabel)) {
+      return user;
+    }
+  }
+  return null;
+}
+
+function baFoxApplyOptionalTaskIdentityValues_(rowValues, normalized, actorProfile) {
+  var schema = getTaskIdentitySchemaStatus_();
+  if (!schema.exists || schema.status === 'missing') {
+    return {
+      rowValues: rowValues,
+      schema: schema,
+      writtenFields: [],
+      skippedFields: schema.missingColumns || []
+    };
+  }
+
+  var ownerUser = findUserByOwnerLabel_(normalized.owner);
+  var identityValues = {
+    ownerEmail: ownerUser ? ownerUser.email : '',
+    ownerUserId: ownerUser ? ownerUser.userId : '',
+    collaboratorEmails: '',
+    collaboratorUserIds: '',
+    createdByEmail: actorProfile && actorProfile.email ? actorProfile.email : '',
+    createdByUserId: actorProfile && actorProfile.userId ? actorProfile.userId : '',
+    visibility: 'workspace'
+  };
+  var output = rowValues.slice();
+  var writtenFields = [];
+
+  Object.keys(identityValues).forEach(function(key) {
+    var column = schema.optionalColumns && schema.optionalColumns[key] && schema.optionalColumns[key].column;
+    if (column && column > 0) {
+      while (output.length < column) {
+        output.push('');
+      }
+      output[column - 1] = identityValues[key];
+      writtenFields.push(key);
+    }
+  });
+
+  return {
+    rowValues: output,
+    schema: schema,
+    writtenFields: writtenFields,
+    skippedFields: schema.missingColumns || []
+  };
+}
+
+function baFoxSafeCreateTaskRow_(taskId, normalized, now, actorProfile) {
   var controlDate = baFoxSafeString(normalized.controlDate || normalized.deadline);
   var reminder = baFoxSafeString(normalized.reminder);
   var status = baFoxSafeString(normalized.status || 'Не начато');
-  return [
+  var rowValues = [
     taskId,
     '',
     baFoxSafeString(normalized.category),
@@ -452,9 +512,11 @@ function baFoxSafeCreateTaskRow_(taskId, normalized, now) {
     '',
     false
   ];
+  return baFoxApplyOptionalTaskIdentityValues_(rowValues, normalized, actorProfile);
 }
 
 function baFoxSafeCreateTask(request) {
+  var operationStartedAt = new Date().getTime();
   var normalized = baFoxNormalizeRequest(request);
   var rejectedKeys = baFoxRejectedCreateTaskKeys_(normalized);
   if (rejectedKeys.length) {
@@ -536,7 +598,8 @@ function baFoxSafeCreateTask(request) {
   var taskId = baFoxBuildSafeCreateTaskId_(now);
   var actorProfile = identityCheck.profile || {};
   var actorLabel = actorProfile.email || actorProfile.displayName || 'BA Fox Web';
-  var appendResponse = baFoxAppendSafeCreateTaskRow(baFoxSafeCreateTaskRow_(taskId, normalized, now));
+  var rowBuild = baFoxSafeCreateTaskRow_(taskId, normalized, now, actorProfile);
+  var appendResponse = baFoxAppendSafeCreateTaskRow(rowBuild.rowValues);
   if (!appendResponse.ok) {
     baFoxAuditTaskAction({
       timestamp: now,
@@ -583,7 +646,19 @@ function baFoxSafeCreateTask(request) {
     source: 'BA Fox Web',
     createdAt: now,
     appendResult: appendResponse.data,
-    auditResult: auditResult
+    auditResult: auditResult,
+    taskIdentitySchema: {
+      status: rowBuild.schema.status,
+      optionalIdentityWriteActive: rowBuild.writtenFields.length > 0,
+      writtenFields: rowBuild.writtenFields,
+      missingColumns: rowBuild.schema.missingColumns
+    },
+    performance: {
+      operation: 'createTask',
+      durationMs: new Date().getTime() - operationStartedAt,
+      sheetWriteMs: appendResponse.data && appendResponse.data.performance ? appendResponse.data.performance.sheetWriteMs : null,
+      timestamp: baFoxIsoNow()
+    }
   });
 }
 

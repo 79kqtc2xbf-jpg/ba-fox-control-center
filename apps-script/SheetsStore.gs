@@ -79,6 +79,142 @@ function baFoxOptionalTaskFieldNames_(field) {
   return names[field] || [];
 }
 
+function baFoxTaskIdentityColumnDefinitions_() {
+  return [
+    { key: 'ownerEmail', field: 'OWNER_EMAIL', header: 'Owner Email' },
+    { key: 'ownerUserId', field: 'OWNER_USER_ID', header: 'Owner User ID' },
+    { key: 'collaboratorEmails', field: 'COLLABORATOR_EMAILS', header: 'Collaborator Emails' },
+    { key: 'collaboratorUserIds', field: 'COLLABORATOR_USER_IDS', header: 'Collaborator User IDs' },
+    { key: 'createdByEmail', field: 'CREATED_BY_EMAIL', header: 'Created By Email' },
+    { key: 'createdByUserId', field: 'CREATED_BY_USER_ID', header: 'Created By User ID' },
+    { key: 'visibility', field: 'VISIBILITY', header: 'Visibility' }
+  ];
+}
+
+function getTaskIdentitySchemaStatus_() {
+  var sheet = baFoxGetSheetByName_(BA_FOX_CONFIG.SHEETS.TASKS);
+  var definitions = baFoxTaskIdentityColumnDefinitions_();
+  var recommendedColumns = definitions.map(function(definition) {
+    return definition.header;
+  });
+  var fallback = {
+    sheet: BA_FOX_CONFIG.SHEETS.TASKS,
+    exists: false,
+    status: 'missing',
+    requiredLegacyColumnsOk: false,
+    optionalColumnsPresent: {},
+    optionalColumns: {},
+    missingColumns: recommendedColumns.slice(),
+    recommendedColumns: recommendedColumns,
+    canSafelyMigrate: false,
+    migrationAlreadyDone: false,
+    optionalIdentityWriteActive: false,
+    headerColumns: 0,
+    dataRows: 0
+  };
+
+  definitions.forEach(function(definition) {
+    fallback.optionalColumnsPresent[definition.key] = false;
+    fallback.optionalColumns[definition.key] = {
+      present: false,
+      header: '',
+      recommendedHeader: definition.header,
+      column: 0
+    };
+  });
+
+  if (!sheet) {
+    return fallback;
+  }
+
+  var headers = baFoxReadSheetHeaders_(sheet);
+  var lastLegacyColumn = BA_FOX_CONFIG.TASK_COLUMNS.ARCHIVED || 25;
+  var requiredLegacyColumnsOk = sheet.getLastColumn() >= lastLegacyColumn
+    && baFoxFindHeaderColumn_(headers, ['ID', 'id', 'Task ID'])
+    && baFoxFindHeaderColumn_(headers, ['Title', 'title', 'Название'])
+    && baFoxFindHeaderColumn_(headers, ['Owner', 'owner', 'Ответственный']);
+  var missingColumns = [];
+  var presentCount = 0;
+  var optionalColumnsPresent = {};
+  var optionalColumns = {};
+
+  definitions.forEach(function(definition) {
+    var column = baFoxFindHeaderColumn_(headers, baFoxOptionalTaskFieldNames_(definition.field));
+    var present = column > 0;
+    if (present) {
+      presentCount += 1;
+    } else {
+      missingColumns.push(definition.header);
+    }
+    optionalColumnsPresent[definition.key] = present;
+    optionalColumns[definition.key] = {
+      present: present,
+      header: present ? headers[column - 1] : '',
+      recommendedHeader: definition.header,
+      column: column
+    };
+  });
+
+  return {
+    sheet: BA_FOX_CONFIG.SHEETS.TASKS,
+    exists: true,
+    status: presentCount === 0 ? 'missing' : presentCount === definitions.length ? 'ready' : 'partial',
+    requiredLegacyColumnsOk: Boolean(requiredLegacyColumnsOk),
+    optionalColumnsPresent: optionalColumnsPresent,
+    optionalColumns: optionalColumns,
+    missingColumns: missingColumns,
+    recommendedColumns: recommendedColumns,
+    canSafelyMigrate: Boolean(requiredLegacyColumnsOk && missingColumns.length > 0),
+    migrationAlreadyDone: missingColumns.length === 0,
+    optionalIdentityWriteActive: missingColumns.length < definitions.length,
+    headerColumns: sheet.getLastColumn(),
+    dataRows: Math.max(sheet.getLastRow() - 1, 0)
+  };
+}
+
+function ensureTaskIdentityColumns_(options) {
+  var settings = options || {};
+  var confirm = settings.confirm === true || baFoxSafeString(settings.confirm).toLowerCase() === 'true';
+  var status = getTaskIdentitySchemaStatus_();
+  var result = {
+    dryRun: !confirm,
+    confirmed: confirm,
+    schemaBefore: status,
+    addedColumns: [],
+    skippedColumns: status.missingColumns.slice(),
+    schemaAfter: status
+  };
+
+  if (!status.exists) {
+    result.error = 'TASKS_SHEET_MISSING';
+    return result;
+  }
+  if (!status.requiredLegacyColumnsOk) {
+    result.error = 'LEGACY_TASK_COLUMNS_INCOMPLETE';
+    return result;
+  }
+  if (!status.missingColumns.length) {
+    result.skippedColumns = [];
+    return result;
+  }
+  if (!confirm) {
+    return result;
+  }
+
+  var sheet = baFoxGetSheetByName_(BA_FOX_CONFIG.SHEETS.TASKS);
+  var startColumn = sheet.getLastColumn() + 1;
+  sheet.getRange(1, startColumn, 1, status.missingColumns.length).setValues([status.missingColumns]);
+  result.addedColumns = status.missingColumns.map(function(header, index) {
+    return {
+      header: header,
+      column: startColumn + index
+    };
+  });
+  result.skippedColumns = [];
+  result.schemaAfter = getTaskIdentitySchemaStatus_();
+  return result;
+}
+
 function baFoxTaskColumnForField_(sheet, headers, field) {
   var fixedColumn = BA_FOX_CONFIG.TASK_COLUMNS[field];
   if (fixedColumn && fixedColumn <= sheet.getLastColumn()) {
@@ -165,11 +301,17 @@ function baFoxAppendSafeCreateTaskRow(rowValues) {
   }
 
   try {
+    var startedAt = new Date().getTime();
     sheet.appendRow(rowValues);
     return baFoxOk({
       dryRun: false,
       appended: true,
-      rowNumber: sheet.getLastRow()
+      rowNumber: sheet.getLastRow(),
+      performance: {
+        operation: 'sheetAppend',
+        sheetWriteMs: new Date().getTime() - startedAt,
+        timestamp: baFoxIsoNow()
+      }
     });
   } catch (err) {
     return baFoxError(
