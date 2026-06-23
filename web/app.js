@@ -3351,7 +3351,7 @@ function renderMfSettings() {
     ? 'Доступ запрещён: нужен аккаунт mfstream.io'
     : profile.isVerifiedByGoogle
       ? 'Проверено через Google'
-      : 'Не завершён';
+      : 'Профиль не подтверждён';
   const enforcementLabel = backendProfile && backendProfile.isBackendEnforced
     ? 'включён'
     : 'Не завершён';
