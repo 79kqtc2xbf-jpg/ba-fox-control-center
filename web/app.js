@@ -704,9 +704,21 @@ let dashboardState = BAFoxClient.createLoadingState('dashboard');
 let scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
 let cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
 cleanupAuditState.status = 'idle';
+let taskIdentitySchemaState = BAFoxClient.createLoadingState('taskIdentitySchema');
+taskIdentitySchemaState.status = 'idle';
+let activeUsersState = BAFoxClient.createLoadingState('activeUsers');
+activeUsersState.status = 'idle';
+let visibilityPreviewState = BAFoxClient.createLoadingState('visibilityPreview');
+visibilityPreviewState.status = 'idle';
 let taskActionState = {};
 let createTaskState = { status: 'idle', message: '' };
 let editTaskState = { status: 'idle', message: '', taskId: '' };
+let performanceState = {
+  createTaskMs: null,
+  dashboardRefreshMs: null,
+  createTaskBackend: null,
+  dashboardBackend: null,
+};
 let flashMessage = '';
 let liveRefreshState = {
   status: 'loading',
@@ -759,6 +771,14 @@ function formatLastUpdatedTime(date) {
   }).format(date);
 }
 
+function formatDurationMs(ms) {
+  const numeric = Number(ms);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return 'нет данных';
+  }
+  return (numeric / 1000).toFixed(numeric >= 10000 ? 0 : 1) + ' сек';
+}
+
 function liveSourceLabel(state) {
   return state && state.isMock ? 'Demo fallback' : 'Live';
 }
@@ -787,6 +807,20 @@ function scaffoldData() {
 
 function cleanupAuditData() {
   return cleanupAuditState.data || {};
+}
+
+function taskIdentitySchemaData() {
+  const dashboardSchema = dashboardData().identity && dashboardData().identity.taskIdentitySchema;
+  return (taskIdentitySchemaState.data && taskIdentitySchemaState.data.taskIdentitySchema) || dashboardSchema || null;
+}
+
+function activeUsersData() {
+  return activeUsersState.data && Array.isArray(activeUsersState.data.users) ? activeUsersState.data.users : [];
+}
+
+function currentVisibilityPreviewData() {
+  const dashboardPreview = dashboardData().identity && dashboardData().identity.visibilityPreview;
+  return (visibilityPreviewState.data && visibilityPreviewState.data.visibilityPreview) || dashboardPreview || null;
 }
 
 function allOpenTasks() {
@@ -3314,6 +3348,86 @@ function usersSheetColumnsHtml() {
   }).join('');
 }
 
+function taskIdentitySchemaFoundHtml(schema) {
+  const columns = schema && (schema.optionalColumns || schema.columns);
+  if (!columns) {
+    return '<span>Схема ещё не проверена</span>';
+  }
+  return Object.keys(columns).map(function (key) {
+    const column = columns[key];
+    const label = column.present
+      ? (column.header || column.recommendedHeader) + ' · #' + column.column
+      : (column.recommendedHeader || key) + ' · нет';
+    return '<span>' + escapeHtml(label) + '</span>';
+  }).join('');
+}
+
+function taskIdentityMissingText(schema) {
+  if (!schema || !Array.isArray(schema.missingColumns)) {
+    return 'Схема ещё не проверена';
+  }
+  return schema.missingColumns.length ? schema.missingColumns.join(', ') : 'Все рекомендованные поля найдены';
+}
+
+function taskIdentityManualColumnsHtml(schema) {
+  const columns = schema && Array.isArray(schema.recommendedColumns)
+    ? schema.recommendedColumns
+    : schema && Array.isArray(schema.recommendedTaskIdentityColumns)
+      ? schema.recommendedTaskIdentityColumns
+      : [];
+  return columns.map(function (column) {
+    return '<span>' + escapeHtml(column) + '</span>';
+  }).join('');
+}
+
+function activeUsersOptionsHtml(users) {
+  if (!users.length) {
+    return '<option value="">Нет списка пользователей</option>';
+  }
+  return users.map(function (user) {
+    return '<option value="' + escapeHtml(user.userId) + '">' + escapeHtml(user.displayName || user.email || user.userId) + ' · ' + escapeHtml(user.accessRole || '') + '</option>';
+  }).join('');
+}
+
+function visibilityPreviewHtml(preview) {
+  if (!preview) {
+    return '<p>Предпросмотр видимости ещё не рассчитан.</p>';
+  }
+  const reasons = preview.reasonCounts || {};
+  return [
+    '<div class="mf-readonly-grid">',
+    '<span>Dry-run <strong>' + escapeHtml(preview.mode || 'dry_run') + '</strong></span>',
+    '<span>Пользователь <strong>' + escapeHtml(preview.effectiveUser || 'не выбран') + '</strong></span>',
+    '<span>Роль <strong>' + escapeHtml(preview.effectiveRole || 'viewer') + '</strong></span>',
+    '<span>Фильтрация дашборда <strong>' + escapeHtml(preview.filteredByUser ? 'включена' : 'не применена') + '</strong></span>',
+    '<span>Всего задач <strong>' + escapeHtml(preview.totalTasks || 0) + '</strong></span>',
+    '<span>Видно при enforcement <strong>' + escapeHtml(preview.visibleIfEnforced || 0) + '</strong></span>',
+    '<span>Скрыто при enforcement <strong>' + escapeHtml(preview.hiddenIfEnforced || 0) + '</strong></span>',
+    '<span>Legacy unclassified <strong>' + escapeHtml(preview.legacyUnclassified || 0) + '</strong></span>',
+    '</div>',
+    '<div class="mf-column-list compact">',
+    Object.keys(reasons).map(function (key) {
+      return '<span>' + escapeHtml(key + ': ' + reasons[key]) + '</span>';
+    }).join(''),
+    '</div>',
+  ].join('');
+}
+
+function performanceSummaryHtml() {
+  const backendCreate = performanceState.createTaskBackend && Number.isFinite(Number(performanceState.createTaskBackend.durationMs))
+    ? ' · backend ' + formatDurationMs(performanceState.createTaskBackend.durationMs)
+    : '';
+  const backendDashboard = performanceState.dashboardBackend && Number.isFinite(Number(performanceState.dashboardBackend.durationMs))
+    ? ' · backend ' + formatDurationMs(performanceState.dashboardBackend.durationMs)
+    : '';
+  return [
+    '<div class="mf-readonly-grid">',
+    '<span>Создание задачи <strong>' + escapeHtml(formatDurationMs(performanceState.createTaskMs)) + backendCreate + '</strong></span>',
+    '<span>Обновление дашборда <strong>' + escapeHtml(formatDurationMs(performanceState.dashboardRefreshMs)) + backendDashboard + '</strong></span>',
+    '</div>',
+  ].join('');
+}
+
 function diagnosticValueLabel(value) {
   if (value === true) return 'да';
   if (value === false) return 'нет';
@@ -3408,13 +3522,25 @@ function renderMfSettings() {
     ? backendProfile.enforcementMode
     : config.identityEnforcementMode;
   const permissions = profile.permissions || {};
+  const taskSchema = taskIdentitySchemaData();
+  const activeUsers = activeUsersData();
+  const visibilityPreview = currentVisibilityPreviewData();
+  const canManageTaskIdentity = permissions.canManageUsers === true;
+  const migrationDisabled = canManageTaskIdentity && taskSchema && taskSchema.canSafelyMigrate && !BAFoxConfig.isMockMode()
+    ? ''
+    : ' disabled';
   const dashboardIdentity = dashboardData().identity || {};
-  const taskIdentitySchema = dashboardIdentity.taskIdentitySchema || {};
+  const taskIdentitySchema = taskSchema || dashboardIdentity.taskIdentitySchema || {};
   const recommendedTaskIdentityColumns = dashboardIdentity.recommendedTaskIdentityColumns
     || taskIdentitySchema.recommendedTaskIdentityColumns
+    || taskIdentitySchema.recommendedColumns
     || [];
   const missingTaskIdentityColumns = taskIdentitySchema.missingColumns || [];
-  const presentTaskIdentityColumns = taskIdentitySchema.presentColumns || [];
+  const presentTaskIdentityColumns = taskIdentitySchema.presentColumns
+    || Object.keys(taskIdentitySchema.optionalColumns || taskIdentitySchema.columns || {}).filter(function (key) {
+      const column = (taskIdentitySchema.optionalColumns || taskIdentitySchema.columns || {})[key];
+      return column && column.present;
+    });
   const taskIdentitySchemaLabel = taskIdentitySchema.status === 'ready'
     ? 'поля готовы'
     : taskIdentitySchema.status === 'partial'
@@ -3507,6 +3633,36 @@ function renderMfSettings() {
     '<span>Следующие поля <strong>' + escapeHtml(recommendedTaskIdentityColumns.join(', ') || 'Owner Email, Owner User ID, Collaborator Emails, Collaborator User IDs, Created By Email, Created By User ID, Visibility') + '</strong></span>',
     '</div>',
     '</article>',
+    '</section>',
+    '<section class="mf-two-column settings">',
+    '<article class="mf-settings-card">',
+    '<div class="mf-section-title"><h3>Поля видимости задач</h3><span>' + escapeHtml(taskSchema ? taskSchema.status : 'не проверено') + '</span></div>',
+    '<div class="mf-readonly-grid">',
+    '<span>Статус схемы <strong>' + escapeHtml(taskSchema ? taskSchema.status : 'не проверено') + '</strong></span>',
+    '<span>Legacy Tasks <strong>' + escapeHtml(taskSchema && taskSchema.requiredLegacyColumnsOk ? 'ок' : 'нужно проверить') + '</strong></span>',
+    '<span>Не хватает <strong>' + escapeHtml(taskIdentityMissingText(taskSchema)) + '</strong></span>',
+    '<span>Optional write <strong>' + escapeHtml(taskSchema && taskSchema.optionalIdentityWriteActive ? 'частично активно' : 'не активно') + '</strong></span>',
+    '<span>Миграция <strong>не обязательна для текущего режима</strong></span>',
+    '<span>Фильтрация <strong>по пользователю не включена</strong></span>',
+    '</div>',
+    '<div class="mf-column-list compact">' + taskIdentitySchemaFoundHtml(taskSchema) + '</div>',
+    '<div class="mf-action-row">',
+    '<button class="secondary-button" type="button" data-task-identity-action="check">Проверить поля задач</button>',
+    '<button class="secondary-button" type="button" data-task-identity-action="migrate"' + migrationDisabled + '>Подготовить колонки видимости</button>',
+    '</div>',
+    '<div class="mf-column-list compact">' + taskIdentityManualColumnsHtml(taskSchema) + '</div>',
+    '</article>',
+    '<article class="mf-settings-card">',
+    '<div class="mf-section-title"><h3>Предпросмотр видимости</h3><span>Dry-run</span></div>',
+    '<p>Фильтрация не применена к реальному дашборду.</p>',
+    '<label class="mf-form-control" for="visibilityPreviewUserSelect"><span>Пользователь</span><select id="visibilityPreviewUserSelect">' + activeUsersOptionsHtml(activeUsers) + '</select></label>',
+    '<div class="mf-action-row"><button class="secondary-button" type="button" data-visibility-preview-action="calculate"' + (canManageTaskIdentity && activeUsers.length ? '' : ' disabled') + '>Посчитать видимость</button></div>',
+    visibilityPreviewHtml(visibilityPreview),
+    '</article>',
+    '</section>',
+    '<section class="mf-settings-card">',
+    '<div class="mf-section-title"><h3>Производительность</h3><span>debug</span></div>',
+    performanceSummaryHtml(),
     '</section>',
     '<section class="mf-two-column settings">',
     '<section><div class="mf-section-title"><h3>Роли доступа</h3><span>model</span></div><div class="mf-settings-list">' + roleRows + '</div></section>',
@@ -3794,6 +3950,68 @@ async function handleIdentityAction(action) {
   }
 }
 
+async function handleTaskIdentityAction(action) {
+  if (action === 'check') {
+    taskIdentitySchemaState = BAFoxClient.createLoadingState('taskIdentitySchema');
+    renderPanel();
+    taskIdentitySchemaState = await BAFoxClient.getTaskIdentitySchema(identityRequestParams());
+    renderPanel();
+    return;
+  }
+
+  if (action === 'migrate') {
+    const confirmed = window.confirm('Добавить колонки видимости в Tasks?\n\nСуществующие колонки не будут изменены.');
+    if (!confirmed) {
+      return;
+    }
+    taskIdentitySchemaState = BAFoxClient.createLoadingState('taskIdentitySchema');
+    renderPanel();
+    try {
+      const result = await BAFoxClient.prepareTaskIdentityColumns(Object.assign({}, identityRequestParams(), {
+        confirm: 'true',
+      }));
+      taskIdentitySchemaState = {
+        status: 'success',
+        route: 'taskIdentitySchema',
+        data: {
+          taskIdentitySchema: result.taskIdentitySchemaMigration && result.taskIdentitySchemaMigration.schemaAfter,
+        },
+        error: null,
+        isMock: false,
+      };
+      flashMessage = 'Колонки видимости подготовлены.';
+    } catch (error) {
+      taskIdentitySchemaState = {
+        status: 'error',
+        route: 'taskIdentitySchema',
+        data: taskIdentitySchemaState.data || null,
+        error: error,
+        message: error && error.message ? error.message : 'Не удалось подготовить колонки.',
+        isMock: false,
+      };
+      flashMessage = error && error.message ? error.message : 'Не удалось подготовить колонки.';
+    }
+    renderPanel();
+  }
+}
+
+async function handleVisibilityPreviewAction(action) {
+  if (action !== 'calculate') {
+    return;
+  }
+  const select = document.querySelector('#visibilityPreviewUserSelect');
+  const previewUserId = select ? select.value : '';
+  if (!previewUserId) {
+    return;
+  }
+  visibilityPreviewState = BAFoxClient.createLoadingState('visibilityPreview');
+  renderPanel();
+  visibilityPreviewState = await BAFoxClient.getVisibilityPreview(Object.assign({}, identityRequestParams(), {
+    previewUserId: previewUserId,
+  }));
+  renderPanel();
+}
+
 function editTaskPayloadFromForm() {
   const formData = new FormData(elements.editTaskForm);
   return {
@@ -3955,11 +4173,23 @@ async function handleCreateTaskSubmit(event) {
     message: 'Сохраняем задачу...',
   };
   renderCreateTaskModal();
+  const createStartedAt = performance.now();
+  const slowNoticeId = window.setTimeout(function () {
+    if (createTaskState.status === 'loading') {
+      createTaskState = {
+        status: 'loading',
+        message: 'Сохраняю задачу, Apps Script может отвечать несколько секунд…',
+      };
+      renderCreateTaskModal();
+    }
+  }, 5000);
 
   try {
-    await BAFoxClient.createTask(Object.assign({}, payload, identityRequestParams()));
+    const createResponse = await BAFoxClient.createTask(Object.assign({}, payload, identityRequestParams()));
+    performanceState.createTaskMs = Math.round(performance.now() - createStartedAt);
+    performanceState.createTaskBackend = createResponse && createResponse.performance ? createResponse.performance : null;
     elements.createTaskForm.reset();
-    createTaskState = { status: 'success', message: 'Задача добавлена' };
+    createTaskState = { status: 'success', message: 'Задача добавлена · ' + formatDurationMs(performanceState.createTaskMs) };
     elements.createTaskModal.hidden = true;
     activeTab = 'all';
     activeTaskFilter = 'active';
@@ -3967,11 +4197,12 @@ async function handleCreateTaskSubmit(event) {
     activeOwnerFilter = 'all';
     taskSearchQuery = '';
     await loadDashboard({ forceRefresh: true });
-    flashMessage = 'Задача добавлена';
+    flashMessage = 'Задача добавлена · создание: ' + formatDurationMs(performanceState.createTaskMs) + ' · обновление: ' + formatDurationMs(performanceState.dashboardRefreshMs);
     render();
     renderCreateTaskModal();
     openCreateTaskSuccessModal();
   } catch (error) {
+    performanceState.createTaskMs = Math.round(performance.now() - createStartedAt);
     createTaskState = {
       status: 'error',
       message: error && error.message && !String(error.message).includes('JSONP')
@@ -3979,12 +4210,15 @@ async function handleCreateTaskSubmit(event) {
         : 'Не удалось добавить задачу. Проверьте данные и попробуйте ещё раз.',
     };
     renderCreateTaskModal();
+  } finally {
+    window.clearTimeout(slowNoticeId);
   }
 }
 
 async function loadDashboard(options) {
   const settings = options || {};
   const forceRefresh = Boolean(settings.forceRefresh);
+  const refreshStartedAt = performance.now();
   liveRefreshState = Object.assign({}, liveRefreshState, {
     status: 'loading',
     message: 'Обновляем данные…',
@@ -4001,16 +4235,25 @@ async function loadDashboard(options) {
   const data = workspaceState.data || {};
   dashboardState = stateFromFullDashboard(workspaceState, 'dashboard', data);
   scaffoldState = stateFromFullDashboard(workspaceState, 'scaffoldInfo', data.scaffoldInfo);
+  performanceState.dashboardRefreshMs = Math.round(performance.now() - refreshStartedAt);
+  performanceState.dashboardBackend = data.performance || null;
   updateLiveRefreshStateFromDashboard(workspaceState, { isForced: forceRefresh });
   render();
 }
 
 async function loadProfile() {
   profileState = BAFoxClient.createLoadingState('profile');
+  taskIdentitySchemaState = BAFoxClient.createLoadingState('taskIdentitySchema');
   if (activeTab === 'settings') {
     renderPanel();
   }
   profileState = await BAFoxClient.getProfile(identityRequestParams());
+  taskIdentitySchemaState = await BAFoxClient.getTaskIdentitySchema(identityRequestParams());
+  const profileData = profileState.data || {};
+  const permissions = profileData.permissions || {};
+  if (permissions.canManageUsers) {
+    activeUsersState = await BAFoxClient.getActiveUsers(identityRequestParams());
+  }
   if (activeTab === 'settings') {
     renderPanel();
   }
@@ -4025,17 +4268,20 @@ async function handleManualRefresh() {
 }
 
 async function refreshDashboardAfterAction(taskId, successMessage) {
+  const refreshStartedAt = performance.now();
   const previousTab = activeTab;
   const previousFilter = activeTaskFilter;
   const previousSearch = taskSearchQuery;
   const previousCompleted = dashboardData().completed;
-  const workspaceState = await BAFoxClient.getDashboard();
+  const workspaceState = await BAFoxClient.getDashboard(identityRequestParams());
   const data = Object.assign({}, workspaceState.data || {});
   if (previousCompleted && !data.completed) {
     data.completed = previousCompleted;
   }
   dashboardState = stateFromFullDashboard(workspaceState, 'dashboard', data);
   scaffoldState = stateFromFullDashboard(workspaceState, 'scaffoldInfo', data.scaffoldInfo);
+  performanceState.dashboardRefreshMs = Math.round(performance.now() - refreshStartedAt);
+  performanceState.dashboardBackend = data.performance || null;
   activeTab = previousTab;
   activeTaskFilter = previousFilter;
   taskSearchQuery = previousSearch;
@@ -4204,6 +4450,18 @@ elements.taskList.addEventListener('click', function (event) {
   const identityActionButton = event.target.closest('[data-identity-action]');
   if (identityActionButton) {
     handleIdentityAction(identityActionButton.dataset.identityAction);
+    return;
+  }
+
+  const taskIdentityButton = event.target.closest('[data-task-identity-action]');
+  if (taskIdentityButton) {
+    handleTaskIdentityAction(taskIdentityButton.dataset.taskIdentityAction);
+    return;
+  }
+
+  const visibilityPreviewButton = event.target.closest('[data-visibility-preview-action]');
+  if (visibilityPreviewButton) {
+    handleVisibilityPreviewAction(visibilityPreviewButton.dataset.visibilityPreviewAction);
     return;
   }
 

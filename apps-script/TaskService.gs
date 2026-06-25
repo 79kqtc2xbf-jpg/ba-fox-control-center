@@ -509,6 +509,7 @@ function baFoxCreateTaskIdentityMetadata_(normalized, profile) {
 }
 
 function baFoxSafeCreateTask(request) {
+  var operationStartedAt = new Date().getTime();
   var normalized = baFoxNormalizeRequest(request);
   var rejectedKeys = baFoxRejectedCreateTaskKeys_(normalized);
   if (rejectedKeys.length) {
@@ -640,7 +641,19 @@ function baFoxSafeCreateTask(request) {
     createdAt: now,
     taskIdentityMetadata: identityMetadata,
     appendResult: appendResponse.data,
-    auditResult: auditResult
+    auditResult: auditResult,
+    taskIdentitySchema: {
+      status: appendResponse.data && appendResponse.data.taskIdentitySchema ? appendResponse.data.taskIdentitySchema.status : 'unknown',
+      optionalIdentityWriteActive: appendResponse.data && appendResponse.data.optionalIdentityColumnsPresent === true,
+      writtenFields: appendResponse.data && appendResponse.data.identityColumnsApplied ? appendResponse.data.identityColumnsApplied : [],
+      missingColumns: appendResponse.data && appendResponse.data.identityColumnsMissing ? appendResponse.data.identityColumnsMissing : []
+    },
+    performance: {
+      operation: 'createTask',
+      durationMs: new Date().getTime() - operationStartedAt,
+      sheetWriteMs: appendResponse.data && appendResponse.data.performance ? appendResponse.data.performance.sheetWriteMs : null,
+      timestamp: baFoxIsoNow()
+    }
   });
 }
 

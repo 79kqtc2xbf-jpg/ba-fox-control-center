@@ -14,11 +14,15 @@
     'safetyStatus',
     'profile',
     'me',
+    'taskIdentitySchema',
+    'activeUsers',
+    'visibilityPreview',
   ]);
   const WRITE_ROUTES = Object.freeze([
     'taskAction',
     'createTask',
     'editTask',
+    'prepareTaskIdentityColumns',
   ]);
   const TASK_ACTION_MESSAGES = Object.freeze({
     ACTION_NOT_ALLOWED: 'Это действие пока не включено для EA FOX Web.',
@@ -159,6 +163,26 @@
 
     if (!isValid) {
       throw new Error('Profile response shape is incomplete.');
+    }
+  }
+
+  function validateTaskIdentitySchema(data) {
+    const schema = data && data.taskIdentitySchema;
+    if (!schema || typeof schema.status !== 'string' || !Array.isArray(schema.recommendedColumns)) {
+      throw new Error('Task identity schema response shape is incomplete.');
+    }
+  }
+
+  function validateActiveUsers(data) {
+    if (!data || !Array.isArray(data.users)) {
+      throw new Error('Active users response shape is incomplete.');
+    }
+  }
+
+  function validateVisibilityPreview(data) {
+    const preview = data && data.visibilityPreview;
+    if (!preview || typeof preview.mode !== 'string' || typeof preview.totalTasks !== 'number') {
+      throw new Error('Visibility preview response shape is incomplete.');
     }
   }
 
@@ -338,6 +362,24 @@
       return profile;
     }
 
+    if (route === 'taskIdentitySchema') {
+      const schema = await getJsonp(route, params);
+      validateTaskIdentitySchema(schema);
+      return schema;
+    }
+
+    if (route === 'activeUsers') {
+      const users = await getJsonp(route, params);
+      validateActiveUsers(users);
+      return users;
+    }
+
+    if (route === 'visibilityPreview') {
+      const preview = await getJsonp(route, params);
+      validateVisibilityPreview(preview);
+      return preview;
+    }
+
     const scaffoldInfo = await getJsonp('scaffoldInfo', {});
     validateScaffoldSafety(scaffoldInfo);
     const data = await getJsonp(route, params);
@@ -444,6 +486,34 @@
     },
     getProfile: function (options) {
       return readRoute('profile', options || {});
+    },
+    getTaskIdentitySchema: function (options) {
+      return readRoute('taskIdentitySchema', options || {});
+    },
+    getActiveUsers: function (options) {
+      return readRoute('activeUsers', options || {});
+    },
+    getVisibilityPreview: function (options) {
+      return readRoute('visibilityPreview', options || {});
+    },
+    prepareTaskIdentityColumns: async function (options) {
+      const config = global.BAFoxConfig.getConfig();
+      if (config.useMockData) {
+        throw new Error('Подготовка колонок отключена в demo mode.');
+      }
+      try {
+        return await getJsonp('prepareTaskIdentityColumns', Object.assign({}, options || {}, {
+          token: config.actionToken,
+        }));
+      } catch (error) {
+        if (error && error.code === 'SAFE_WRITES_DISABLED') {
+          error.message = 'Безопасная запись выключена. Колонки не добавлены.';
+        }
+        if (error && error.code === 'ADMIN_OR_TOKEN_REQUIRED') {
+          error.message = 'Нужен admin профиль или action token для добавления колонок.';
+        }
+        throw error;
+      }
     },
     runTaskAction: async function (options) {
       const config = global.BAFoxConfig.getConfig();
