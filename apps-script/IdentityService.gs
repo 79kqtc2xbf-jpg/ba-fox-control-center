@@ -153,6 +153,49 @@ function findUserByEmail_(email) {
   return null;
 }
 
+function findUserByUserId_(userId) {
+  var normalized = baFoxSafeString(userId).toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  var users = getUsers_();
+  for (var index = 0; index < users.length; index += 1) {
+    if (baFoxSafeString(users[index].userId).toLowerCase() === normalized) {
+      return users[index];
+    }
+  }
+  return null;
+}
+
+function findUserByOwnerLabel_(label) {
+  var normalized = baFoxSafeString(label).toLowerCase();
+  if (!normalized) {
+    return {
+      user: null,
+      matches: [],
+      ambiguous: false,
+      warning: 'OWNER_LABEL_MISSING'
+    };
+  }
+  var matches = getUsers_().filter(function(user) {
+    return baFoxSafeString(user.defaultOwnerLabel).toLowerCase() === normalized;
+  });
+  if (matches.length === 1) {
+    return {
+      user: matches[0],
+      matches: matches,
+      ambiguous: false,
+      warning: ''
+    };
+  }
+  return {
+    user: null,
+    matches: matches,
+    ambiguous: matches.length > 1,
+    warning: matches.length > 1 ? 'OWNER_LABEL_AMBIGUOUS' : 'OWNER_LABEL_NOT_FOUND'
+  };
+}
+
 function activeUserEmail_() {
   if (typeof Session === 'undefined' || !Session.getActiveUser) {
     return '';
@@ -167,13 +210,15 @@ function activeUserEmail_() {
 function verifyGoogleIdentityToken_(idToken) {
   var token = baFoxSafeString(idToken);
   var clientId = configuredGoogleClientId_();
+  var clientIdConfigured = Boolean(clientId);
   if (!token) {
     return {
       ok: false,
       mode: 'missing_token',
       claims: null,
       error: 'MISSING_TOKEN',
-      message: 'Google identity token is missing.'
+      message: 'Google identity token is missing.',
+      clientIdConfigured: clientIdConfigured
     };
   }
   if (typeof UrlFetchApp === 'undefined') {
@@ -182,7 +227,8 @@ function verifyGoogleIdentityToken_(idToken) {
       mode: 'google_token_invalid',
       claims: null,
       error: 'URL_FETCH_UNAVAILABLE',
-      message: 'Apps Script UrlFetchApp is not available for token verification.'
+      message: 'Apps Script UrlFetchApp is not available for token verification.',
+      clientIdConfigured: clientIdConfigured
     };
   }
 
@@ -200,7 +246,9 @@ function verifyGoogleIdentityToken_(idToken) {
         mode: 'google_token_invalid',
         claims: claims,
         error: claims.error || 'TOKENINFO_REJECTED',
-        message: claims.error_description || 'Google tokeninfo rejected the identity token.'
+        message: claims.error_description || 'Google tokeninfo rejected the identity token.',
+        email: normalizeWorkspaceEmail_(claims.email),
+        clientIdConfigured: clientIdConfigured
       };
     }
     if (clientId && claims.aud !== clientId) {
@@ -209,7 +257,9 @@ function verifyGoogleIdentityToken_(idToken) {
         mode: 'google_token_invalid',
         claims: claims,
         error: 'AUDIENCE_MISMATCH',
-        message: 'Google identity token audience does not match configured client ID.'
+        message: 'Google identity token audience does not match configured client ID.',
+        email: normalizeWorkspaceEmail_(claims.email),
+        clientIdConfigured: clientIdConfigured
       };
     }
     if (!baFoxSafeString(claims.email)) {
@@ -218,7 +268,8 @@ function verifyGoogleIdentityToken_(idToken) {
         mode: 'google_token_invalid',
         claims: claims,
         error: 'EMAIL_MISSING',
-        message: 'Google identity token does not include email.'
+        message: 'Google identity token does not include email.',
+        clientIdConfigured: clientIdConfigured
       };
     }
     if (claims.email_verified !== undefined && String(claims.email_verified) !== 'true') {
@@ -227,7 +278,9 @@ function verifyGoogleIdentityToken_(idToken) {
         mode: 'google_token_invalid',
         claims: claims,
         error: 'EMAIL_NOT_VERIFIED',
-        message: 'Google identity token email is not verified.'
+        message: 'Google identity token email is not verified.',
+        email: normalizeWorkspaceEmail_(claims.email),
+        clientIdConfigured: clientIdConfigured
       };
     }
     return {
@@ -235,7 +288,7 @@ function verifyGoogleIdentityToken_(idToken) {
       mode: 'google_token_verified',
       claims: claims,
       email: normalizeWorkspaceEmail_(claims.email),
-      clientIdConfigured: Boolean(clientId)
+      clientIdConfigured: clientIdConfigured
     };
   } catch (err) {
     return {
@@ -243,9 +296,49 @@ function verifyGoogleIdentityToken_(idToken) {
       mode: 'google_token_invalid',
       claims: null,
       error: 'TOKEN_VERIFICATION_FAILED',
-      message: err && err.message ? err.message : 'Google identity token verification failed.'
+      message: err && err.message ? err.message : 'Google identity token verification failed.',
+      clientIdConfigured: clientIdConfigured
     };
   }
+}
+
+function safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, overrides) {
+  var result = tokenResult || {};
+  var claims = result.claims || {};
+  var clientId = configuredGoogleClientId_();
+  var expectedAudienceConfigured = Boolean(clientId || result.clientIdConfigured);
+  var tokenAudience = baFoxSafeString(claims.aud);
+  var audienceMatches = '';
+  if (expectedAudienceConfigured && tokenAudience) {
+    audienceMatches = tokenAudience === clientId;
+  }
+  var email = normalizeWorkspaceEmail_(result.email || claims.email);
+  var domainAllowed = email ? isAllowedWorkspaceEmail_(email) : false;
+  var userRegistered = false;
+  if (email && domainAllowed && usersSheetStatus && usersSheetStatus.exists) {
+    userRegistered = Boolean(findUserByEmail_(email));
+  }
+  var emailVerified = '';
+  if (claims.email_verified !== undefined) {
+    emailVerified = String(claims.email_verified) === 'true';
+  }
+  var diagnostics = {
+    ok: result.ok === true,
+    mode: result.mode || 'missing_token',
+    error: result.error || '',
+    message: result.message || '',
+    audienceMatches: audienceMatches,
+    expectedAudienceConfigured: expectedAudienceConfigured,
+    tokenAudience: tokenAudience,
+    email: email,
+    emailVerified: emailVerified,
+    domainAllowed: domainAllowed,
+    userRegistered: userRegistered
+  };
+  Object.keys(overrides || {}).forEach(function(key) {
+    diagnostics[key] = overrides[key];
+  });
+  return diagnostics;
 }
 
 function getIdentityFromRequest_(request) {
@@ -393,6 +486,7 @@ function getCurrentUserProfile_(request, context) {
   var enforcementMode = identityEnforcementMode_();
   var tokenResult = identity.tokenVerification || {};
   var limitations = identityResponseLimitations_(tokenResult);
+  var tokenDiagnostics = safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, {});
 
   if (!activeEmail) {
     var missingProfile = getFallbackUserProfile_();
@@ -411,11 +505,7 @@ function getCurrentUserProfile_(request, context) {
       canCreateTasks: false,
       canUseDashboard: enforcementMode !== 'enforced',
       canManageUsers: false,
-      tokenVerification: {
-        ok: tokenResult.ok === true,
-        mode: tokenResult.mode || 'missing_token',
-        error: tokenResult.error || ''
-      }
+      tokenVerification: tokenDiagnostics
     };
   }
 
@@ -438,11 +528,11 @@ function getCurrentUserProfile_(request, context) {
       canCreateTasks: false,
       canUseDashboard: enforcementMode !== 'enforced',
       canManageUsers: false,
-      tokenVerification: {
-        ok: tokenResult.ok === true,
-        mode: tokenResult.mode || 'missing_token',
-        error: tokenResult.error || ''
-      }
+      tokenVerification: safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, {
+        email: activeEmail,
+        domainAllowed: false,
+        userRegistered: false
+      })
     };
   }
 
@@ -467,11 +557,11 @@ function getCurrentUserProfile_(request, context) {
       canCreateTasks: false,
       canUseDashboard: enforcementMode !== 'enforced',
       canManageUsers: false,
-      tokenVerification: {
-        ok: tokenResult.ok === true,
-        mode: tokenResult.mode || 'missing_token',
-        error: tokenResult.error || ''
-      }
+      tokenVerification: safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, {
+        email: activeEmail,
+        domainAllowed: true,
+        userRegistered: false
+      })
     };
   }
 
@@ -492,11 +582,11 @@ function getCurrentUserProfile_(request, context) {
       canCreateTasks: false,
       canUseDashboard: enforcementMode !== 'enforced',
       canManageUsers: false,
-      tokenVerification: {
-        ok: tokenResult.ok === true,
-        mode: tokenResult.mode || 'missing_token',
-        error: tokenResult.error || ''
-      }
+      tokenVerification: safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, {
+        email: activeEmail,
+        domainAllowed: true,
+        userRegistered: true
+      })
     };
   }
 
@@ -518,11 +608,11 @@ function getCurrentUserProfile_(request, context) {
     canCreateTasks: permissions.canCreateTasks,
     canUseDashboard: permissions.canUseDashboard,
     canManageUsers: permissions.canManageUsers,
-    tokenVerification: {
-      ok: tokenResult.ok === true,
-      mode: tokenResult.mode || 'missing_token',
-      error: tokenResult.error || ''
-    }
+    tokenVerification: safeTokenVerificationDiagnostics_(tokenResult, usersSheetStatus, {
+      email: activeEmail,
+      domainAllowed: true,
+      userRegistered: true
+    })
   };
 }
 
@@ -607,32 +697,48 @@ function isUserAllowedForRoute_(profile, routeName, action) {
   return true;
 }
 
-function taskIdentityValues_(task) {
-  return [
-    task.ownerEmail,
-    task.ownerUserId,
-    task.createdByEmail,
-    task.createdByUserId,
-    task.collaboratorEmails,
-    task.collaboratorUserIds,
-    task.owner
-  ].map(function(value) {
-    return baFoxSafeString(value).toLowerCase();
-  }).join(' ');
+function identityArrayContains_(items, value, normalizeEmail) {
+  var target = normalizeEmail ? normalizeWorkspaceEmail_(value) : baFoxSafeString(value).toLowerCase();
+  if (!target) {
+    return false;
+  }
+  return (items || []).some(function(item) {
+    var normalized = normalizeEmail ? normalizeWorkspaceEmail_(item) : baFoxSafeString(item).toLowerCase();
+    return normalized === target;
+  });
+}
+
+function taskIdentityList_(task, fieldName, normalizeEmail) {
+  if (!task) {
+    return [];
+  }
+  if (Array.isArray(task[fieldName])) {
+    return task[fieldName];
+  }
+  return baFoxSplitIdentityList_(task[fieldName], normalizeEmail);
 }
 
 function profileCanSeeTask_(profile, task) {
-  if (!profileCanUseDashboard_(profile)) {
+  if (!profileCanUseDashboard_(profile) || profile.status !== 'active' || profile.isRegistered !== true) {
     return false;
   }
   if (profileCanSeeAll_(profile)) {
     return true;
   }
-  var haystack = taskIdentityValues_(task || {});
-  return Boolean(haystack) && (
-    haystack.indexOf(normalizeWorkspaceEmail_(profile.email)) !== -1
-    || haystack.indexOf(baFoxSafeString(profile.userId).toLowerCase()) !== -1
-    || haystack.indexOf(baFoxSafeString(profile.defaultOwnerLabel).toLowerCase()) !== -1
+  var normalizedEmail = normalizeWorkspaceEmail_(profile.email);
+  var userId = baFoxSafeString(profile.userId).toLowerCase();
+  var ownerLabel = baFoxSafeString(profile.defaultOwnerLabel).toLowerCase();
+  var normalizedTask = task || {};
+  return Boolean(
+    (normalizedEmail && normalizeWorkspaceEmail_(normalizedTask.ownerEmail) === normalizedEmail)
+    || (userId && baFoxSafeString(normalizedTask.ownerUserId).toLowerCase() === userId)
+    || (ownerLabel && baFoxSafeString(normalizedTask.ownerLabel || normalizedTask.owner).toLowerCase() === ownerLabel)
+    || identityArrayContains_(taskIdentityList_(normalizedTask, 'collaboratorEmailList', true), normalizedEmail, true)
+    || identityArrayContains_(taskIdentityList_(normalizedTask, 'collaboratorEmails', true), normalizedEmail, true)
+    || identityArrayContains_(taskIdentityList_(normalizedTask, 'collaboratorUserIdList', false), userId, false)
+    || identityArrayContains_(taskIdentityList_(normalizedTask, 'collaboratorUserIds', false), userId, false)
+    || (normalizedEmail && normalizeWorkspaceEmail_(normalizedTask.createdByEmail) === normalizedEmail)
+    || (userId && baFoxSafeString(normalizedTask.createdByUserId).toLowerCase() === userId)
   );
 }
 
@@ -791,11 +897,24 @@ function identityDashboardMetadata_(request, routeName) {
   var identity = getCurrentUserProfile_(request || {}, {});
   var permissions = identity.permissions || profilePermissions_(identity.profile);
   var storeTasks = request && request.__normalizedTasks ? request.__normalizedTasks : null;
+  var taskIdentitySchema = baFoxTaskIdentitySchemaStatus_();
+  var visibilityMode = identityVisibilityMode_();
+  var identityWarnings = [];
+  if (!taskIdentitySchema.allPresent) {
+    identityWarnings.push('TASK_IDENTITY_COLUMNS_OPTIONAL_OR_MISSING');
+  }
+  if (visibilityMode !== 'enforced') {
+    identityWarnings.push('TASK_VISIBILITY_NOT_ENFORCED');
+  }
   return {
     identityMode: identity.identityMode,
     enforcementMode: identity.enforcementMode,
-    visibilityMode: identityVisibilityMode_(),
+    visibilityMode: visibilityMode,
     filteredByUser: false,
+    taskIdentitySchema: taskIdentitySchema,
+    optionalIdentityColumnsPresent: taskIdentitySchema.anyPresent,
+    identityWarnings: identityWarnings,
+    recommendedTaskIdentityColumns: taskIdentitySchema.recommendedTaskIdentityColumns,
     effectiveRole: identity.profile && identity.profile.accessRole ? identity.profile.accessRole : 'viewer',
     canSeeAll: permissions.canSeeAll === true,
     canCreateTasks: permissions.canCreateTasks === true,
@@ -803,7 +922,6 @@ function identityDashboardMetadata_(request, routeName) {
     canManageUsers: permissions.canManageUsers === true,
     route: routeName || '',
     limitations: identity.limitations || [],
-    taskIdentitySchema: getTaskIdentitySchemaStatus_(),
     visibilityPreview: storeTasks ? buildVisibilityPreview_(identity.profile, storeTasks, {}) : null
   };
 }

@@ -3349,11 +3349,12 @@ function usersSheetColumnsHtml() {
 }
 
 function taskIdentitySchemaFoundHtml(schema) {
-  if (!schema || !schema.optionalColumns) {
+  const columns = schema && (schema.optionalColumns || schema.columns);
+  if (!columns) {
     return '<span>Схема ещё не проверена</span>';
   }
-  return Object.keys(schema.optionalColumns).map(function (key) {
-    const column = schema.optionalColumns[key];
+  return Object.keys(columns).map(function (key) {
+    const column = columns[key];
     const label = column.present
       ? (column.header || column.recommendedHeader) + ' · #' + column.column
       : (column.recommendedHeader || key) + ' · нет';
@@ -3369,7 +3370,11 @@ function taskIdentityMissingText(schema) {
 }
 
 function taskIdentityManualColumnsHtml(schema) {
-  const columns = schema && Array.isArray(schema.recommendedColumns) ? schema.recommendedColumns : [];
+  const columns = schema && Array.isArray(schema.recommendedColumns)
+    ? schema.recommendedColumns
+    : schema && Array.isArray(schema.recommendedTaskIdentityColumns)
+      ? schema.recommendedTaskIdentityColumns
+      : [];
   return columns.map(function (column) {
     return '<span>' + escapeHtml(column) + '</span>';
   }).join('');
@@ -3419,6 +3424,55 @@ function performanceSummaryHtml() {
     '<div class="mf-readonly-grid">',
     '<span>Создание задачи <strong>' + escapeHtml(formatDurationMs(performanceState.createTaskMs)) + backendCreate + '</strong></span>',
     '<span>Обновление дашборда <strong>' + escapeHtml(formatDurationMs(performanceState.dashboardRefreshMs)) + backendDashboard + '</strong></span>',
+    '</div>',
+  ].join('');
+}
+
+function diagnosticValueLabel(value) {
+  if (value === true) return 'да';
+  if (value === false) return 'нет';
+  if (value === '' || value === null || value === undefined) return 'не передано';
+  return String(value);
+}
+
+function renderGoogleTokenDiagnosticsHtml(backendProfile) {
+  const tokenVerification = backendProfile && backendProfile.tokenVerification ? backendProfile.tokenVerification : null;
+  const shouldShow = backendProfile && (
+    backendProfile.identityMode === 'google_token_invalid'
+    || (tokenVerification && tokenVerification.error && tokenVerification.error !== 'MISSING_TOKEN')
+  );
+  if (!shouldShow || !tokenVerification) {
+    return '';
+  }
+
+  const rows = [
+    ['Код ошибки', tokenVerification.error],
+    ['Режим проверки', tokenVerification.mode],
+    ['Сообщение', tokenVerification.message],
+    ['Client ID задан в Apps Script', tokenVerification.expectedAudienceConfigured],
+    ['Audience совпадает', tokenVerification.audienceMatches],
+    ['Token audience', tokenVerification.tokenAudience],
+    ['Email из токена', tokenVerification.email],
+    ['Email подтверждён', tokenVerification.emailVerified],
+    ['Домен mfstream.io', tokenVerification.domainAllowed],
+    ['Пользователь есть в Users', tokenVerification.userRegistered],
+    ['Identity mode', backendProfile.identityMode],
+    ['Enforcement mode', backendProfile.enforcementMode],
+  ].filter(function (row) {
+    return row[1] !== '' && row[1] !== null && row[1] !== undefined;
+  }).map(function (row) {
+    return '<span>' + escapeHtml(row[0]) + ' <strong>' + escapeHtml(diagnosticValueLabel(row[1])) + '</strong></span>';
+  }).join('');
+
+  return [
+    '<div class="mf-token-diagnostics">',
+    '<div class="mf-section-title"><h3>Ошибка проверки Google-токена</h3><span>OAuth live QA</span></div>',
+    '<div class="mf-readonly-grid">',
+    rows,
+    '</div>',
+    '<p>Проверьте совпадение Client ID в GitHub runtime config и Apps Script Script Properties.</p>',
+    '<p>Проверьте Authorized JavaScript origins в Google Cloud.</p>',
+    '<p>Проверьте, что выбран рабочий аккаунт mfstream.io.</p>',
     '</div>',
   ].join('');
 }
@@ -3475,6 +3529,27 @@ function renderMfSettings() {
   const migrationDisabled = canManageTaskIdentity && taskSchema && taskSchema.canSafelyMigrate && !BAFoxConfig.isMockMode()
     ? ''
     : ' disabled';
+  const dashboardIdentity = dashboardData().identity || {};
+  const taskIdentitySchema = taskSchema || dashboardIdentity.taskIdentitySchema || {};
+  const recommendedTaskIdentityColumns = dashboardIdentity.recommendedTaskIdentityColumns
+    || taskIdentitySchema.recommendedTaskIdentityColumns
+    || taskIdentitySchema.recommendedColumns
+    || [];
+  const missingTaskIdentityColumns = taskIdentitySchema.missingColumns || [];
+  const presentTaskIdentityColumns = taskIdentitySchema.presentColumns
+    || Object.keys(taskIdentitySchema.optionalColumns || taskIdentitySchema.columns || {}).filter(function (key) {
+      const column = (taskIdentitySchema.optionalColumns || taskIdentitySchema.columns || {})[key];
+      return column && column.present;
+    });
+  const taskIdentitySchemaLabel = taskIdentitySchema.status === 'ready'
+    ? 'поля готовы'
+    : taskIdentitySchema.status === 'partial'
+      ? 'часть полей найдена'
+      : 'Поля участников пока не заполнены';
+  const visibilityFilterLabel = dashboardIdentity.filteredByUser
+    ? 'Фильтрация по пользователю включена'
+    : 'Фильтрация по пользователю не включена';
+  const pilotStatusLabel = 'Пилот не запущен';
   elements.taskList.innerHTML = [
     '<section class="mf-settings-page">',
     '<section class="mf-two-column settings">',
@@ -3512,6 +3587,7 @@ function renderMfSettings() {
     '<button class="secondary-button" type="button" data-identity-action="signin"' + signInDisabled + '>Войти через Google</button>',
     '<button class="secondary-button" type="button" data-identity-action="signout"' + signOutDisabled + '>Выйти</button>',
     '</div>',
+    renderGoogleTokenDiagnosticsHtml(backendProfile),
     '</article>',
     '</section>',
     '<section class="mf-two-column settings">',
@@ -3544,9 +3620,18 @@ function renderMfSettings() {
     '</div>',
     '</article>',
     '<article class="mf-settings-card mf-external-card">',
-    '<div class="mf-section-title"><h3>Модель видимости</h3><span class="mf-external-marker">prepared only</span></div>',
+    '<div class="mf-section-title"><h3>Права доступа</h3><span class="mf-external-marker">' + escapeHtml(pilotStatusLabel) + '</span></div>',
     '<p>admin и executive должны видеть все задачи после backend enforcement. member видит свои задачи, участие и, возможно, созданные им задачи.</p>',
     '<p>Текущий dashboard пока не фильтрует live-данные по пользователю в profile_only/soft режиме. Полная фильтрация включается только после отдельного enforced QA.</p>',
+    '<div class="mf-readonly-grid">',
+    '<span>Поля видимости задач <strong>' + escapeHtml(taskIdentitySchemaLabel) + '</strong></span>',
+    '<span>Visibility mode <strong>' + escapeHtml(dashboardIdentity.visibilityMode || enforcementModeLabel || 'profile_only') + '</strong></span>',
+    '<span>Фильтрация <strong>' + escapeHtml(visibilityFilterLabel) + '</strong></span>',
+    '<span>Статус пилота <strong>' + escapeHtml(pilotStatusLabel) + '</strong></span>',
+    '<span>Найдено полей <strong>' + escapeHtml(String(presentTaskIdentityColumns.length || 0)) + '</strong></span>',
+    '<span>Не хватает полей <strong>' + escapeHtml(String(missingTaskIdentityColumns.length || 0)) + '</strong></span>',
+    '<span>Следующие поля <strong>' + escapeHtml(recommendedTaskIdentityColumns.join(', ') || 'Owner Email, Owner User ID, Collaborator Emails, Collaborator User IDs, Created By Email, Created By User ID, Visibility') + '</strong></span>',
+    '</div>',
     '</article>',
     '</section>',
     '<section class="mf-two-column settings">',

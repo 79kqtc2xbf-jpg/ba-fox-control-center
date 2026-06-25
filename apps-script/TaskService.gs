@@ -1,6 +1,19 @@
 function baFoxTaskOptionalValue_(row, headers, field) {
-  var column = baFoxFindHeaderColumn_(headers || [], baFoxOptionalTaskFieldNames_(field));
-  return column ? row[column - 1] : '';
+  var headerMap = headers && headers.byName ? headers : getTaskHeaderMap_(headers || []);
+  return readOptionalCell_(row, headerMap, baFoxOptionalTaskFieldNames_(field));
+}
+
+function baFoxSplitIdentityList_(value, normalizeEmail) {
+  return baFoxSafeString(value).split(',').map(function(item) {
+    var normalized = baFoxSafeString(item);
+    return normalizeEmail ? normalizeWorkspaceEmail_(normalized) : normalized;
+  }).filter(function(item) {
+    return Boolean(item);
+  });
+}
+
+function baFoxTaskIdentityFieldsAvailable_(headers) {
+  return baFoxTaskIdentitySchemaStatus_(headers || []).columns;
 }
 
 function baFoxNormalizeTaskRows_(storeResult) {
@@ -10,14 +23,24 @@ function baFoxNormalizeTaskRows_(storeResult) {
   if (storeResult.normalizedTasks) {
     return storeResult.normalizedTasks;
   }
+  var headerMap = getTaskHeaderMap_(storeResult.headers || []);
   storeResult.normalizedTasks = (storeResult.rows || []).map(function(row) {
-    return baFoxNormalizeTaskRow(row, storeResult.headers || []);
+    return baFoxNormalizeTaskRow(row, headerMap);
   });
   return storeResult.normalizedTasks;
 }
 
 function baFoxNormalizeTaskRow(row, headers) {
+  var headerMap = headers && headers.byName ? headers : getTaskHeaderMap_(headers || []);
   var nextReminder = row[BA_FOX_CONFIG.TASK_COLUMNS.NEXT_REMINDER - 1] || '';
+  var ownerLabel = row[BA_FOX_CONFIG.TASK_COLUMNS.OWNER - 1] || '';
+  var ownerEmail = normalizeWorkspaceEmail_(baFoxTaskOptionalValue_(row, headerMap, 'OWNER_EMAIL'));
+  var ownerUserId = baFoxSafeString(baFoxTaskOptionalValue_(row, headerMap, 'OWNER_USER_ID'));
+  var collaboratorEmailsRaw = baFoxTaskOptionalValue_(row, headerMap, 'COLLABORATOR_EMAILS');
+  var collaboratorUserIdsRaw = baFoxTaskOptionalValue_(row, headerMap, 'COLLABORATOR_USER_IDS');
+  var createdByEmail = normalizeWorkspaceEmail_(baFoxTaskOptionalValue_(row, headerMap, 'CREATED_BY_EMAIL'));
+  var createdByUserId = baFoxSafeString(baFoxTaskOptionalValue_(row, headerMap, 'CREATED_BY_USER_ID'));
+  var visibility = baFoxSafeString(baFoxTaskOptionalValue_(row, headerMap, 'VISIBILITY')) || 'unassigned';
   return {
     id: row[BA_FOX_CONFIG.TASK_COLUMNS.ID - 1] || '',
     date: baFoxTaskDateValue(row[BA_FOX_CONFIG.TASK_COLUMNS.DATE - 1]),
@@ -35,14 +58,18 @@ function baFoxNormalizeTaskRow(row, headers) {
     comment: row[BA_FOX_CONFIG.TASK_COLUMNS.COMMENT - 1] || '',
     channel: row[BA_FOX_CONFIG.TASK_COLUMNS.CHANNEL - 1] || '',
     taskType: row[BA_FOX_CONFIG.TASK_COLUMNS.TASK_TYPE - 1] || 'work',
-    owner: row[BA_FOX_CONFIG.TASK_COLUMNS.OWNER - 1] || '',
-    ownerEmail: baFoxTaskOptionalValue_(row, headers, 'OWNER_EMAIL'),
-    ownerUserId: baFoxTaskOptionalValue_(row, headers, 'OWNER_USER_ID'),
-    collaboratorEmails: baFoxTaskOptionalValue_(row, headers, 'COLLABORATOR_EMAILS'),
-    collaboratorUserIds: baFoxTaskOptionalValue_(row, headers, 'COLLABORATOR_USER_IDS'),
-    createdByEmail: baFoxTaskOptionalValue_(row, headers, 'CREATED_BY_EMAIL'),
-    createdByUserId: baFoxTaskOptionalValue_(row, headers, 'CREATED_BY_USER_ID'),
-    visibility: baFoxTaskOptionalValue_(row, headers, 'VISIBILITY'),
+    owner: ownerLabel,
+    ownerLabel: ownerLabel,
+    ownerEmail: ownerEmail,
+    ownerUserId: ownerUserId,
+    collaboratorEmails: baFoxSafeString(collaboratorEmailsRaw),
+    collaboratorUserIds: baFoxSafeString(collaboratorUserIdsRaw),
+    collaboratorEmailList: baFoxSplitIdentityList_(collaboratorEmailsRaw, true),
+    collaboratorUserIdList: baFoxSplitIdentityList_(collaboratorUserIdsRaw, false),
+    createdByEmail: createdByEmail,
+    createdByUserId: createdByUserId,
+    visibility: visibility,
+    identityFieldsAvailable: baFoxTaskIdentityFieldsAvailable_(headerMap.headers),
     createdAt: row[BA_FOX_CONFIG.TASK_COLUMNS.CREATED_AT - 1] || '',
     updatedAt: row[BA_FOX_CONFIG.TASK_COLUMNS.UPDATED_AT - 1] || '',
     completedAt: row[BA_FOX_CONFIG.TASK_COLUMNS.COMPLETED_AT - 1] || '',
@@ -52,7 +79,7 @@ function baFoxNormalizeTaskRow(row, headers) {
     appSource: row[BA_FOX_CONFIG.TASK_COLUMNS.APP_SOURCE - 1] || '',
     externalRef: row[BA_FOX_CONFIG.TASK_COLUMNS.EXTERNAL_REF - 1] || '',
     archived: baFoxIsTrueValue_(row[BA_FOX_CONFIG.TASK_COLUMNS.ARCHIVED - 1]),
-    focus: baFoxIsTrueValue_(baFoxTaskOptionalValue_(row, headers, 'FOCUS'))
+    focus: baFoxIsTrueValue_(baFoxTaskOptionalValue_(row, headerMap, 'FOCUS'))
   };
 }
 
@@ -421,71 +448,11 @@ function baFoxBuildSafeCreateTaskId_(now) {
   return 'BA-WEB-' + compactNow + '-' + suffix;
 }
 
-function findUserByOwnerLabel_(ownerLabel) {
-  var normalizedOwner = baFoxSafeString(ownerLabel).toLowerCase();
-  if (!normalizedOwner) {
-    return null;
-  }
-  var users = getUsers_();
-  for (var index = 0; index < users.length; index += 1) {
-    var user = users[index];
-    if (baFoxSafeString(user.defaultOwnerLabel).toLowerCase() === normalizedOwner
-      || baFoxSafeString(user.displayName).toLowerCase() === normalizedOwner
-      || normalizeWorkspaceEmail_(user.email) === normalizeWorkspaceEmail_(ownerLabel)) {
-      return user;
-    }
-  }
-  return null;
-}
-
-function baFoxApplyOptionalTaskIdentityValues_(rowValues, normalized, actorProfile) {
-  var schema = getTaskIdentitySchemaStatus_();
-  if (!schema.exists || schema.status === 'missing') {
-    return {
-      rowValues: rowValues,
-      schema: schema,
-      writtenFields: [],
-      skippedFields: schema.missingColumns || []
-    };
-  }
-
-  var ownerUser = findUserByOwnerLabel_(normalized.owner);
-  var identityValues = {
-    ownerEmail: ownerUser ? ownerUser.email : '',
-    ownerUserId: ownerUser ? ownerUser.userId : '',
-    collaboratorEmails: '',
-    collaboratorUserIds: '',
-    createdByEmail: actorProfile && actorProfile.email ? actorProfile.email : '',
-    createdByUserId: actorProfile && actorProfile.userId ? actorProfile.userId : '',
-    visibility: 'workspace'
-  };
-  var output = rowValues.slice();
-  var writtenFields = [];
-
-  Object.keys(identityValues).forEach(function(key) {
-    var column = schema.optionalColumns && schema.optionalColumns[key] && schema.optionalColumns[key].column;
-    if (column && column > 0) {
-      while (output.length < column) {
-        output.push('');
-      }
-      output[column - 1] = identityValues[key];
-      writtenFields.push(key);
-    }
-  });
-
-  return {
-    rowValues: output,
-    schema: schema,
-    writtenFields: writtenFields,
-    skippedFields: schema.missingColumns || []
-  };
-}
-
-function baFoxSafeCreateTaskRow_(taskId, normalized, now, actorProfile) {
+function baFoxSafeCreateTaskRow_(taskId, normalized, now) {
   var controlDate = baFoxSafeString(normalized.controlDate || normalized.deadline);
   var reminder = baFoxSafeString(normalized.reminder);
   var status = baFoxSafeString(normalized.status || 'Не начато');
-  var rowValues = [
+  return [
     taskId,
     '',
     baFoxSafeString(normalized.category),
@@ -512,7 +479,33 @@ function baFoxSafeCreateTaskRow_(taskId, normalized, now, actorProfile) {
     '',
     false
   ];
-  return baFoxApplyOptionalTaskIdentityValues_(rowValues, normalized, actorProfile);
+}
+
+function baFoxCreateTaskIdentityMetadata_(normalized, profile) {
+  var ownerMatch = findUserByOwnerLabel_(normalized.owner || 'Лиза');
+  var ownerUser = ownerMatch.user || null;
+  var warnings = [];
+  if (ownerMatch.ambiguous) {
+    warnings.push('OWNER_LABEL_AMBIGUOUS');
+  }
+  if (!ownerUser && ownerMatch.warning) {
+    warnings.push(ownerMatch.warning);
+  }
+  return {
+    ownerEmail: ownerUser ? ownerUser.email : '',
+    ownerUserId: ownerUser ? ownerUser.userId : '',
+    createdByEmail: profile && profile.isAuthenticated ? normalizeWorkspaceEmail_(profile.email) : '',
+    createdByUserId: profile && profile.isAuthenticated ? baFoxSafeString(profile.userId) : '',
+    visibility: baFoxSafeString(normalized.visibility || 'team'),
+    ownerResolution: {
+      input: baFoxSafeString(normalized.owner || 'Лиза'),
+      matched: Boolean(ownerUser),
+      ambiguous: ownerMatch.ambiguous === true,
+      matchedCount: ownerMatch.matches ? ownerMatch.matches.length : 0,
+      warning: ownerMatch.warning || ''
+    },
+    warnings: warnings
+  };
 }
 
 function baFoxSafeCreateTask(request) {
@@ -598,8 +591,8 @@ function baFoxSafeCreateTask(request) {
   var taskId = baFoxBuildSafeCreateTaskId_(now);
   var actorProfile = identityCheck.profile || {};
   var actorLabel = actorProfile.email || actorProfile.displayName || 'BA Fox Web';
-  var rowBuild = baFoxSafeCreateTaskRow_(taskId, normalized, now, actorProfile);
-  var appendResponse = baFoxAppendSafeCreateTaskRow(rowBuild.rowValues);
+  var identityMetadata = baFoxCreateTaskIdentityMetadata_(normalized, actorProfile);
+  var appendResponse = baFoxAppendSafeCreateTaskRow(baFoxSafeCreateTaskRow_(taskId, normalized, now), identityMetadata);
   if (!appendResponse.ok) {
     baFoxAuditTaskAction({
       timestamp: now,
@@ -635,6 +628,7 @@ function baFoxSafeCreateTask(request) {
       reminder: normalized.reminder || '',
       comment: normalized.comment || ''
     }),
+    taskIdentityMetadata: baFoxSafeJson_(identityMetadata),
     identityMode: identityCheck.identity && identityCheck.identity.identityMode,
     enforcementMode: identityCheck.identity && identityCheck.identity.enforcementMode
   });
@@ -645,13 +639,14 @@ function baFoxSafeCreateTask(request) {
     owner: normalized.owner || 'Лиза',
     source: 'BA Fox Web',
     createdAt: now,
+    taskIdentityMetadata: identityMetadata,
     appendResult: appendResponse.data,
     auditResult: auditResult,
     taskIdentitySchema: {
-      status: rowBuild.schema.status,
-      optionalIdentityWriteActive: rowBuild.writtenFields.length > 0,
-      writtenFields: rowBuild.writtenFields,
-      missingColumns: rowBuild.schema.missingColumns
+      status: appendResponse.data && appendResponse.data.taskIdentitySchema ? appendResponse.data.taskIdentitySchema.status : 'unknown',
+      optionalIdentityWriteActive: appendResponse.data && appendResponse.data.optionalIdentityColumnsPresent === true,
+      writtenFields: appendResponse.data && appendResponse.data.identityColumnsApplied ? appendResponse.data.identityColumnsApplied : [],
+      missingColumns: appendResponse.data && appendResponse.data.identityColumnsMissing ? appendResponse.data.identityColumnsMissing : []
     },
     performance: {
       operation: 'createTask',
