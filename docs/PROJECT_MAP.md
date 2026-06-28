@@ -62,6 +62,7 @@ docs/STAGE_34_GOOGLE_CLIENT_ID_OAUTH_QA.md
 docs/STAGE_35_TASK_IDENTITY_SCHEMA_AND_MEMBER_VISIBILITY.md
 docs/STAGE_36_VISIBILITY_DRY_RUN_AND_TASK_IDENTITY_MIGRATION.md
 docs/STAGE_37_CONTROLLED_PILOT_READINESS.md
+docs/STAGE_38_LIVE_PILOT_EVIDENCE_AND_OPTIONAL_MIGRATION_QA.md
 docs/PROJECT_MAP.md
 ```
 
@@ -454,6 +455,7 @@ Stage 34 — Google Client ID setup and live OAuth QA: manual setup package read
 Stage 35 — task identity schema and member visibility foundation: optional columns supported, filtering not enabled by default.
 Stage 36 — visibility dry-run and optional identity migration foundation: live QA passed, dashboard filtering remains off.
 Stage 37 — controlled pilot readiness: runbook and dry-run preview QA prep, pilot paused.
+Stage 38 — live pilot evidence and optional migration QA: evidence collection only, enforcement remains off.
 Telegram/Railway — legacy/paused.
 ```
 
