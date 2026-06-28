@@ -61,6 +61,7 @@ docs/STAGE_33_GOOGLE_IDENTITY_ENFORCEMENT_AND_VISIBILITY.md
 docs/STAGE_34_GOOGLE_CLIENT_ID_OAUTH_QA.md
 docs/STAGE_35_TASK_IDENTITY_SCHEMA_AND_MEMBER_VISIBILITY.md
 docs/STAGE_36_VISIBILITY_DRY_RUN_AND_TASK_IDENTITY_MIGRATION.md
+docs/STAGE_37_CONTROLLED_PILOT_READINESS.md
 docs/PROJECT_MAP.md
 ```
 
@@ -451,6 +452,8 @@ Stage 32 — Apps Script identity/users read model: profile route implemented, e
 Stage 33 — Google identity verification/enforcement foundation: profile token verification prepared, dashboard filtering not enabled by default.
 Stage 34 — Google Client ID setup and live OAuth QA: manual setup package ready, enforcement remains profile_only.
 Stage 35 — task identity schema and member visibility foundation: optional columns supported, filtering not enabled by default.
+Stage 36 — visibility dry-run and optional identity migration foundation: live QA passed, dashboard filtering remains off.
+Stage 37 — controlled pilot readiness: runbook and dry-run preview QA prep, pilot paused.
 Telegram/Railway — legacy/paused.
 ```
 

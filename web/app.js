@@ -3413,6 +3413,17 @@ function visibilityPreviewHtml(preview) {
   ].join('');
 }
 
+function pilotReadinessGuardrailsHtml() {
+  return [
+    '<div class="mf-readonly-grid">',
+    '<span>Статус пилота <strong>на паузе / не активен</strong></span>',
+    '<span>Реальная фильтрация <strong>выключена</strong></span>',
+    '<span>Миграция колонок <strong>только вручную, после backup</strong></span>',
+    '<span>Rollback <strong>через backup или скрытие appended колонок</strong></span>',
+    '</div>',
+  ].join('');
+}
+
 function performanceSummaryHtml() {
   const backendCreate = performanceState.createTaskBackend && Number.isFinite(Number(performanceState.createTaskBackend.durationMs))
     ? ' · backend ' + formatDurationMs(performanceState.createTaskBackend.durationMs)
@@ -3549,7 +3560,10 @@ function renderMfSettings() {
   const visibilityFilterLabel = dashboardIdentity.filteredByUser
     ? 'Фильтрация по пользователю включена'
     : 'Фильтрация по пользователю не включена';
-  const pilotStatusLabel = 'Пилот не запущен';
+  const pilotStatusLabel = 'Пилот на паузе / не активен';
+  const enforcementOffLabel = dashboardIdentity.filteredByUser
+    ? 'проверить: фильтрация включена'
+    : 'выключено, preview only';
   elements.taskList.innerHTML = [
     '<section class="mf-settings-page">',
     '<section class="mf-two-column settings">',
@@ -3621,12 +3635,13 @@ function renderMfSettings() {
     '</article>',
     '<article class="mf-settings-card mf-external-card">',
     '<div class="mf-section-title"><h3>Права доступа</h3><span class="mf-external-marker">' + escapeHtml(pilotStatusLabel) + '</span></div>',
-    '<p>admin и executive должны видеть все задачи после backend enforcement. member видит свои задачи, участие и, возможно, созданные им задачи.</p>',
-    '<p>Текущий dashboard пока не фильтрует live-данные по пользователю в profile_only/soft режиме. Полная фильтрация включается только после отдельного enforced QA.</p>',
+    '<p>Пилот Andrey/Daniil сейчас не активен. Этот экран готовит только controlled readiness и dry-run preview.</p>',
+    '<p>Текущий dashboard не фильтрует live-данные по пользователю в profile_only/soft режиме. Полная фильтрация включается только после отдельного enforced QA.</p>',
     '<div class="mf-readonly-grid">',
     '<span>Поля видимости задач <strong>' + escapeHtml(taskIdentitySchemaLabel) + '</strong></span>',
     '<span>Visibility mode <strong>' + escapeHtml(dashboardIdentity.visibilityMode || enforcementModeLabel || 'profile_only') + '</strong></span>',
     '<span>Фильтрация <strong>' + escapeHtml(visibilityFilterLabel) + '</strong></span>',
+    '<span>Enforcement <strong>' + escapeHtml(enforcementOffLabel) + '</strong></span>',
     '<span>Статус пилота <strong>' + escapeHtml(pilotStatusLabel) + '</strong></span>',
     '<span>Найдено полей <strong>' + escapeHtml(String(presentTaskIdentityColumns.length || 0)) + '</strong></span>',
     '<span>Не хватает полей <strong>' + escapeHtml(String(missingTaskIdentityColumns.length || 0)) + '</strong></span>',
@@ -3642,23 +3657,28 @@ function renderMfSettings() {
     '<span>Legacy Tasks <strong>' + escapeHtml(taskSchema && taskSchema.requiredLegacyColumnsOk ? 'ок' : 'нужно проверить') + '</strong></span>',
     '<span>Не хватает <strong>' + escapeHtml(taskIdentityMissingText(taskSchema)) + '</strong></span>',
     '<span>Optional write <strong>' + escapeHtml(taskSchema && taskSchema.optionalIdentityWriteActive ? 'частично активно' : 'не активно') + '</strong></span>',
-    '<span>Миграция <strong>не обязательна для текущего режима</strong></span>',
-    '<span>Фильтрация <strong>по пользователю не включена</strong></span>',
+    '<span>Миграция <strong>опционально, вручную, после backup</strong></span>',
+    '<span>Фильтрация <strong>выключена; preview only</strong></span>',
     '</div>',
     '<div class="mf-column-list compact">' + taskIdentitySchemaFoundHtml(taskSchema) + '</div>',
     '<div class="mf-action-row">',
     '<button class="secondary-button" type="button" data-task-identity-action="check">Проверить поля задач</button>',
-    '<button class="secondary-button" type="button" data-task-identity-action="migrate"' + migrationDisabled + '>Подготовить колонки видимости</button>',
+    '<button class="secondary-button" type="button" data-task-identity-action="migrate"' + migrationDisabled + '>Ручная подготовка колонок</button>',
     '</div>',
+    '<p>Эта кнопка не запускается автоматически. Использовать только после backup Google Sheet и ручного подтверждения.</p>',
     '<div class="mf-column-list compact">' + taskIdentityManualColumnsHtml(taskSchema) + '</div>',
     '</article>',
     '<article class="mf-settings-card">',
     '<div class="mf-section-title"><h3>Предпросмотр видимости</h3><span>Dry-run</span></div>',
-    '<p>Фильтрация не применена к реальному дашборду.</p>',
+    '<p>Фильтрация не применена к реальному дашборду. Preview нужен для Liza/admin, Andrey и Daniil перед любым pilot go.</p>',
     '<label class="mf-form-control" for="visibilityPreviewUserSelect"><span>Пользователь</span><select id="visibilityPreviewUserSelect">' + activeUsersOptionsHtml(activeUsers) + '</select></label>',
     '<div class="mf-action-row"><button class="secondary-button" type="button" data-visibility-preview-action="calculate"' + (canManageTaskIdentity && activeUsers.length ? '' : ' disabled') + '>Посчитать видимость</button></div>',
     visibilityPreviewHtml(visibilityPreview),
     '</article>',
+    '</section>',
+    '<section class="mf-settings-card">',
+    '<div class="mf-section-title"><h3>Stage 37 readiness</h3><span>pilot paused</span></div>',
+    pilotReadinessGuardrailsHtml(),
     '</section>',
     '<section class="mf-settings-card">',
     '<div class="mf-section-title"><h3>Производительность</h3><span>debug</span></div>',
@@ -3960,7 +3980,14 @@ async function handleTaskIdentityAction(action) {
   }
 
   if (action === 'migrate') {
-    const confirmed = window.confirm('Добавить колонки видимости в Tasks?\n\nСуществующие колонки не будут изменены.');
+    const confirmed = window.confirm([
+      'Stage 37: ручная подготовка колонок видимости.',
+      '',
+      'Продолжать только если Google Sheet backup уже создан и открыт.',
+      'Будут добавлены только отсутствующие optional колонки.',
+      'Существующие колонки не будут изменены.',
+      'Реальная фильтрация дашборда останется выключенной.',
+    ].join('\n'));
     if (!confirmed) {
       return;
     }
