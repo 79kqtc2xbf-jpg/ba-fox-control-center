@@ -76,6 +76,90 @@ function baFoxTaskIdentityColumnDefinitions_() {
   ];
 }
 
+function baFoxLegacyTaskFieldNames_(field) {
+  var names = {
+    ID: ['ID', 'id', 'Task ID'],
+    DATE: ['Дата', 'Date', 'date'],
+    CATEGORY: ['Категория', 'Category', 'category'],
+    ORGANIZATION: ['Организация / контакт', 'Organization', 'organization', 'Contact', 'contact'],
+    TITLE: ['Задача', 'Title', 'title', 'Task', 'Task name', 'Название'],
+    STEPS: ['Шаги для Лизы', 'Steps', 'steps', 'Next action', 'nextAction'],
+    SOURCE: ['Источник', 'Source', 'source'],
+    PRIORITY: ['Приоритет', 'Priority', 'priority'],
+    DEADLINE: ['Дедлайн', 'Deadline', 'deadline'],
+    REMINDER_MODE: ['Режим напоминаний', 'Reminder mode', 'reminderMode'],
+    STATUS: ['Статус', 'Status', 'status'],
+    NEXT_REMINDER: ['Следующее напоминание', 'Next reminder', 'nextReminder'],
+    COMMENT: ['Итог / комментарий', 'Comment', 'comment', 'Result', 'result'],
+    CHANNEL: ['Канал', 'Channel', 'channel'],
+    TASK_TYPE: ['Task type', 'taskType', 'task_type'],
+    OWNER: ['Owner', 'owner', 'Ответственный'],
+    CREATED_AT: ['Created at', 'createdAt', 'created_at'],
+    UPDATED_AT: ['Updated at', 'updatedAt', 'updated_at'],
+    COMPLETED_AT: ['Completed at', 'completedAt', 'completed_at'],
+    REMINDER_RECURRENCE: ['Reminder recurrence', 'reminderRecurrence'],
+    NOTIFICATION_CHANNELS: ['Notification channels', 'notificationChannels'],
+    NOTIFICATION_STATUS: ['Notification status', 'notificationStatus'],
+    APP_SOURCE: ['App source', 'appSource'],
+    EXTERNAL_REF: ['External ref', 'externalRef'],
+    ARCHIVED: ['Archived', 'archived'],
+    CONTROL_DATE: ['controlDate', 'control_date', 'Control Date', 'Контрольная дата', 'Дата контроля'],
+    FOCUS: ['focus', 'isFocus', 'manualFocus', 'Focus', 'Фокус']
+  };
+  return names[field] || [];
+}
+
+function baFoxRequiredLegacyTaskFields_() {
+  return [
+    'ID',
+    'DATE',
+    'CATEGORY',
+    'ORGANIZATION',
+    'TITLE',
+    'STEPS',
+    'SOURCE',
+    'PRIORITY',
+    'DEADLINE',
+    'REMINDER_MODE',
+    'STATUS',
+    'NEXT_REMINDER',
+    'COMMENT',
+    'CHANNEL',
+    'TASK_TYPE',
+    'OWNER',
+    'CREATED_AT',
+    'UPDATED_AT',
+    'COMPLETED_AT',
+    'REMINDER_RECURRENCE',
+    'NOTIFICATION_CHANNELS',
+    'NOTIFICATION_STATUS',
+    'APP_SOURCE',
+    'EXTERNAL_REF',
+    'ARCHIVED'
+  ];
+}
+
+function baFoxMissingLegacyTaskFields_(headers) {
+  return baFoxRequiredLegacyTaskFields_().filter(function(field) {
+    return !baFoxFindHeaderColumn_(headers, baFoxLegacyTaskFieldNames_(field));
+  });
+}
+
+function baFoxOptionalLegacyTaskFields_() {
+  return [
+    'CONTROL_DATE',
+    'FOCUS'
+  ];
+}
+
+function baFoxPresentOptionalLegacyTaskFields_(headers) {
+  var present = {};
+  baFoxOptionalLegacyTaskFields_().forEach(function(field) {
+    present[field] = Boolean(baFoxFindHeaderColumn_(headers, baFoxLegacyTaskFieldNames_(field)));
+  });
+  return present;
+}
+
 function getTaskHeaderMap_(sheetOrHeaders) {
   var headers = Array.isArray(sheetOrHeaders)
     ? sheetOrHeaders
@@ -195,6 +279,8 @@ function getTaskIdentitySchemaStatus_() {
     canSafelyMigrate: false,
     migrationAlreadyDone: false,
     optionalIdentityWriteActive: false,
+    missingLegacyFields: baFoxRequiredLegacyTaskFields_(),
+    optionalLegacyFieldsPresent: {},
     headerColumns: 0,
     dataRows: 0
   };
@@ -215,10 +301,9 @@ function getTaskIdentitySchemaStatus_() {
 
   var headers = baFoxReadSheetHeaders_(sheet);
   var lastLegacyColumn = BA_FOX_CONFIG.TASK_COLUMNS.ARCHIVED || 25;
-  var requiredLegacyColumnsOk = sheet.getLastColumn() >= lastLegacyColumn
-    && baFoxFindHeaderColumn_(headers, ['ID', 'id', 'Task ID'])
-    && baFoxFindHeaderColumn_(headers, ['Title', 'title', 'Название'])
-    && baFoxFindHeaderColumn_(headers, ['Owner', 'owner', 'Ответственный']);
+  var missingLegacyFields = baFoxMissingLegacyTaskFields_(headers);
+  var optionalLegacyFieldsPresent = baFoxPresentOptionalLegacyTaskFields_(headers);
+  var requiredLegacyColumnsOk = sheet.getLastColumn() >= lastLegacyColumn && missingLegacyFields.length === 0;
   var missingColumns = [];
   var presentCount = 0;
   var optionalColumnsPresent = {};
@@ -246,6 +331,8 @@ function getTaskIdentitySchemaStatus_() {
     exists: true,
     status: presentCount === 0 ? 'missing' : presentCount === definitions.length ? 'ready' : 'partial',
     requiredLegacyColumnsOk: Boolean(requiredLegacyColumnsOk),
+    missingLegacyFields: missingLegacyFields,
+    optionalLegacyFieldsPresent: optionalLegacyFieldsPresent,
     optionalColumnsPresent: optionalColumnsPresent,
     optionalColumns: optionalColumns,
     missingColumns: missingColumns,
