@@ -48,7 +48,7 @@ In scope:
 
 - backup confirmation;
 - schema evidence before migration;
-- optional manual migration QA if, and only if, the missing fields are exactly `Collaborator Emails` and `Collaborator User IDs`;
+- optional manual migration QA when the legacy schema is recognized and missing identity fields are expected;
 - post-migration task creation evidence;
 - Liza/admin, Andrey, and Daniil visibility preview evidence;
 - rollback readiness.
@@ -86,6 +86,7 @@ Migration:
 - Migration used: yes/no
 - Reason if skipped:
 - Confirmed backup before migration: yes/no
+- Expected identity columns to append:
 - Columns appended:
 - Columns duplicated: yes/no
 - Existing columns renamed/reordered: yes/no
@@ -145,16 +146,21 @@ Do not run confirmed migration without a verified backup.
 ### 3. Schema Check Before Migration
 
 1. In Settings, run the task identity schema check.
-2. Record schema status.
+2. Confirm `Legacy Tasks` is `ok`.
 3. Record missing columns.
-4. Continue to optional migration only if missing fields are exactly:
+4. For the current production sheet, continue to optional migration only if identity schema status is `missing` and missing identity fields are exactly:
 
 ```text
+Owner Email
+Owner User ID
 Collaborator Emails
 Collaborator User IDs
+Created By Email
+Created By User ID
+Visibility
 ```
 
-Stop if any other field is missing, duplicated, renamed, or suspicious.
+Stop if `Legacy Tasks` is not `ok`, if any existing legacy column is renamed/reordered, or if the missing identity list differs from the seven fields above.
 
 ### 4. Optional Manual Migration
 
@@ -162,7 +168,9 @@ Migration is optional. Run it only if all are true:
 
 - backup exists and opens;
 - Liza/admin explicitly approves;
-- missing fields are exactly `Collaborator Emails` and `Collaborator User IDs`;
+- `Legacy Tasks` is `ok`;
+- identity schema status is `missing`;
+- missing identity fields are exactly the seven expected identity columns;
 - Settings still says migration is manual/optional;
 - the route is called with `confirm=true`;
 - the request has verified admin profile or action token;
@@ -170,8 +178,13 @@ Migration is optional. Run it only if all are true:
 
 Expected result:
 
+- append `Owner Email`;
+- append `Owner User ID`;
 - append `Collaborator Emails`;
 - append `Collaborator User IDs`;
+- append `Created By Email`;
+- append `Created By User ID`;
+- append `Visibility`;
 - do not rename existing columns;
 - do not reorder existing columns;
 - do not create duplicate identity columns.
@@ -180,11 +193,15 @@ Expected result:
 
 After migration, inspect the `Tasks` header row:
 
+- `Owner Email` exists once;
+- `Owner User ID` exists once;
 - `Collaborator Emails` exists once;
 - `Collaborator User IDs` exists once;
-- both were appended after existing used columns;
+- `Created By Email` exists once;
+- `Created By User ID` exists once;
+- `Visibility` exists once;
+- all seven identity columns were appended after existing used columns, currently after `focus`;
 - existing legacy columns remain in place;
-- existing identity columns remain in place;
 - no existing column was renamed.
 
 Record the final column letters/numbers.
@@ -272,6 +289,7 @@ Rollback must not delete legacy task columns or task rows.
 - [ ] Real dashboard filtering is off.
 - [ ] `filteredByUser=false`.
 - [ ] Schema check was run manually.
+- [ ] `Legacy Tasks` is `ok`.
 - [ ] Missing fields recorded.
 - [ ] No columns were added automatically.
 - [ ] Sheet backup created.
@@ -279,12 +297,13 @@ Rollback must not delete legacy task columns or task rows.
 
 ### B. Optional Migration
 
-- [ ] Missing fields are exactly `Collaborator Emails` and `Collaborator User IDs`.
+- [ ] Identity schema status is `missing`.
+- [ ] Missing fields are exactly the seven identity columns.
 - [ ] Liza/admin approved migration.
 - [ ] Migration was manual only.
 - [ ] Migration used `confirm=true`.
 - [ ] Migration had verified admin profile or action token.
-- [ ] Only missing collaborator columns were appended.
+- [ ] Only the seven missing identity columns were appended.
 - [ ] No duplicate identity columns were created.
 - [ ] No existing columns were renamed.
 - [ ] No existing columns were reordered.
@@ -325,8 +344,9 @@ Rollback must not delete legacy task columns or task rows.
 Stop Stage 38 if:
 
 - backup is missing or cannot be opened;
-- schema is not the expected partial state;
-- missing fields are not exactly `Collaborator Emails` and `Collaborator User IDs`;
+- legacy schema is not recognized as `ok`;
+- schema is not the expected `missing` identity state;
+- missing fields are not exactly the seven expected identity columns;
 - migration would create duplicates;
 - migration happens automatically;
 - `VISIBILITY_ENFORCEMENT` becomes true;
