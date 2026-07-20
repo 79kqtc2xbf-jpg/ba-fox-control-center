@@ -722,6 +722,8 @@ let taskActionState = {};
 let createTaskState = { status: 'idle', message: '' };
 let editTaskState = { status: 'idle', message: '', taskId: '' };
 let performanceState = {
+  signInMs: null,
+  profileLoadMs: null,
   createTaskMs: null,
   dashboardRefreshMs: null,
   createTaskBackend: null,
@@ -3728,6 +3730,8 @@ function performanceSummaryHtml() {
     : '';
   return [
     '<div class="mf-readonly-grid">',
+    '<span>Вход через Google <strong>' + escapeHtml(formatDurationMs(performanceState.signInMs)) + '</strong></span>',
+    '<span>Проверка профиля <strong>' + escapeHtml(formatDurationMs(performanceState.profileLoadMs)) + '</strong></span>',
     '<span>Создание задачи <strong>' + escapeHtml(formatDurationMs(performanceState.createTaskMs)) + backendCreate + '</strong></span>',
     '<span>Обновление дашборда <strong>' + escapeHtml(formatDurationMs(performanceState.dashboardRefreshMs)) + backendDashboard + '</strong></span>',
     '</div>',
@@ -4474,6 +4478,7 @@ async function handleIdentityAction(action) {
       return;
     }
     try {
+      const signInStartedAt = performance.now();
       flashMessage = 'Открываем Google-вход...';
       render();
       const credential = await requestGoogleIdentityCredential();
@@ -4484,8 +4489,9 @@ async function handleIdentityAction(action) {
         activeTab = 'dashboard';
         await loadDashboard({ forceRefresh: true });
       }
+      performanceState.signInMs = Math.round(performance.now() - signInStartedAt);
       flashMessage = profile.isVerifiedByGoogle
-        ? 'Профиль подтверждён через Google.'
+        ? 'Профиль подтверждён через Google · вход: ' + formatDurationMs(performanceState.signInMs)
         : 'Google credential получен, но backend профиль не подтверждён.';
       render();
     } catch (error) {
@@ -4748,11 +4754,11 @@ async function handleCreateTaskSubmit(event) {
     activeCategoryFilter = 'all';
     activeOwnerFilter = 'all';
     taskSearchQuery = '';
-    await loadDashboard({ forceRefresh: true });
-    flashMessage = 'Задача добавлена · создание: ' + formatDurationMs(performanceState.createTaskMs) + ' · обновление: ' + formatDurationMs(performanceState.dashboardRefreshMs);
+    flashMessage = 'Задача добавлена · создание: ' + formatDurationMs(performanceState.createTaskMs) + ' · список обновляется в фоне.';
     render();
     renderCreateTaskModal();
     openCreateTaskSuccessModal();
+    refreshDashboardAfterCreate();
   } catch (error) {
     performanceState.createTaskMs = Math.round(performance.now() - createStartedAt);
     createTaskState = {
@@ -4794,6 +4800,7 @@ async function loadDashboard(options) {
 }
 
 async function loadProfile() {
+  const profileStartedAt = performance.now();
   profileState = BAFoxClient.createLoadingState('profile');
   taskIdentitySchemaState.status = 'idle';
   activeUsersState.status = 'idle';
@@ -4801,13 +4808,44 @@ async function loadProfile() {
     renderPanel();
   }
   profileState = await BAFoxClient.getProfile(identityRequestParams());
-  const profileData = profileState.data || {};
-  const permissions = profileData.permissions || {};
-  if (permissions.canManageUsers) {
-    taskIdentitySchemaState = await BAFoxClient.getTaskIdentitySchema(identityRequestParams());
-    activeUsersState = await BAFoxClient.getActiveUsers(identityRequestParams());
-  }
+  performanceState.profileLoadMs = Math.round(performance.now() - profileStartedAt);
   render();
+}
+
+async function loadAdminDiagnosticsIfNeeded() {
+  const profile = identityDisplayProfile();
+  if (!(profile.permissions && profile.permissions.canManageUsers)) {
+    return;
+  }
+  if (taskIdentitySchemaState.status === 'loading' || activeUsersState.status === 'loading') {
+    return;
+  }
+  if (taskIdentitySchemaState.status === 'success' && activeUsersState.status === 'success') {
+    return;
+  }
+  taskIdentitySchemaState = BAFoxClient.createLoadingState('taskIdentitySchema');
+  activeUsersState = BAFoxClient.createLoadingState('activeUsers');
+  renderPanel();
+  const results = await Promise.all([
+    BAFoxClient.getTaskIdentitySchema(identityRequestParams()),
+    BAFoxClient.getActiveUsers(identityRequestParams()),
+  ]);
+  taskIdentitySchemaState = results[0];
+  activeUsersState = results[1];
+  if (activeTab === 'admin') {
+    renderPanel();
+  }
+}
+
+async function refreshDashboardAfterCreate() {
+  try {
+    await loadDashboard({ forceRefresh: true });
+    flashMessage = 'Задача добавлена · данные обновлены.';
+    render();
+  } catch (error) {
+    flashMessage = 'Задача добавлена. Обновите список вручную, если она не появилась сразу.';
+    render();
+  }
 }
 
 async function handleManualRefresh() {
@@ -4886,6 +4924,9 @@ function loadLazyTabData(tabName) {
   }
   if (tabName === 'audit') {
     loadCleanupAuditIfNeeded();
+  }
+  if (tabName === 'admin') {
+    loadAdminDiagnosticsIfNeeded();
   }
 }
 
@@ -5310,6 +5351,11 @@ async function initializeDashboard() {
   setInterval(formatBangkokTime, 30000);
   render();
   await loadOptionalLocalConfig();
+  if (BAFoxConfig.getConfig().hasGoogleClientId) {
+    loadGoogleIdentityScript().catch(function () {
+      // Sign-in will show the actionable error if Google remains unavailable.
+    });
+  }
   await loadProfile();
   const profile = identityDisplayProfile();
   if (profile.isVerifiedByGoogle && profile.permissions && profile.permissions.canUseDashboard) {
