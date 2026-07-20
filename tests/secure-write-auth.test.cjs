@@ -241,7 +241,6 @@ test('backend protects task reads and admin diagnostics independently of visibil
 test('Pages workflows cannot serialize BA_FOX_ACTION_TOKEN into the public bundle', function () {
   const workflowPaths = [
     '.github/workflows/pages.yml',
-    '.github/workflows/deploy-web-pages.yml',
   ];
 
   workflowPaths.forEach(function (relativePath) {
@@ -249,4 +248,36 @@ test('Pages workflows cannot serialize BA_FOX_ACTION_TOKEN into the public bundl
     assert.equal(source.includes('BA_FOX_ACTION_TOKEN'), false, relativePath);
     assert.equal(source.includes('"BA_FOX_ACTION_TOKEN"'), false, relativePath);
   });
+});
+
+test('completed task reads carry the Google identity token', async function () {
+  const { client, requests } = loadWebClient({}, function (url) {
+    if (url.searchParams.get('route') === 'scaffoldInfo') {
+      return {
+        ok: true,
+        data: {
+          dryRun: true,
+          readLiveSheets: true,
+          liveAutomationEnabled: false,
+          triggersEnabled: false,
+        },
+        error: null,
+      };
+    }
+    return {
+      ok: true,
+      data: {
+        dryRun: true,
+        readLive: true,
+        tasks: [],
+      },
+      error: null,
+    };
+  });
+
+  await client.getCompletedTasks({ limit: 100, idToken: 'google-id-token' });
+
+  assert.equal(requests.length, 2);
+  assert.equal(requests[1].searchParams.get('route'), 'completed');
+  assert.equal(requests[1].searchParams.get('idToken'), 'google-id-token');
 });

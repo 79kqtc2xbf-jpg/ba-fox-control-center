@@ -42,7 +42,7 @@ function baFoxCacheKey_(route, parameters) {
 }
 
 function baFoxIsWriteRoute_(route) {
-  return ['taskAction', 'createTask', 'editTask', 'prepareTaskIdentityColumns'].indexOf(route) !== -1;
+  return ['taskAction', 'createTask', 'editTask', 'createProject', 'prepareTaskIdentityColumns'].indexOf(route) !== -1;
 }
 
 function baFoxIsCacheBypass_(parameters) {
@@ -119,7 +119,17 @@ function baFoxPutCachedResponse_(route, parameters, response) {
   }
 }
 
-function baFoxBuildTaskViewsFromRows_(parameters, storeResult) {
+function baFoxVisibleTaskStore_(storeResult, profile) {
+  var allTasks = baFoxNormalizeTaskRows_(storeResult);
+  return Object.assign({}, storeResult, {
+    normalizedTasks: profileCanSeeAll_(profile)
+      ? allTasks
+      : allTasks.filter(function(task) { return profileCanSeeTask_(profile, task); })
+  });
+}
+
+function baFoxBuildTaskViewsFromRows_(parameters, storeResult, profile) {
+  storeResult = baFoxVisibleTaskStore_(storeResult, profile);
   var normalizedTasks = baFoxNormalizeTaskRows_(storeResult);
   var identityParameters = Object.assign({}, parameters || {}, {
     __normalizedTasks: normalizedTasks
@@ -133,11 +143,14 @@ function baFoxBuildTaskViewsFromRows_(parameters, storeResult) {
     open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult),
     completed: baFoxListCompletedTasks({ limit: parameters.completedLimit || 50 }, storeResult),
+    users: getUsers_().filter(function(user) { return user.status === 'active'; }).map(safeUserSummary_),
+    projects: baFoxListProjects_(),
     identity: identityDashboardMetadata_(identityParameters, 'fullDashboard')
   };
 }
 
-function baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult) {
+function baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult, profile) {
+  storeResult = baFoxVisibleTaskStore_(storeResult, profile);
   var normalizedTasks = baFoxNormalizeTaskRows_(storeResult);
   var identityParameters = Object.assign({}, parameters || {}, {
     __normalizedTasks: normalizedTasks
@@ -150,6 +163,8 @@ function baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult) {
     all: baFoxListAllTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     open: baFoxListOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' }, storeResult),
     pushes: baFoxListPushTasks({ dateRange: parameters.dateRange || 'today' }, storeResult),
+    users: getUsers_().filter(function(user) { return user.status === 'active'; }).map(safeUserSummary_),
+    projects: baFoxListProjects_(),
     identity: identityDashboardMetadata_(identityParameters, 'dashboard')
   };
 }
@@ -162,7 +177,7 @@ function baFoxGetDashboard_(parameters) {
   }
   var readStartedAt = new Date().getTime();
   var storeResult = baFoxReadTasksRows();
-  var dashboard = baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult);
+  var dashboard = baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult, identityCheck.profile);
   dashboard.performance = {
     operation: 'dashboard',
     durationMs: new Date().getTime() - startedAt,
@@ -180,7 +195,7 @@ function baFoxGetWorkspaceDashboard_(parameters) {
   }
   var readStartedAt = new Date().getTime();
   var storeResult = baFoxReadTasksRows();
-  var dashboard = baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult);
+  var dashboard = baFoxBuildWorkspaceViewsFromRows_(parameters, storeResult, identityCheck.profile);
   dashboard.performance = {
     operation: 'workspaceDashboard',
     durationMs: new Date().getTime() - startedAt,
@@ -198,8 +213,9 @@ function baFoxGetFullDashboard_(parameters) {
   }
   var readStartedAt = new Date().getTime();
   var storeResult = baFoxReadTasksRows();
-  var dashboard = baFoxBuildTaskViewsFromRows_(parameters, storeResult);
-  var auditResponse = baFoxBuildCleanupAuditDryRun(storeResult);
+  var visibleStoreResult = baFoxVisibleTaskStore_(storeResult, identityCheck.profile);
+  var dashboard = baFoxBuildTaskViewsFromRows_(parameters, visibleStoreResult, identityCheck.profile);
+  var auditResponse = baFoxBuildCleanupAuditDryRun(visibleStoreResult);
   if (!auditResponse.ok) {
     return auditResponse;
   }
@@ -329,7 +345,15 @@ function baFoxAuthorizeReadRoute_(route, parameters) {
       accessRole: authorization.profile && authorization.profile.accessRole
     });
   }
+  parameters.__verifiedAuthorization = authorization;
+  parameters.__verifiedIdentityResult = authorization.identity;
   return null;
+}
+
+function baFoxProtectedTaskList_(parameters, listFunction, options) {
+  var authorization = parameters.__verifiedAuthorization;
+  var storeResult = baFoxVisibleTaskStore_(baFoxReadTasksRows(), authorization.profile);
+  return baFoxOk(listFunction(options || {}, storeResult));
 }
 
 function baFoxBuildRouteResponse_(route, parameters) {
@@ -344,22 +368,22 @@ function baFoxBuildRouteResponse_(route, parameters) {
       response = baFoxScaffoldInfo();
       break;
     case 'today':
-      response = getTodayTasks({ date: parameters.date });
+      response = baFoxProtectedTaskList_(parameters, baFoxListTodayTasks, { date: parameters.date });
       break;
     case 'inbox':
-      response = getInboxTasks({ date: parameters.date });
+      response = baFoxProtectedTaskList_(parameters, baFoxListInboxTasks, { date: parameters.date });
       break;
     case 'focus':
-      response = getFocusTasks({ date: parameters.date });
+      response = baFoxProtectedTaskList_(parameters, baFoxListFocusTasks, { date: parameters.date });
       break;
     case 'open':
-      response = getOpenTasks({ taskType: parameters.taskType || parameters.scope || 'all' });
+      response = baFoxProtectedTaskList_(parameters, baFoxListOpenTasks, { taskType: parameters.taskType || parameters.scope || 'all' });
       break;
     case 'pushes':
-      response = getPushTasks({ dateRange: parameters.dateRange || 'today' });
+      response = baFoxProtectedTaskList_(parameters, baFoxListPushTasks, { dateRange: parameters.dateRange || 'today' });
       break;
     case 'completed':
-      response = getCompletedTasks({ limit: parameters.limit || 50 });
+      response = baFoxProtectedTaskList_(parameters, baFoxListCompletedTasks, { limit: parameters.limit || 50 });
       break;
     case 'dashboard':
       response = baFoxGetDashboard_(parameters);
@@ -400,6 +424,9 @@ function baFoxBuildRouteResponse_(route, parameters) {
       break;
     case 'editTask':
       response = editTask(parameters);
+      break;
+    case 'createProject':
+      response = baFoxCreateProject_(parameters);
       break;
     default:
       response = baFoxError(

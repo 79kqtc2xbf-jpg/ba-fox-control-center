@@ -22,6 +22,7 @@
     'taskAction',
     'createTask',
     'editTask',
+    'createProject',
     'prepareTaskIdentityColumns',
   ]);
   const TASK_ACTION_MESSAGES = Object.freeze({
@@ -518,8 +519,8 @@
     getFullDashboard: function (options) {
       return readRoute('fullDashboard', options || {});
     },
-    getCleanupAudit: function () {
-      return readRoute('cleanupAudit', {});
+    getCleanupAudit: function (options) {
+      return readRoute('cleanupAudit', options || {});
     },
     getSafetyStatus: function () {
       return readRoute('safetyStatus', {});
@@ -535,6 +536,14 @@
     },
     getVisibilityPreview: function (options) {
       return readRoute('visibilityPreview', options || {});
+    },
+    createProject: async function (options) {
+      const config = global.BAFoxConfig.getConfig();
+      if (config.useMockData) {
+        throw new Error('Создание проектов недоступно без live-источника.');
+      }
+      requireWriteCredential(options, config);
+      return getJsonp('createProject', writeRequestParams(options, config));
     },
     prepareTaskIdentityColumns: async function (options) {
       const config = global.BAFoxConfig.getConfig();

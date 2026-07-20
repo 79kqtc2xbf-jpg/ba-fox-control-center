@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  python-compile:
+  quality:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -21,3 +21,11 @@ jobs:
 
       - name: Compile Python modules
         run: python -m compileall bot services
+
+      - name: Run Node tests
+        run: node --test tests/*.test.cjs
+
+      - name: Check browser JavaScript syntax
+        run: |
+          node --check web/app.js
+          node --check web/api/baFoxClient.js

@@ -27,9 +27,9 @@
       </div>
     </header>
 
-    <div class="mode-banner mock" id="modeBanner" role="status">
-      <strong>Демо-режим MF Group</strong>
-      <span>Макет только для просмотра. Без миграции таблиц, записей, Telegram, Gmail и изменений Apps Script.</span>
+    <div class="mode-banner" id="modeBanner" role="status">
+      <strong>Проверяем доступ</strong>
+      <span>Подключаем рабочие данные.</span>
     </div>
 
     <div class="workspace-layout">
@@ -105,10 +105,7 @@
           </label>
           <label class="form-field">
             <span>Ответственный</span>
-            <select name="owner">
-              <option value="Лиза" selected>Лиза</option>
-              <option value="Андрей">Андрей</option>
-              <option value="Даниил">Даниил</option>
+            <select name="owner" id="taskOwnerSelect">
               <option value="Не назначено">Не назначено</option>
             </select>
           </label>
@@ -154,17 +151,8 @@
           </label>
           <label class="form-field">
             <span>Отдел / направление</span>
-            <select name="category">
+            <select name="category" id="taskDepartmentSelect">
               <option value="">Не назначено</option>
-              <option value="Руководство">Руководство</option>
-              <option value="Операции">Операции</option>
-              <option value="Финансы / платежи">Финансы / платежи</option>
-              <option value="Юридическое / compliance">Юридическое / compliance</option>
-              <option value="Продажи / партнёры">Продажи / партнёры</option>
-              <option value="Маркетинг / презентации">Маркетинг / презентации</option>
-              <option value="Продукт / IT">Продукт / IT</option>
-              <option value="Админ / EA">Админ / EA</option>
-              <option value="QA">QA</option>
             </select>
           </label>
           <label class="form-field form-field-wide">
