@@ -61,7 +61,14 @@
   });
   const JSONP_TIMEOUT_MS = 25000;
   const RATE_LIMIT_MESSAGE = 'Google Sheets временно ограничил чтение. EA FOX повторит попытку позже.';
-  const TIMEOUT_FALLBACK_MESSAGE = 'Google Sheets отвечает дольше обычного. Показываю временные данные, EA FOX повторит попытку при следующем обновлении.';
+  const TIMEOUT_MESSAGE = 'Google Sheets отвечает дольше обычного. Попробуйте обновить данные ещё раз.';
+  const AUTH_ERROR_CODES = Object.freeze([
+    'GOOGLE_TOKEN_REQUIRED',
+    'IDENTITY_REQUIRED',
+    'USER_NOT_REGISTERED',
+    'USER_INACTIVE',
+    'ADMIN_REQUIRED',
+  ]);
   let jsonpRequestSequence = 0;
 
   function assertRoute(route) {
@@ -232,6 +239,10 @@
     return code === 'JSONP_TIMEOUT'
       || message.includes('jsonp endpoint timed out')
       || message.includes('timed out');
+  }
+
+  function isAuthenticationError(error) {
+    return Boolean(error && AUTH_ERROR_CODES.includes(error.code));
   }
 
   function backoffDelayMs(error, attempt) {
@@ -446,27 +457,29 @@
       }
       return global.BAFoxUiState.success(route, data);
     } catch (clientError) {
-      const fallback = global.BAFoxMockData.getResponse(route, params).data;
       const rateLimited = isRateLimitError(clientError);
       const timedOut = isTimeoutError(clientError);
+      const authenticationRequired = isAuthenticationError(clientError);
       const diagnosticMessage = clientError && clientError.message
         ? clientError.message
         : 'Unknown endpoint error.';
       if (global.console && typeof global.console.warn === 'function') {
-        global.console.warn('BA FOX live read failed; showing fallback data.', {
+        global.console.warn('BA FOX live read failed.', {
           route: route,
           message: diagnosticMessage,
           error: clientError,
         });
       }
       return global.BAFoxUiState.error(route, clientError, {
-        isMock: true,
-        fallbackData: fallback,
-        message: rateLimited
+        isMock: false,
+        fallbackData: null,
+        message: authenticationRequired
+          ? 'Войдите через Google рабочим аккаунтом, чтобы открыть данные.'
+          : rateLimited
           ? RATE_LIMIT_MESSAGE
           : timedOut
-            ? TIMEOUT_FALLBACK_MESSAGE
-            : 'Не удалось обновить live-данные, показана последняя доступная версия / mock fallback.',
+            ? TIMEOUT_MESSAGE
+            : 'Не удалось загрузить live-данные. Демо-задачи не подставляются.',
       });
     }
   }

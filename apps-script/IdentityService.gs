@@ -480,7 +480,22 @@ function applyRegisteredProfileFlags_(user, identitySource) {
 }
 
 function getCurrentUserProfile_(request, context) {
+  var settings = context || {};
   var identity = getIdentityFromRequest_(request || {});
+  if (settings.requireGoogleToken === true && identity.identityMode !== 'google_token_verified') {
+    identity = {
+      source: 'none',
+      identityMode: identity.identityMode === 'google_token_invalid' ? 'google_token_invalid' : 'missing_token',
+      email: '',
+      tokenVerification: identity.tokenVerification || {
+        ok: false,
+        mode: 'missing_token',
+        claims: null,
+        error: 'MISSING_TOKEN',
+        message: 'No verified Google identity token was provided.'
+      }
+    };
+  }
   var activeEmail = identity.email;
   var usersSheetStatus = usersSheetStatus_();
   var enforcementMode = identityEnforcementMode_();
@@ -617,7 +632,9 @@ function getCurrentUserProfile_(request, context) {
 }
 
 function baFoxGetProfile(request) {
-  return baFoxOk(getCurrentUserProfile_(request || {}, {}));
+  return baFoxOk(getCurrentUserProfile_(request || {}, {
+    requireGoogleToken: true
+  }));
 }
 
 function getVerifiedUserProfile_(request) {
@@ -626,13 +643,16 @@ function getVerifiedUserProfile_(request) {
 
 function requireVerifiedProfile_(request, options) {
   var settings = options || {};
-  var result = getVerifiedUserProfile_(request || {});
+  var result = getCurrentUserProfile_(request || {}, {
+    requireGoogleToken: settings.requireGoogleToken === true
+  });
   var mode = identityEnforcementMode_();
+  var alwaysEnforce = settings.alwaysEnforce === true;
   var requiresRegistered = settings.requireRegistered !== false;
   var requiresWrite = settings.requireWrite === true;
   var profile = result.profile || getFallbackUserProfile_();
 
-  if (mode !== 'enforced') {
+  if (mode !== 'enforced' && !alwaysEnforce) {
     return {
       ok: true,
       enforced: false,

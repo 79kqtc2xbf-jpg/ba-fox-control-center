@@ -285,8 +285,59 @@ function baFoxReadErrorResponse_(err) {
   );
 }
 
+function baFoxProtectedTaskReadRoute_(route) {
+  return [
+    'today',
+    'inbox',
+    'focus',
+    'open',
+    'pushes',
+    'completed',
+    'dashboard',
+    'workspaceDashboard',
+    'fullDashboard'
+  ].indexOf(route) !== -1;
+}
+
+function baFoxAdminReadRoute_(route) {
+  return [
+    'cleanupAudit',
+    'safetyStatus',
+    'taskIdentitySchema',
+    'activeUsers',
+    'visibilityPreview'
+  ].indexOf(route) !== -1;
+}
+
+function baFoxAuthorizeReadRoute_(route, parameters) {
+  if (!baFoxProtectedTaskReadRoute_(route) && !baFoxAdminReadRoute_(route)) {
+    return null;
+  }
+
+  var authorization = requireVerifiedProfile_(parameters, {
+    requireRegistered: true,
+    requireGoogleToken: true,
+    alwaysEnforce: true
+  });
+  if (!authorization.ok) {
+    return authorization.error;
+  }
+
+  if (baFoxAdminReadRoute_(route) && !profileCanManageUsers_(authorization.profile)) {
+    return baFoxError('ADMIN_REQUIRED', 'Verified admin profile is required for this route.', {
+      route: route,
+      accessRole: authorization.profile && authorization.profile.accessRole
+    });
+  }
+  return null;
+}
+
 function baFoxBuildRouteResponse_(route, parameters) {
   var response;
+  var readAuthorizationError = baFoxAuthorizeReadRoute_(route, parameters || {});
+  if (readAuthorizationError) {
+    return readAuthorizationError;
+  }
 
   switch (route) {
     case 'scaffoldInfo':
