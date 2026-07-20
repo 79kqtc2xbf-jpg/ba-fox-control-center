@@ -32,7 +32,7 @@
     GOOGLE_TOKEN_REQUIRED: 'Нужен подтверждённый Google-вход.',
     IDENTITY_REQUIRED: 'Нужен подтверждённый рабочий профиль.',
     WRITE_FORBIDDEN: 'У этого профиля нет прав на запись.',
-    UNAUTHORIZED: 'Нет доступа для выполнения действия. Проверьте action token.',
+    UNAUTHORIZED: 'Нет доступа для выполнения действия.',
   });
   const CREATE_TASK_MESSAGES = Object.freeze({
     FIELDS_NOT_ALLOWED: 'Проверьте поля задачи: часть данных не поддерживается текущей схемой.',
@@ -42,7 +42,7 @@
     GOOGLE_TOKEN_REQUIRED: 'Нужен подтверждённый Google-вход.',
     IDENTITY_REQUIRED: 'Нужен подтверждённый рабочий профиль.',
     WRITE_FORBIDDEN: 'У этого профиля нет прав на создание задач.',
-    UNAUTHORIZED: 'Нет доступа для создания задачи. Проверьте action token.',
+    UNAUTHORIZED: 'Нет доступа для создания задачи.',
     VALIDATION_ERROR: 'Введите название задачи',
   });
   const EDIT_TASK_MESSAGES = Object.freeze({
@@ -56,7 +56,7 @@
     GOOGLE_TOKEN_REQUIRED: 'Нужен подтверждённый Google-вход.',
     IDENTITY_REQUIRED: 'Нужен подтверждённый рабочий профиль.',
     WRITE_FORBIDDEN: 'У этого профиля нет прав на обновление задач.',
-    UNAUTHORIZED: 'Нет доступа для обновления задачи. Проверьте action token.',
+    UNAUTHORIZED: 'Нет доступа для обновления задачи.',
     VALIDATION_ERROR: 'Проверьте поля обновления этапа.',
   });
   const JSONP_TIMEOUT_MS = 25000;
@@ -305,6 +305,33 @@
     });
   }
 
+  function hasIdentityCredential(options) {
+    const params = options || {};
+    return Boolean(
+      params.idToken
+      || params.identityToken
+      || params.credential
+      || params.googleCredential
+    );
+  }
+
+  function writeRequestParams(options, config) {
+    const params = Object.assign({}, options || {});
+    if (config.actionToken) {
+      params.token = config.actionToken;
+    }
+    return params;
+  }
+
+  function requireWriteCredential(options, config) {
+    if (config.actionToken || hasIdentityCredential(options)) {
+      return;
+    }
+    const missingCredentialError = new Error('Войдите через Google рабочим аккаунтом, чтобы изменять задачи.');
+    missingCredentialError.code = 'GOOGLE_TOKEN_REQUIRED';
+    throw missingCredentialError;
+  }
+
   async function readLive(route, params) {
     if (route === 'scaffoldInfo') {
       const scaffoldInfo = await getJsonp(route, params);
@@ -501,16 +528,15 @@
       if (config.useMockData) {
         throw new Error('Подготовка колонок отключена в demo mode.');
       }
+      requireWriteCredential(options, config);
       try {
-        return await getJsonp('prepareTaskIdentityColumns', Object.assign({}, options || {}, {
-          token: config.actionToken,
-        }));
+        return await getJsonp('prepareTaskIdentityColumns', writeRequestParams(options, config));
       } catch (error) {
         if (error && error.code === 'SAFE_WRITES_DISABLED') {
           error.message = 'Безопасная запись выключена. Колонки не добавлены.';
         }
         if (error && error.code === 'ADMIN_OR_TOKEN_REQUIRED') {
-          error.message = 'Нужен admin профиль или action token для добавления колонок.';
+          error.message = 'Нужен подтверждённый Google-профиль администратора.';
         }
         throw error;
       }
@@ -520,15 +546,9 @@
       if (config.useMockData) {
         throw new Error('Безопасные действия отключены в демо-режиме.');
       }
-      if (!config.actionToken) {
-        const missingTokenError = new Error('Action token не настроен для безопасных действий.');
-        missingTokenError.code = 'UNAUTHORIZED';
-        throw missingTokenError;
-      }
+      requireWriteCredential(options, config);
       try {
-        return await getJsonp('taskAction', Object.assign({}, options || {}, {
-          token: config.actionToken,
-        }));
+        return await getJsonp('taskAction', writeRequestParams(options, config));
       } catch (error) {
         if (error && error.code && TASK_ACTION_MESSAGES[error.code]) {
           error.message = TASK_ACTION_MESSAGES[error.code];
@@ -541,15 +561,9 @@
       if (config.useMockData) {
         throw new Error('Создание задач отключено в demo mode.');
       }
-      if (!config.actionToken) {
-        const missingTokenError = new Error('Нет доступа для создания задачи. Проверьте action token.');
-        missingTokenError.code = 'UNAUTHORIZED';
-        throw missingTokenError;
-      }
+      requireWriteCredential(options, config);
       try {
-        return await getJsonp('createTask', Object.assign({}, options || {}, {
-          token: config.actionToken,
-        }));
+        return await getJsonp('createTask', writeRequestParams(options, config));
       } catch (error) {
         if (error && error.code && CREATE_TASK_MESSAGES[error.code]) {
           error.message = CREATE_TASK_MESSAGES[error.code];
@@ -568,15 +582,9 @@
       if (config.useMockData) {
         throw new Error('Обновление задач отключено в demo mode.');
       }
-      if (!config.actionToken) {
-        const missingTokenError = new Error('Action token не настроен для безопасного обновления задач.');
-        missingTokenError.code = 'UNAUTHORIZED';
-        throw missingTokenError;
-      }
+      requireWriteCredential(options, config);
       try {
-        return await getJsonp('editTask', Object.assign({}, options || {}, {
-          token: config.actionToken,
-        }));
+        return await getJsonp('editTask', writeRequestParams(options, config));
       } catch (error) {
         if (error && error.code && EDIT_TASK_MESSAGES[error.code]) {
           error.message = EDIT_TASK_MESSAGES[error.code];

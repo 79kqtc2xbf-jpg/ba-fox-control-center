@@ -458,7 +458,7 @@ function profilePermissions_(profile) {
 function identityResponseLimitations_(tokenResult) {
   var limitations = [
     'Dashboard visibility is identity-aware but not filtered by user unless enforcement mode is enforced.',
-    'createTask, editTask, and taskAction still keep the existing action token path in non-enforced modes.',
+    'Browser writes require a verified Google profile. A server-side action token remains a legacy integration fallback only.',
     'Legacy tasks only have Owner label; robust member visibility needs ownerEmail/userId, collaborator, createdBy, and visibility columns.',
     'Token verification uses Google tokeninfo from Apps Script. This is real Google validation, but future hard enforcement should be QA-tested against deployed OAuth settings.'
   ];
@@ -678,6 +678,70 @@ function requireVerifiedProfile_(request, options) {
     enforced: true,
     identity: result,
     profile: profile
+  };
+}
+
+function requireAuthorizedSafeWrite_(request) {
+  var result = getVerifiedUserProfile_(request || {});
+  var profile = result.profile || getFallbackUserProfile_();
+  var hasVerifiedGoogleProfile = result.identityMode === 'google_token_verified'
+    && profile.isAuthenticated === true
+    && profile.isRegistered === true
+    && profile.status === 'active';
+
+  if (hasVerifiedGoogleProfile && profileCanWrite_(profile)) {
+    return {
+      ok: true,
+      authorizationMode: 'google_profile',
+      identity: result,
+      profile: profile
+    };
+  }
+
+  if (baFoxActionTokenMatches_(baFoxNormalizeRequest(request || {}).token)) {
+    return {
+      ok: true,
+      authorizationMode: 'legacy_action_token',
+      identity: result,
+      profile: profile
+    };
+  }
+
+  if (hasVerifiedGoogleProfile) {
+    return {
+      ok: false,
+      authorizationMode: 'denied',
+      identity: result,
+      profile: profile,
+      error: baFoxError('WRITE_FORBIDDEN', 'This user cannot write tasks.', {
+        accessRole: profile.accessRole
+      })
+    };
+  }
+
+  if (result.identityMode === 'domain_not_allowed'
+      || result.identityMode === 'user_not_registered'
+      || result.identityMode === 'users_sheet_missing'
+      || result.identityMode === 'user_inactive') {
+    return {
+      ok: false,
+      authorizationMode: 'denied',
+      identity: result,
+      profile: profile,
+      error: baFoxError('IDENTITY_REQUIRED', 'Verified active workspace user is required.', {
+        identityMode: result.identityMode
+      })
+    };
+  }
+
+  return {
+    ok: false,
+    authorizationMode: 'denied',
+    identity: result,
+    profile: profile,
+    error: baFoxError('GOOGLE_TOKEN_REQUIRED', 'Verified Google identity token is required for browser writes.', {
+      identityMode: result.identityMode || 'missing_token'
+    })
   };
 }
 

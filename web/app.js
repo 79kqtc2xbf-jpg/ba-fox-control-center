@@ -1984,13 +1984,26 @@ function summaryCount(sectionName) {
   return section && Array.isArray(section.tasks) ? section.tasks.length : '-';
 }
 
-function safeWritesEnabled() {
+function safeWriteBackendAvailable() {
   const info = scaffoldData();
   return info.safeWritesEnabled === true && !dashboardState.isMock;
 }
 
+function safeWritesEnabled() {
+  if (!safeWriteBackendAvailable()) {
+    return false;
+  }
+  const config = BAFoxConfig.getConfig();
+  const profile = identityDisplayProfile();
+  const permissions = profile.permissions || {};
+  return config.hasActionToken || (profile.isVerifiedByGoogle && permissions.canWrite === true);
+}
+
 function writeModeLabel() {
-  return safeWritesEnabled() ? 'БЕЗОПАСНАЯ ЗАПИСЬ ВКЛЮЧЕНА' : 'ТОЛЬКО ЧТЕНИЕ';
+  if (safeWritesEnabled()) {
+    return 'БЕЗОПАСНАЯ ЗАПИСЬ ВКЛЮЧЕНА';
+  }
+  return safeWriteBackendAvailable() ? 'ВОЙДИТЕ ЧЕРЕЗ GOOGLE' : 'ТОЛЬКО ЧТЕНИЕ';
 }
 
 function renderModeBanner() {
@@ -2009,17 +2022,29 @@ function renderModeBanner() {
       ? '<strong>Демо-режим MF Group</strong><span>Макет только для просмотра. Без миграции таблиц, записей, Telegram, Gmail и изменений Apps Script.</span>'
       : safeWritesEnabled()
         ? '<strong>БЕЗОПАСНАЯ ЗАПИСЬ ВКЛЮЧЕНА</strong><span>Доступны только безопасное создание, статус, напоминание и обновление этапа.</span>'
-        : '<strong>ТОЛЬКО ЧТЕНИЕ</strong><span>Данные загружены только для просмотра. Безопасные действия отключены.</span>';
+        : safeWriteBackendAvailable()
+          ? '<strong>ВОЙДИТЕ ЧЕРЕЗ GOOGLE</strong><span>Просмотр доступен. Для создания и изменения задач нужен подтверждённый рабочий профиль.</span>'
+          : '<strong>ТОЛЬКО ЧТЕНИЕ</strong><span>Данные загружены только для просмотра. Безопасные действия отключены.</span>';
 }
 
 function renderCreateTaskButton() {
   const loading = dashboardState.status === 'loading' || scaffoldState.status === 'loading';
   elements.createTaskButton.disabled = loading || !safeWritesEnabled();
-  elements.writeModePill.textContent = safeWritesEnabled() ? 'Запись включена' : 'Только просмотр';
-  elements.createTaskButton.textContent = safeWritesEnabled() ? 'Новая задача' : 'Только просмотр';
+  elements.writeModePill.textContent = safeWritesEnabled()
+    ? 'Запись включена'
+    : safeWriteBackendAvailable()
+      ? 'Нужен Google-вход'
+      : 'Только просмотр';
+  elements.createTaskButton.textContent = safeWritesEnabled()
+    ? 'Новая задача'
+    : safeWriteBackendAvailable()
+      ? 'Войдите для записи'
+      : 'Только просмотр';
   elements.createTaskButton.title = safeWritesEnabled()
     ? 'Создать новую задачу'
-    : 'Макет только для просмотра. Существующая безопасная запись остаётся за runtime-флагами.';
+    : safeWriteBackendAvailable()
+      ? 'Откройте Настройки и войдите через Google рабочим аккаунтом.'
+      : 'Безопасная запись выключена на сервере.';
 }
 
 function renderLiveDataStatus() {
@@ -2319,7 +2344,7 @@ function actionButtonsHtml(task) {
     : state.status === 'success'
       ? '<div class="task-success">' + escapeHtml(state.message || 'Готово. Данные обновлены.') + '</div>'
       : disabled
-        ? '<div class="task-notice">Безопасные действия отключены.</div>'
+        ? '<div class="task-notice">' + escapeHtml(safeWriteBackendAvailable() ? 'Войдите через Google, чтобы изменить задачу.' : 'Безопасные действия отключены.') + '</div>'
         : '';
   return [
     '<div class="task-actions" aria-label="Действия задачи">',
@@ -3593,7 +3618,7 @@ function renderMfSettings() {
     '<span>Identity mode <strong>' + escapeHtml(backendProfile && backendProfile.identityMode ? backendProfile.identityMode : googleStatus) + '</strong></span>',
     '<span>Users sheet <strong>' + escapeHtml(usersSheet ? usersSheet.status + ' · rows: ' + usersSheet.dataRows : 'не проверен') + '</strong></span>',
     '<span>Dashboard <strong>' + escapeHtml(permissions.canUseDashboard ? 'доступен' : 'не подтверждён') + '</strong></span>',
-    '<span>Создание задач <strong>' + escapeHtml(permissions.canCreateTasks ? 'разрешено профилем' : 'action token / не подтверждено') + '</strong></span>',
+    '<span>Создание задач <strong>' + escapeHtml(permissions.canCreateTasks && profile.isVerifiedByGoogle ? 'разрешено подтверждённому профилю' : 'нужен подтверждённый Google-профиль') + '</strong></span>',
     '<span>Управление Users <strong>' + escapeHtml(permissions.canManageUsers ? 'да' : 'нет') + '</strong></span>',
     '<span>Текущий статус <strong>' + escapeHtml(profile.message) + '</strong></span>',
     '</div>',
@@ -4281,9 +4306,7 @@ async function loadProfile() {
   if (permissions.canManageUsers) {
     activeUsersState = await BAFoxClient.getActiveUsers(identityRequestParams());
   }
-  if (activeTab === 'settings') {
-    renderPanel();
-  }
+  render();
 }
 
 async function handleManualRefresh() {

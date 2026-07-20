@@ -574,11 +574,7 @@ function baFoxSafeCreateTask(request) {
     });
   }
 
-  if (!baFoxActionTokenMatches_(normalized.token)) {
-    return baFoxUnauthorized_();
-  }
-
-  var identityCheck = requireVerifiedProfile_(normalized, { requireRegistered: true, requireWrite: true });
+  var identityCheck = requireAuthorizedSafeWrite_(normalized);
   if (!identityCheck.ok) {
     return identityCheck.error;
   }
@@ -766,11 +762,7 @@ function baFoxTaskAction(request) {
     return baFoxError('VALIDATION_ERROR', 'Missing required fields.', { missing: missing });
   }
 
-  if (!baFoxActionTokenMatches_(normalized.token)) {
-    return baFoxUnauthorized_();
-  }
-
-  var identityCheck = requireVerifiedProfile_(normalized, { requireRegistered: true, requireWrite: true });
+  var identityCheck = requireAuthorizedSafeWrite_(normalized);
   if (!identityCheck.ok) {
     return identityCheck.error;
   }
@@ -980,11 +972,7 @@ function baFoxSafeEditTask(request) {
     return baFoxError('VALIDATION_ERROR', 'Missing required fields.', { missing: missing });
   }
 
-  if (!baFoxActionTokenMatches_(normalized.token)) {
-    return baFoxUnauthorized_();
-  }
-
-  var identityCheck = requireVerifiedProfile_(normalized, { requireRegistered: true, requireWrite: true });
+  var identityCheck = requireAuthorizedSafeWrite_(normalized);
   if (!identityCheck.ok) {
     return identityCheck.error;
   }
