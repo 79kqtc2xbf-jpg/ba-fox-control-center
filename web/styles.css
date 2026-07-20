@@ -4247,6 +4247,44 @@ body[data-mf-theme="light"] .home-action:hover strong {
   margin: 0;
 }
 
+/* The task dialog uses a light surface. Keep its controls light as well so
+   text, placeholders and selected values remain easy to read. */
+.modal-panel .form-field span {
+  color: #334155;
+}
+
+.modal-panel .form-field input,
+.modal-panel .form-field textarea,
+.modal-panel .form-field select {
+  border-color: #d7dee8;
+  background: #f8fafc;
+  color: #172033;
+}
+
+.modal-panel .form-field input::placeholder,
+.modal-panel .form-field textarea::placeholder {
+  color: #78869d;
+}
+
+.modal-panel .form-field input:focus,
+.modal-panel .form-field textarea:focus,
+.modal-panel .form-field select:focus {
+  border-color: rgba(255, 79, 216, 0.78);
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(255, 79, 216, 0.14);
+}
+
+.modal-panel .date-control {
+  border-color: #f2c5e8;
+  background: #fff9fd;
+}
+
+.modal-panel .date-picker-button {
+  border-color: #efb2df;
+  background: linear-gradient(135deg, #fff0fa, #f8e8ff);
+  color: #3a2440;
+}
+
 .signed-out-gate p,
 .signed-out-gate > span {
   color: var(--muted-strong);
