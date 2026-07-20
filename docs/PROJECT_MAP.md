@@ -456,6 +456,7 @@ Stage 35 — task identity schema and member visibility foundation: optional col
 Stage 36 — visibility dry-run and optional identity migration foundation: live QA passed, dashboard filtering remains off.
 Stage 37 — controlled pilot readiness: runbook and dry-run preview QA prep, pilot paused.
 Stage 38 — live pilot evidence and optional migration QA: evidence collection only, enforcement remains off.
+Stage 39 — secure full test contour: Google-verified browser writes, zero public action token, migration and full write QA before employee access.
 Telegram/Railway — legacy/paused.
 ```
 
