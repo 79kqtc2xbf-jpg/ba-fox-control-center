@@ -36,6 +36,13 @@ BA Fox Control Center turns Lisa's daily Telegram-style BA workflow into a contr
 BA Fox Control Center:
 https://docs.google.com/spreadsheets/d/1TJjQ0Uc_olOxL8kGW3tmd-e2wCfRoPkxbOEDOBs60F4/edit
 
+## Test contour
+
+- Dashboard: https://79kqtc2xbf-jpg.github.io/ba-fox-control-center/
+- User guide for colleagues: [`docs/TEST_CONTOUR_USER_GUIDE_RU.md`](docs/TEST_CONTOUR_USER_GUIDE_RU.md)
+- GitHub tokens are not required for testers.
+- The current test mode shows the shared dashboard; per-user task filtering is not enforced yet.
+
 ## MVP scope
 
 ### Included
