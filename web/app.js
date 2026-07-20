@@ -18,6 +18,7 @@ const viewLabels = Object.freeze({
   brokers: ['Брокеры', 'Брокеры, партнёры и внешние касания'],
   waiting: ['⏰ Ждут ответа', 'Ожидания, контрольные даты и пуши'],
   all: ['Задачи команды', 'Поиск и фильтры по общей очереди'],
+  trash: ['Корзина', 'Удалённые задачи с возможностью восстановления'],
   completed: ['Завершённые', 'Архив, история и память для отчётов'],
   calendar: ['Календарь', 'Задачи по срокам и напоминаниям'],
   legacyReports: ['📈 Отчёты', 'Дневной и недельный отчёт'],
@@ -126,6 +127,8 @@ const actionLabels = Object.freeze({
   snoozeOneDay: 'Завтра',
   snoozeThreeDays: '+3 дня',
   snoozeNextWeek: 'Следующая неделя',
+  moveToTrash: 'В корзину',
+  restoreFromTrash: 'Восстановить',
 });
 
 const allowedTaskActions = Object.freeze([
@@ -136,6 +139,8 @@ const allowedTaskActions = Object.freeze([
   'snoozeOneDay',
   'snoozeThreeDays',
   'snoozeNextWeek',
+  'moveToTrash',
+  'restoreFromTrash',
 ]);
 
 const actionStatusUpdates = Object.freeze({
@@ -673,6 +678,8 @@ const actionSuccessMessages = Object.freeze({
   snoozeOneDay: 'Напоминание поставлено на завтра.',
   snoozeThreeDays: 'Напоминание поставлено через 3 дня.',
   snoozeNextWeek: 'Напоминание поставлено на следующую неделю.',
+  moveToTrash: 'Задача перемещена в корзину.',
+  restoreFromTrash: 'Задача восстановлена.',
 });
 
 const taskGroupLabels = Object.freeze({
@@ -1307,12 +1314,24 @@ function presentationTasks() {
 }
 
 function completedTasks() {
-  return allLoadedTasks().filter(isFinalTask);
+  return allLoadedTasks().filter(function (task) {
+    return task.archived !== true && (
+      isCompletedStatus(task)
+      || isNonReportableFinal(task)
+      || Boolean(task.completedAt)
+    );
+  });
 }
 
 function activeTasks() {
   return allLoadedTasks().filter(function (task) {
     return !isFinalTask(task);
+  });
+}
+
+function trashedTasks() {
+  return allLoadedTasks().filter(function (task) {
+    return task.archived === true;
   });
 }
 
@@ -1905,6 +1924,7 @@ function navCountForTab(tabName) {
     waiting: waitListTasks().length,
     all: activeTasks().length,
     completed: completedTasks().length,
+    trash: trashedTasks().length,
     calendar: allLoadedTasks().length,
     legacyReports: completedThisWeekTasks().length,
     mail: '',
@@ -2001,7 +2021,10 @@ function taskRowsForTab() {
     return brokerTasks();
   }
   if (activeTab === 'all') {
-    return allLoadedTasks();
+    return allLoadedTasks().filter(function (task) { return task.archived !== true; });
+  }
+  if (activeTab === 'trash') {
+    return trashedTasks();
   }
   if (activeTab === 'completed') {
     return completedTasks();
@@ -2282,6 +2305,9 @@ function statusText() {
   if (activeTab === 'all') {
     return 'Все задачи сохраняют фильтры по статусу, ответственному, направлению и поиску по названию или контакту.';
   }
+  if (activeTab === 'trash') {
+    return 'Задачи в корзине скрыты из рабочих списков и отчётов. Автор, руководитель или администратор может их восстановить.';
+  }
   if (activeTab === 'reports') {
     return 'Отчёты генерируют локальный предпросмотр. PDF, запись в Sheets и отправка выполняются только отдельным подтверждённым шагом.';
   }
@@ -2456,6 +2482,14 @@ function taskTone(task) {
   return 'work';
 }
 
+function canManageTaskTrash(task) {
+  const profile = identityDisplayProfile();
+  if (profile.accessRole === 'admin' || profile.accessRole === 'executive') {
+    return true;
+  }
+  return taskRelationshipToProfile(task, profile).createdBy;
+}
+
 function actionButtonsHtml(task) {
   const disabled = !safeWritesEnabled();
   const state = taskActionState[task.id] || {};
@@ -2494,6 +2528,7 @@ function actionButtonsHtml(task) {
     '<div class="task-chip-row reminder-row" aria-label="Контрольная дата"><span class="chip-row-label">Контроль</span>' + reminderButtons + '<span class="chip-row-label muted">Выбор даты через обновление этапа</span></div>',
     '<button class="task-action chip focus-chip" type="button" data-task-focus="' + escapeHtml(task.id) + '">' + (isManualFocusTask(task) ? '✓ В фокусе' : 'В фокус') + '</button>',
     '<button class="task-action chip edit-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-edit="' + escapeHtml(task.id) + '">Изменить</button>',
+    canManageTaskTrash(task) ? '<button class="task-action chip trash-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="moveToTrash">В корзину</button>' : '',
     '</div>',
     message,
   ].join('');
@@ -2543,9 +2578,35 @@ function completedTaskCardHtml(task) {
       task.id ? 'ID: ' + task.id : '',
     ].filter(Boolean).map(function (item) { return '<span>' + escapeHtml(item) + '</span>'; }).join('') + '</div>',
     '<div class="next-action completed-summary"><strong>История / следующий след</strong><span>' + escapeHtml(nextActionText(task)) + '</span></div>',
+    canManageTaskTrash(task) ? '<div class="task-actions"><button class="task-action chip trash-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="moveToTrash">В корзину</button></div>' : '',
     '</div>',
     '</article>',
   ].join('');
+}
+
+function trashedTaskCardHtml(task) {
+  return [
+    '<article class="task-card completed-card trashed-card">',
+    '<div class="task-main">',
+    '<div class="task-topline"><span class="task-chip">В корзине</span></div>',
+    '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title || 'Без названия')) + '</div>',
+    '<div class="task-meta">' + taskMeta(task).map(function (item) { return '<span>' + escapeHtml(item) + '</span>'; }).join('') + '</div>',
+    canManageTaskTrash(task)
+      ? '<div class="task-actions"><button class="task-action chip restore-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="restoreFromTrash">Восстановить</button></div>'
+      : '<div class="task-notice">Восстановить задачу может её автор, руководитель или администратор.</div>',
+    '</div>',
+    '</article>',
+  ].join('');
+}
+
+function renderTrash() {
+  const tasks = trashedTasks().slice().sort(function (left, right) {
+    return String(right.updatedAt || '').localeCompare(String(left.updatedAt || ''));
+  });
+  elements.workspaceControls.innerHTML = '';
+  elements.taskList.innerHTML = tasks.length
+    ? '<div class="task-group-list">' + tasks.map(trashedTaskCardHtml).join('') + '</div>'
+    : '<article class="empty-state"><strong>Корзина пуста</strong><span>Удалённые задачи появятся здесь и останутся доступными для восстановления.</span></article>';
 }
 
 function taskGroupsHtml(tasks) {
@@ -3460,6 +3521,21 @@ function renderMfTeam() {
     : '<article class="empty-state"><strong>Команда не настроена</strong><span>Добавьте активных сотрудников в лист Users.</span></article>';
 }
 
+function projectStatusLabel(status) {
+  return {
+    Active: 'Активен',
+    Paused: 'На паузе',
+    Completed: 'Завершён',
+    Archived: 'В архиве',
+  }[status] || status || 'Активен';
+}
+
+function findDashboardProject(projectId) {
+  return dashboardProjects().find(function (project) {
+    return project.id === projectId;
+  }) || null;
+}
+
 function renderMfDepartments() {
   const cards = directionWorkloadRows(activeTasks()).map(function (direction) {
     const urgentTasks = direction.active.slice().sort(compareTaskUrgency).slice(0, 3);
@@ -3478,11 +3554,23 @@ function renderMfDepartments() {
       '</article>',
     ].join('');
   }).join('');
-  const projects = dashboardProjects().map(function (project) {
-    return '<article class="mf-department-card"><div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(project.id) + '</span><h3>' + escapeHtml(project.name) + '</h3></div>' + mfPill(project.status, project.status === 'Active' ? 'green' : 'neutral') + '</div><p>' + escapeHtml(project.description || 'Без описания') + '</p><div class="mf-task-meta"><span>Отдел: <strong>' + escapeHtml(project.department) + '</strong></span><span>Ответственный: <strong>' + escapeHtml(project.ownerEmail || 'Не назначен') + '</strong></span></div></article>';
-  }).join('');
   const profile = identityDisplayProfile();
-  const addButton = profile.permissions && profile.permissions.canManageProjects
+  const canManageProjects = Boolean(profile.permissions && profile.permissions.canManageProjects);
+  const projects = dashboardProjects().map(function (project) {
+    const archived = project.status === 'Archived';
+    const actions = canManageProjects
+      ? [
+        '<div class="mf-action-row">',
+        '<button class="secondary-button" type="button" data-project-action="edit" data-project-id="' + escapeHtml(project.id) + '">Изменить</button>',
+        archived
+          ? '<button class="secondary-button" type="button" data-project-action="restore" data-project-id="' + escapeHtml(project.id) + '">Восстановить</button>'
+          : '<button class="secondary-button danger-button" type="button" data-project-action="archive" data-project-id="' + escapeHtml(project.id) + '">В архив</button>',
+        '</div>',
+      ].join('')
+      : '';
+    return '<article class="mf-department-card' + (archived ? ' archived-project' : '') + '"><div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(project.id) + '</span><h3>' + escapeHtml(project.name) + '</h3></div>' + mfPill(projectStatusLabel(project.status), project.status === 'Active' ? 'green' : 'neutral') + '</div><p>' + escapeHtml(project.description || 'Без описания') + '</p><div class="mf-task-meta"><span>Отдел: <strong>' + escapeHtml(project.department) + '</strong></span><span>Ответственный: <strong>' + escapeHtml(project.ownerEmail || 'Не назначен') + '</strong></span></div>' + actions + '</article>';
+  }).join('');
+  const addButton = canManageProjects
     ? '<div class="mf-action-row"><button class="primary-button" type="button" data-project-action="create">Добавить проект</button></div>'
     : '';
   elements.taskList.innerHTML = [
@@ -3978,6 +4066,10 @@ function renderMfSection() {
     renderMfMyFocus();
     return true;
   }
+  if (activeTab === 'trash') {
+    renderTrash();
+    return true;
+  }
   if (activeTab === 'team') {
     renderMfTeam();
     return true;
@@ -4185,37 +4277,93 @@ function openCreateTaskModal() {
   elements.createTaskForm.elements.title.focus();
 }
 
-async function handleProjectAction(action) {
-  if (action !== 'create') {
-    return;
-  }
-  const name = window.prompt('Название проекта');
-  if (!name) {
-    return;
-  }
+async function handleProjectAction(action, projectId) {
   const departments = dashboardDepartments();
-  const department = window.prompt(
-    'Отдел проекта' + (departments.length ? '\nДоступны: ' + departments.join(', ') : ''),
-    departments[0] || ''
-  );
-  if (!department) {
-    return;
-  }
-  const description = window.prompt('Краткое описание проекта (необязательно)', '') || '';
   try {
-    flashMessage = 'Добавляем проект…';
-    render();
-    await BAFoxClient.createProject(Object.assign({
-      name: name.trim(),
-      department: department.trim(),
-      description: description.trim(),
-    }, identityRequestParams()));
+    if (action === 'create') {
+      const name = window.prompt('Название проекта');
+      if (!name) return;
+      const department = window.prompt(
+        'Отдел проекта' + (departments.length ? '\nДоступны: ' + departments.join(', ') : ''),
+        departments[0] || ''
+      );
+      if (!department) return;
+      const description = window.prompt('Краткое описание проекта (необязательно)', '');
+      if (description === null) return;
+      flashMessage = 'Добавляем проект…';
+      render();
+      await BAFoxClient.createProject(Object.assign({
+        name: name.trim(),
+        department: department.trim(),
+        description: description.trim(),
+      }, identityRequestParams()));
+      flashMessage = 'Проект добавлен.';
+    } else {
+      const project = findDashboardProject(projectId);
+      if (!project) {
+        flashMessage = 'Проект не найден. Обновите данные.';
+        render();
+        return;
+      }
+      if (action === 'archive' || action === 'restore') {
+        const nextStatus = action === 'archive' ? 'Archived' : 'Active';
+        const confirmation = action === 'archive'
+          ? 'Переместить проект «' + project.name + '» в архив?'
+          : 'Восстановить проект «' + project.name + '»?';
+        if (!window.confirm(confirmation)) return;
+        flashMessage = action === 'archive' ? 'Архивируем проект…' : 'Восстанавливаем проект…';
+        render();
+        await BAFoxClient.updateProject(Object.assign({
+          projectId: project.id,
+          status: nextStatus,
+        }, identityRequestParams()));
+        flashMessage = action === 'archive' ? 'Проект перемещён в архив.' : 'Проект восстановлен.';
+      } else if (action === 'edit') {
+        const name = window.prompt('Название проекта', project.name || '');
+        if (name === null) return;
+        const department = window.prompt(
+          'Отдел проекта' + (departments.length ? '\nДоступны: ' + departments.join(', ') : ''),
+          project.department || departments[0] || ''
+        );
+        if (department === null) return;
+        const ownerEmail = window.prompt('Рабочая почта ответственного (необязательно)', project.ownerEmail || '');
+        if (ownerEmail === null) return;
+        const status = window.prompt('Статус: Active, Paused, Completed или Archived', project.status || 'Active');
+        if (status === null) return;
+        const description = window.prompt('Краткое описание проекта', project.description || '');
+        if (description === null) return;
+        if (!name.trim() || !department.trim()) {
+          flashMessage = 'Название и отдел проекта обязательны.';
+          render();
+          return;
+        }
+        if (!['Active', 'Paused', 'Completed', 'Archived'].includes(status.trim())) {
+          flashMessage = 'Допустимые статусы: Active, Paused, Completed, Archived.';
+          render();
+          return;
+        }
+        flashMessage = 'Сохраняем проект…';
+        render();
+        await BAFoxClient.updateProject(Object.assign({
+          projectId: project.id,
+          name: name.trim(),
+          department: department.trim(),
+          ownerEmail: ownerEmail.trim(),
+          status: status.trim(),
+          description: description.trim(),
+        }, identityRequestParams()));
+        flashMessage = 'Проект обновлён.';
+      } else {
+        return;
+      }
+    }
+    const successMessage = flashMessage;
     await loadDashboard({ forceRefresh: true });
     activeTab = 'departments';
-    flashMessage = 'Проект добавлен.';
+    flashMessage = successMessage;
     render();
   } catch (error) {
-    flashMessage = error && error.message ? error.message : 'Не удалось добавить проект.';
+    flashMessage = error && error.message ? error.message : 'Не удалось изменить проект.';
     render();
   }
 }
@@ -4856,7 +5004,7 @@ elements.workspaceControls.addEventListener('click', function (event) {
 elements.taskList.addEventListener('click', function (event) {
   const projectActionButton = event.target.closest('[data-project-action]');
   if (projectActionButton) {
-    handleProjectAction(projectActionButton.dataset.projectAction);
+    handleProjectAction(projectActionButton.dataset.projectAction, projectActionButton.dataset.projectId || '');
     return;
   }
   const identityActionButton = event.target.closest('[data-identity-action]');
@@ -4968,6 +5116,9 @@ function cloneTaskWithAction(task, actionData) {
   if (actionData.newNextReminder !== undefined) {
     updated.nextReminder = actionData.newNextReminder;
   }
+  if (actionData.newArchived !== undefined) {
+    updated.archived = actionData.newArchived === true;
+  }
   if (taskStatusKey(updated) === 'done') {
     updated.completedAt = updated.completedAt || new Date().toISOString();
   }
@@ -4976,7 +5127,7 @@ function cloneTaskWithAction(task, actionData) {
 
 function findTaskForAction(taskId) {
   const data = dashboardData();
-  const sections = [data.today, data.open, data.pushes];
+  const sections = [data.all, data.today, data.open, data.pushes, data.completed];
   for (let sectionIndex = 0; sectionIndex < sections.length; sectionIndex += 1) {
     const section = sections[sectionIndex];
     if (!section || !Array.isArray(section.tasks)) {
@@ -5070,8 +5221,11 @@ function applyTaskActionResult(taskId, action, actionData) {
     return;
   }
   const updatedTask = cloneTaskWithAction(currentTask, actionData);
-  const isDone = taskStatusKey(updatedTask) === 'done';
+  const isDone = isFinalTask(updatedTask);
 
+  updateSectionTasks(data.all, taskId, updatedTask, function () {
+    return true;
+  });
   updateSectionTasks(data.open, taskId, updatedTask, function () {
     return !isDone;
   });
@@ -5095,6 +5249,12 @@ async function handleTaskAction(button) {
     return;
   }
   if (action === 'markDone' && !window.confirm('Отметить задачу выполненной?')) {
+    return;
+  }
+  if (action === 'moveToTrash' && !window.confirm('Переместить задачу в корзину? Её можно будет восстановить.')) {
+    return;
+  }
+  if (action === 'restoreFromTrash' && !window.confirm('Восстановить задачу из корзины?')) {
     return;
   }
 

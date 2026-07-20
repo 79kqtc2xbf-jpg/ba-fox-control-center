@@ -1,5 +1,5 @@
 var BA_FOX_CONFIG = {
-  VERSION: 'v2.9.0-team-projects-enforced',
+  VERSION: 'v2.10.0-trash-project-edit',
   DRY_RUN: true,
   READ_LIVE_SHEETS: true,
   SAFE_WRITE_MODE: true,

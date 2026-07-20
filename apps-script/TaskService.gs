@@ -719,8 +719,23 @@ function baFoxTaskActionMap_() {
     moveToWork: { status: 'В работе' },
     moveToPush: { status: 'Пуш' },
     moveToWaiting: { status: 'Ждём ответ' },
-    snoozeTask: { snooze: true }
+    snoozeTask: { snooze: true },
+    moveToTrash: { archived: true, preserveStatus: true },
+    restoreFromTrash: { archived: false, preserveStatus: true }
   };
+}
+
+function baFoxProfileCanManageTrashedTask_(profile, task) {
+  var role = normalizeProfileRole_(profile);
+  if (role === 'admin' || role === 'executive') {
+    return true;
+  }
+  var email = normalizeWorkspaceEmail_(profile && profile.email);
+  var userId = baFoxSafeString(profile && profile.userId).toLowerCase();
+  return Boolean(
+    (email && normalizeWorkspaceEmail_(task && task.createdByEmail) === email)
+    || (userId && baFoxSafeString(task && task.createdByUserId).toLowerCase() === userId)
+  );
 }
 
 function baFoxValidateSafeReminder_(value) {
@@ -799,6 +814,24 @@ function baFoxTaskAction(request) {
   }
 
   var previous = baFoxNormalizeTaskRow(match.row, match.headers);
+  if (actionConfig.preserveStatus === true
+      && !baFoxProfileCanManageTrashedTask_(identityCheck.profile, previous)) {
+    baFoxAuditTaskAction({
+      timestamp: baFoxIsoNow(),
+      actor: identityCheck.profile && identityCheck.profile.email ? identityCheck.profile.email : 'BA Fox Web',
+      taskId: normalized.taskId,
+      action: normalized.action,
+      routeAction: 'taskAction/' + normalized.action,
+      source: 'web',
+      result: 'failed',
+      errorCode: 'WRITE_FORBIDDEN'
+    });
+    return baFoxError(
+      'WRITE_FORBIDDEN',
+      'Only the task creator, an executive, or an admin can move this task to or from trash.',
+      { taskId: normalized.taskId }
+    );
+  }
   var now = baFoxIsoNow();
   var patch = {
     UPDATED_AT: now
@@ -807,6 +840,8 @@ function baFoxTaskAction(request) {
   if (actionConfig.snooze) {
     patch.NEXT_REMINDER = baFoxSafeString(normalized.nextReminder);
     patch.CONTROL_DATE = baFoxTaskDateIso_(normalized.nextReminder);
+  } else if (actionConfig.preserveStatus === true) {
+    patch.ARCHIVED = actionConfig.archived === true;
   } else {
     patch.STATUS = actionConfig.status;
     if (normalized.action === 'markDone') {
@@ -840,22 +875,26 @@ function baFoxTaskAction(request) {
     taskId: normalized.taskId,
     action: normalized.action,
     previousStatus: previous.status,
-    newStatus: actionConfig.snooze ? previous.status : actionConfig.status,
+    newStatus: actionConfig.snooze || actionConfig.preserveStatus ? previous.status : actionConfig.status,
     previousNextReminder: previous.nextReminder,
     newNextReminder: actionConfig.snooze ? patch.NEXT_REMINDER : previous.nextReminder,
     routeAction: 'taskAction/' + normalized.action,
     source: 'web',
     result: 'success',
-    errorCode: ''
+    errorCode: '',
+    previousValues: actionConfig.preserveStatus ? baFoxSafeJson_({ archived: previous.archived }) : '',
+    newValues: actionConfig.preserveStatus ? baFoxSafeJson_({ archived: actionConfig.archived === true }) : ''
   });
 
   return baFoxOk({
     taskId: normalized.taskId,
     action: normalized.action,
     previousStatus: previous.status,
-    newStatus: actionConfig.snooze ? previous.status : actionConfig.status,
+    newStatus: actionConfig.snooze || actionConfig.preserveStatus ? previous.status : actionConfig.status,
     previousNextReminder: previous.nextReminder,
     newNextReminder: actionConfig.snooze ? patch.NEXT_REMINDER : previous.nextReminder,
+    previousArchived: previous.archived === true,
+    newArchived: actionConfig.preserveStatus ? actionConfig.archived === true : previous.archived === true,
     updateResult: updateResponse.data,
     auditResult: auditResult
   });

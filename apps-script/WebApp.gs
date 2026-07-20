@@ -42,7 +42,7 @@ function baFoxCacheKey_(route, parameters) {
 }
 
 function baFoxIsWriteRoute_(route) {
-  return ['taskAction', 'createTask', 'editTask', 'createProject', 'prepareTaskIdentityColumns'].indexOf(route) !== -1;
+  return ['taskAction', 'createTask', 'editTask', 'createProject', 'updateProject', 'prepareTaskIdentityColumns'].indexOf(route) !== -1;
 }
 
 function baFoxIsCacheBypass_(parameters) {
@@ -427,6 +427,9 @@ function baFoxBuildRouteResponse_(route, parameters) {
       break;
     case 'createProject':
       response = baFoxCreateProject_(parameters);
+      break;
+    case 'updateProject':
+      response = baFoxUpdateProject_(parameters);
       break;
     default:
       response = baFoxError(
