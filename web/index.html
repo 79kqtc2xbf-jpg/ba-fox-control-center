@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#070b1a" />
   <title>MF Group Tracker - Операционный дашборд</title>
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=stage40" />
 </head>
 <body>
   <main class="app-shell">
@@ -40,15 +40,14 @@
           <strong>MF OPS</strong>
         </div>
         <nav class="tabs" aria-label="MF Group Tracker sections">
-          <button class="tab active" type="button" data-tab="dashboard" aria-selected="true">Обзор</button>
+          <button class="tab active" type="button" data-tab="dashboard" aria-selected="true">Главная</button>
           <button class="tab" type="button" data-tab="myTasks" aria-selected="false">Мои задачи</button>
-          <button class="tab" type="button" data-tab="myFocus" aria-selected="false">Мой фокус</button>
-          <button class="tab" type="button" data-tab="all" aria-selected="false">Все задачи</button>
-          <button class="tab" type="button" data-tab="team" aria-selected="false">Кто чем занят</button>
-          <button class="tab" type="button" data-tab="departments" aria-selected="false">Отделы / направления</button>
-          <button class="tab" type="button" data-tab="dependencies" aria-selected="false">Риски и зависшие</button>
-          <button class="tab" type="button" data-tab="reports" aria-selected="false">Отчёты</button>
-          <button class="tab" type="button" data-tab="settings" aria-selected="false">Настройки</button>
+          <button class="tab" type="button" data-tab="all" aria-selected="false">Задачи команды</button>
+          <button class="tab" type="button" data-tab="team" aria-selected="false">Команда</button>
+          <button class="tab" type="button" data-tab="departments" data-roles="admin executive" aria-selected="false">Направления</button>
+          <button class="tab" type="button" data-tab="dependencies" data-roles="admin executive" aria-selected="false">Риски</button>
+          <button class="tab" type="button" data-tab="settings" aria-selected="false">Профиль</button>
+          <button class="tab" type="button" data-tab="admin" data-roles="admin" aria-selected="false">Администрирование</button>
         </nav>
       </aside>
 
@@ -258,10 +257,10 @@
 
   <script src="config.runtime.js"></script>
   <script src="config.local.js"></script>
-  <script src="api/baFoxConfig.js?v=stage36"></script>
-  <script src="api/baFoxMockData.js?v=stage36"></script>
-  <script src="api/baFoxUiState.js?v=stage36"></script>
-  <script src="api/baFoxClient.js?v=stage36"></script>
-  <script src="app.js?v=stage36"></script>
+  <script src="api/baFoxConfig.js?v=stage40"></script>
+  <script src="api/baFoxMockData.js?v=stage40"></script>
+  <script src="api/baFoxUiState.js?v=stage40"></script>
+  <script src="api/baFoxClient.js?v=stage40"></script>
+  <script src="app.js?v=stage40"></script>
 </body>
 </html>

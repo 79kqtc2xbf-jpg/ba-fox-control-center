@@ -1,13 +1,14 @@
 // Product owner: Liza Kiseleva. Product concept and workflow architecture for BA Fox / MF Group Tracker.
 const viewLabels = Object.freeze({
-  dashboard: ['Обзор', 'Что требует внимания руководителя'],
-  myTasks: ['Мои задачи', 'Ответственность Lisa, контрольные даты и задачи для отчётов'],
+  dashboard: ['Главная', 'Рабочая сводка'],
+  myTasks: ['Мои задачи', 'Личная очередь и совместная работа'],
   myFocus: ['Мой фокус', 'Личный фокус из командной операционной очереди'],
-  team: ['Кто чем занят', 'Ответственные, нагрузка, блокеры и ожидания'],
-  departments: ['Отделы / направления', 'Активная работа по временной модели направлений'],
-  dependencies: ['Риски и зависшие', 'Просрочка, блокеры, ожидания и задачи без владельца'],
+  team: ['Команда', 'Нагрузка и главные задачи команды'],
+  departments: ['Направления', 'Активная работа по направлениям'],
+  dependencies: ['Риски', 'Просрочка, блокеры и ожидания'],
   reports: ['Отчёты', 'Дневные, недельные, отделовые и управленческие сводки'],
-  settings: ['Настройки', 'Сотрудники, роли, Telegram и права доступа'],
+  settings: ['Профиль', 'Аккаунт и настройки интерфейса'],
+  admin: ['Администрирование', 'Доступы, роли и диагностика'],
   inbox: ['📥 Inbox', 'Новые задачи и входящий поток'],
   focus: ['🎯 Фокус', '3–5 задач, которые двигают день'],
   today: ['🔥 Today', 'Сроки, контроль и напоминания на сегодня'],
@@ -16,7 +17,7 @@ const viewLabels = Object.freeze({
   presentations: ['Презентации', 'Деки, офферы и материалы'],
   brokers: ['Брокеры', 'Брокеры, партнёры и внешние касания'],
   waiting: ['⏰ Ждут ответа', 'Ожидания, контрольные даты и пуши'],
-  all: ['📋 Все задачи', 'Все строки задач из dashboard/read API'],
+  all: ['Задачи команды', 'Поиск и фильтры по общей очереди'],
   completed: ['Завершённые', 'Архив, история и память для отчётов'],
   calendar: ['Календарь', 'Задачи по срокам и напоминаниям'],
   legacyReports: ['📈 Отчёты', 'Дневной и недельный отчёт'],
@@ -1339,7 +1340,7 @@ function stage30ManagementMetrics() {
 }
 
 function ownerWorkloadRows(tasks) {
-  return ownerFilters.filter(function (owner) {
+  return ownerFilterOptions(tasks).filter(function (owner) {
     return owner.id !== 'all';
   }).map(function (owner) {
     const ownerTasks = tasks.filter(function (task) {
@@ -1355,6 +1356,64 @@ function ownerWorkloadRows(tasks) {
       overdue: ownerTasks.filter(isOverdueTask),
     };
   });
+}
+
+function ownerFilterOptions(tasks) {
+  const seen = {};
+  const options = [{ id: 'all', label: 'Все ответственные' }];
+  (tasks || []).forEach(function (task) {
+    const label = taskOwnerLabel(task);
+    const id = ownerKey(task && task.owner);
+    if (!seen[id]) {
+      seen[id] = true;
+      options.push({ id: id, label: label });
+    }
+  });
+  return options.sort(function (left, right) {
+    if (left.id === 'all') return -1;
+    if (right.id === 'all') return 1;
+    if (left.id === 'unassigned') return 1;
+    if (right.id === 'unassigned') return -1;
+    return left.label.localeCompare(right.label, 'ru');
+  });
+}
+
+function identityList(value, fallback) {
+  if (Array.isArray(value)) {
+    return value.map(normalizeText).filter(Boolean);
+  }
+  return String(value || fallback || '')
+    .split(/[;,\n]+/)
+    .map(normalizeText)
+    .filter(Boolean);
+}
+
+function taskRelationshipToProfile(task, profile) {
+  const email = normalizeEmail(profile && profile.email);
+  const userId = normalizeText(profile && profile.backendProfileData && profile.backendProfileData.profile && profile.backendProfileData.profile.userId);
+  const ownerLabels = [
+    profile && profile.defaultOwnerLabel,
+    profile && profile.displayName,
+  ].map(ownerKey).filter(Boolean);
+  const ownerMatches = (email && normalizeEmail(task && task.ownerEmail) === email)
+    || (userId && normalizeText(task && task.ownerUserId) === userId)
+    || ownerLabels.includes(ownerKey(task && task.owner));
+  const collaboratorMatches = (email && identityList(task && task.collaboratorEmailList, task && task.collaboratorEmails).includes(email))
+    || (userId && identityList(task && task.collaboratorUserIdList, task && task.collaboratorUserIds).includes(userId));
+  const createdByMatches = (email && normalizeEmail(task && task.createdByEmail) === email)
+    || (userId && normalizeText(task && task.createdByUserId) === userId);
+  return {
+    owner: Boolean(ownerMatches),
+    collaborator: Boolean(collaboratorMatches),
+    createdBy: Boolean(createdByMatches),
+    related: Boolean(ownerMatches || collaboratorMatches || createdByMatches),
+  };
+}
+
+function personalLiveTasks(profile) {
+  return uniqueTasks(allLoadedTasks().filter(function (task) {
+    return taskRelationshipToProfile(task, profile).related;
+  }));
 }
 
 function directionWorkloadRows(tasks) {
@@ -1549,7 +1608,16 @@ function loadIdentityState() {
 }
 
 function identityDisplayProfile() {
-  const fallbackUser = usersRegistry[0];
+  const fallbackUser = {
+    displayName: 'Не выполнен вход',
+    title: '',
+    accessRole: 'viewer',
+    status: 'identity_missing',
+    department: '',
+    defaultOwnerLabel: '',
+    accentColor: 'green',
+    canSeeAll: false,
+  };
   const backendProfileData = profileState.status === 'success' && profileState.data ? profileState.data : null;
   const backendProfile = backendProfileData && backendProfileData.profile ? backendProfileData.profile : null;
   const backendPermissions = backendProfileData && backendProfileData.permissions ? backendProfileData.permissions : {};
@@ -1752,15 +1820,24 @@ function navCountForTab(tabName) {
   if (dashboardState.status === 'loading') {
     return '...';
   }
+  const profile = identityDisplayProfile();
+  const personalTasks = personalLiveTasks(profile);
+  const managementMetrics = stage30ManagementMetrics();
+  const uniqueRiskCount = uniqueTasks([]
+    .concat(managementMetrics.overdue)
+    .concat(managementMetrics.blockers)
+    .concat(managementMetrics.waiting)
+    .concat(managementMetrics.withoutOwner)).length;
   const counts = {
     dashboard: activeTasks().length,
-    myTasks: mfTasksForEmployee(mfCurrentUserId).filter(isMfOpenTask).length,
-    myFocus: mfTasksForEmployee(mfCurrentUserId).filter(function (task) { return isMfOpenTask(task) && (task.priority === 'Высокий' || task.controlDate === todayIsoBangkok() || isOverdueStatus(task.status)); }).length,
+    myTasks: personalTasks.filter(function (task) { return !isFinalTask(task); }).length,
+    myFocus: '',
     team: ownerWorkloadRows(activeTasks()).filter(function (row) { return row.active.length; }).length,
     departments: directionWorkloadRows(activeTasks()).filter(function (row) { return row.active.length; }).length,
-    dependencies: stage30ManagementMetrics().overdue.length + stage30ManagementMetrics().blockers.length + stage30ManagementMetrics().withoutOwner.length,
-    reports: mfReportRows.length,
+    dependencies: uniqueRiskCount,
+    reports: '',
     settings: '',
+    admin: '',
     inbox: inboxTasks().length,
     focus: focusTasks().length,
     today: derivedTodayTasks().length,
@@ -2029,6 +2106,10 @@ function renderModeBanner() {
 
 function renderCreateTaskButton() {
   const loading = dashboardState.status === 'loading' || scaffoldState.status === 'loading';
+  const profile = identityDisplayProfile();
+  const dashboardAllowed = profile.isVerifiedByGoogle
+    && Boolean(profile.permissions && profile.permissions.canUseDashboard);
+  elements.createTaskButton.hidden = !dashboardAllowed;
   elements.createTaskButton.disabled = loading || !safeWritesEnabled();
   elements.writeModePill.textContent = safeWritesEnabled()
     ? 'Запись включена'
@@ -2069,16 +2150,24 @@ function renderSummary() {
     return;
   }
 
-  const metrics = stage30ManagementMetrics();
-  const cards = [
-    { label: 'Активные задачи', value: metrics.active.length, tone: 'active' },
-    { label: 'Просрочено', value: metrics.overdue.length, tone: 'overdue' },
-    { label: 'Блокеры', value: metrics.blockers.length, tone: 'critical' },
-    { label: 'Ждут ответа', value: metrics.waiting.length, tone: 'waiting' },
-    { label: 'Без ответственного', value: metrics.withoutOwner.length, tone: 'neutral' },
-    { label: 'Без отдела / направления', value: metrics.withoutDirection.length, tone: 'neutral' },
-    { label: 'Выполнено', value: metrics.completed.length, tone: 'done' },
-  ];
+  const profile = identityDisplayProfile();
+  const managementView = profile.accessRole === 'admin' || profile.accessRole === 'executive';
+  const sourceTasks = managementView
+    ? activeTasks()
+    : personalLiveTasks(profile).filter(function (task) { return !isFinalTask(task); });
+  const cards = managementView
+    ? [
+      { label: 'Активные задачи', value: sourceTasks.length, tone: 'active' },
+      { label: 'Просрочено', value: overdueTasks(sourceTasks).length, tone: 'overdue' },
+      { label: 'Ждут ответа', value: waitingTasks(sourceTasks).length, tone: 'waiting' },
+      { label: 'Без ответственного', value: tasksWithoutOwner(sourceTasks).length, tone: 'critical' },
+    ]
+    : [
+      { label: 'Мои активные', value: sourceTasks.length, tone: 'active' },
+      { label: 'Просрочено', value: overdueTasks(sourceTasks).length, tone: 'overdue' },
+      { label: 'Ждут ответа', value: waitingTasks(sourceTasks).length, tone: 'waiting' },
+      { label: 'В фокусе', value: sourceTasks.filter(isManualFocusTask).length, tone: 'done' },
+    ];
 
   elements.summaryCards.innerHTML = cards.map(function (card) {
     return '<article class="summary-card ' + escapeHtml(card.tone) + '"><strong>' + escapeHtml(card.value) + '</strong><span>' + card.label + '</span></article>';
@@ -2093,7 +2182,7 @@ function statusText() {
     return 'Обновляем данные…';
   }
   if (dashboardState.status === 'error' || scaffoldState.status === 'error') {
-    return 'Не удалось обновить live-данные, показана последняя доступная версия / mock fallback.';
+    return dashboardState.message || 'Не удалось загрузить live-данные. Демо-задачи не подставляются.';
   }
   if (activeTab === 'dashboard') {
     return dashboardState.isMock
@@ -2101,13 +2190,13 @@ function statusText() {
       : 'Обзор показывает активные задачи, просрочку, блокеры, ожидания и пустые поля из live-данных.';
   }
   if (activeTab === 'myTasks') {
-    return 'Личный вид Lisa: свои задачи, совместная работа, контрольные даты и задачи для отчётов.';
+    return 'Личная очередь собрана из live-задач, где вы указаны ответственным, участником или автором.';
   }
   if (activeTab === 'myFocus') {
     return 'Личный фокус считается из приоритета, блокеров и контрольных дат. Это не новое поле для записи.';
   }
   if (activeTab === 'team') {
-    return 'Кто чем занят показывает нагрузку по ответственным: активные задачи, блокеры, ожидания, просрочку и 3 главные задачи.';
+    return 'Команда показывает нагрузку по ответственным и три главные задачи каждого.';
   }
   if (activeTab === 'departments') {
     return 'Отдел / направление временно считается из существующей категории задачи. Это можно переименовать без изменения схемы.';
@@ -2116,7 +2205,10 @@ function statusText() {
     return 'Риски и зависшие показывают просрочку, блокеры, ожидания и задачи без владельца, направления, следующего шага или даты.';
   }
   if (activeTab === 'settings') {
-    return 'Настройки пока показывают макет сотрудников, отделов, ролей, Telegram-связки и прав доступа.';
+    return 'Профиль и оформление текущего пользователя.';
+  }
+  if (activeTab === 'admin') {
+    return 'Доступы, пользователи и диагностика для администратора.';
   }
   if (activeTab === 'system') {
     return 'Настройки показывают состояние live read, safe writes и отключенной автоматизации.';
@@ -2234,7 +2326,7 @@ function taskFilterHtml(tasks) {
     const selected = filter.id === activeCategoryFilter ? ' selected' : '';
     return '<option value="' + escapeHtml(filter.id) + '"' + selected + '>' + escapeHtml(filter.label) + ' · ' + count + '</option>';
   }).join('');
-  const ownerOptionsHtml = ownerFilters.map(function (filter) {
+  const ownerOptionsHtml = ownerFilterOptions(tasks).map(function (filter) {
     const count = filter.id === 'all'
       ? tasks.length
       : tasks.filter(function (task) { return ownerKey(task.owner) === filter.id; }).length;
@@ -2262,18 +2354,12 @@ function renderWorkspaceControls(tasks) {
   const activeCount = tasks.filter(function (task) { return taskMatchesFilter(task, 'active'); }).length;
   const completedCount = tasks.filter(function (task) { return taskMatchesFilter(task, 'completed'); }).length;
   const blockedCount = tasks.filter(function (task) { return taskMatchesFilter(task, 'blocked'); }).length;
-  const lizaCount = tasks.filter(function (task) { return ownerKey(task.owner) === 'liza' && taskMatchesFilter(task, 'active'); }).length;
-  const andreyCount = tasks.filter(function (task) { return ownerKey(task.owner) === 'andrey' && taskMatchesFilter(task, 'active'); }).length;
-  const daniilCount = tasks.filter(function (task) { return ownerKey(task.owner) === 'daniil' && taskMatchesFilter(task, 'active'); }).length;
   elements.workspaceControls.innerHTML = [
     '<div class="all-task-counters" aria-label="Счётчики задач">',
     '<span>Активные: <strong>' + activeCount + '</strong></span>',
     '<span>Всего: <strong>' + tasks.length + '</strong></span>',
     '<span>Выполнено: <strong>' + completedCount + '</strong></span>',
     '<span>Блокеры: <strong>' + blockedCount + '</strong></span>',
-    '<span>Лиза: <strong>' + lizaCount + '</strong></span>',
-    '<span>Андрей: <strong>' + andreyCount + '</strong></span>',
-    '<span>Даниил: <strong>' + daniilCount + '</strong></span>',
     '</div>',
     '<label class="task-search">',
     '<span>Поиск задач</span>',
@@ -2320,13 +2406,12 @@ function actionButtonsHtml(task) {
   const moveOptions = [
     ['moveToWork', 'В работе', 'status-chip', false],
     ['moveToWaiting', 'Ждёт ответа', 'status-chip', false],
-    ['moveToPush', 'Пуш', 'status-chip', false],
-    ['moveToBlocker', 'Блокер', 'status-chip muted', true],
+    ['moveToPush', 'Напомнить', 'status-chip', false],
   ];
   const reminderOptions = [
-    ['snoozeOneDay', 'Tomorrow'],
-    ['snoozeThreeDays', '+3 days'],
-    ['snoozeNextWeek', '+7 days'],
+    ['snoozeOneDay', 'Завтра'],
+    ['snoozeThreeDays', '+3 дня'],
+    ['snoozeNextWeek', '+7 дней'],
   ];
   const completeLabel = busy && state.action === 'markDone' ? '...' : '✓ Выполнено';
   const moveButtons = moveOptions.map(function (option) {
@@ -2351,7 +2436,7 @@ function actionButtonsHtml(task) {
     '<div class="task-chip-row" aria-label="Статус">' + moveButtons + '</div>',
     '<div class="task-chip-row reminder-row" aria-label="Контрольная дата"><span class="chip-row-label">Контроль</span>' + reminderButtons + '<span class="chip-row-label muted">Выбор даты через обновление этапа</span></div>',
     '<button class="task-action chip focus-chip" type="button" data-task-focus="' + escapeHtml(task.id) + '">' + (isManualFocusTask(task) ? '✓ В фокусе' : 'В фокус') + '</button>',
-    '<button class="task-action chip edit-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-edit="' + escapeHtml(task.id) + '">Обновить этап</button>',
+    '<button class="task-action chip edit-chip" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-edit="' + escapeHtml(task.id) + '">Изменить</button>',
     '</div>',
     message,
   ].join('');
@@ -3209,44 +3294,64 @@ function renderStage30Dashboard() {
   elements.taskList.innerHTML = [
     '<section class="mf-dashboard stage30-dashboard">',
     '<article class="mf-exec-card">',
-    '<span>Что Лизе смотреть первым</span>',
-    '<h3>' + escapeHtml(firstLook.length ? 'Сначала просрочка, блокеры, ожидания и задачи без владельца.' : 'Критических управленческих сигналов сейчас нет.') + '</h3>',
-    '<p>Обзор считается из live-задач: ответственный берётся из Owner, направление временно берётся из существующей категории задачи.</p>',
-    '<div class="mf-pill-row">',
-    mfPill('Без Google login', 'neutral'),
-    mfPill('Без новой схемы Sheets', 'green'),
-    mfPill('Без изменений Telegram', 'neutral'),
-    '</div>',
+    '<span>Главное сейчас</span>',
+    '<h3>' + escapeHtml(firstLook.length ? 'Сначала просроченные задачи, ожидания и задачи без ответственного.' : 'Критических сигналов сейчас нет.') + '</h3>',
+    '<p>Сводка собрана из актуальных задач Google Sheets.</p>',
     '</article>',
-    managementMiniGrid(metrics),
     '<div class="mf-two-column">',
-    '<section><div class="mf-section-title"><h3>Что смотреть первым</h3><span>' + firstLook.length + '</span></div>' + managementTaskList(firstLook, 'Нет срочных сигналов', 'Просроченных задач, блокеров или пустых владельцев не найдено.', 5) + '</section>',
-    '<section><div class="mf-section-title"><h3>Риски и зависшие</h3><span>' + (metrics.overdue.length + metrics.blockers.length + metrics.waiting.length) + '</span></div>' + managementTaskList(uniqueTasks([].concat(metrics.overdue).concat(metrics.blockers).concat(metrics.waiting)), 'Риски не найдены', 'Просрочки, блокеров и ожиданий в текущей выборке нет.', 5) + '</section>',
+    '<section><div class="mf-section-title"><h3>Что требует внимания</h3><span>' + firstLook.length + '</span></div>' + managementTaskList(firstLook, 'Нет срочных сигналов', 'Просроченных задач, блокеров или пустых владельцев не найдено.', 5) + '</section>',
+    '<section><div class="mf-section-title"><h3>Риски</h3><span>' + uniqueTasks([].concat(metrics.overdue).concat(metrics.blockers).concat(metrics.waiting)).length + '</span></div>' + managementTaskList(uniqueTasks([].concat(metrics.overdue).concat(metrics.blockers).concat(metrics.waiting)), 'Риски не найдены', 'Просрочки, блокеров и ожиданий в текущей выборке нет.', 5) + '</section>',
     '</div>',
-    '<section><div class="mf-section-title"><h3>Кто чем занят</h3><span>' + ownerRows.length + '</span></div><div class="mf-density-list">' + ownerDensity + '</div></section>',
-    '<section><div class="mf-section-title"><h3>Отделы / направления</h3><span>' + directionRows.length + '</span></div><div class="mf-density-list">' + directionDensity + '</div></section>',
+    '<section><div class="mf-section-title"><h3>Команда</h3><span>' + ownerRows.filter(function (row) { return row.active.length; }).length + '</span></div><div class="mf-density-list">' + ownerDensity + '</div></section>',
+    '<section><div class="mf-section-title"><h3>Направления</h3><span>' + directionRows.length + '</span></div><div class="mf-density-list">' + directionDensity + '</div></section>',
     '</section>',
   ].join('');
 }
 
 function renderMfDashboard() {
-  renderStage30Dashboard();
+  const profile = identityDisplayProfile();
+  if (profile.accessRole === 'admin' || profile.accessRole === 'executive') {
+    renderStage30Dashboard();
+    return;
+  }
+  const personal = personalLiveTasks(profile).filter(function (task) { return !isFinalTask(task); });
+  const attention = uniqueTasks([]
+    .concat(overdueTasks(personal))
+    .concat(blockedTasks(personal))
+    .concat(waitingTasks(personal)))
+    .sort(compareTaskUrgency);
+  const nextTasks = personal.slice().sort(compareTaskUrgency).slice(0, 5);
+  elements.taskList.innerHTML = [
+    '<section class="mf-page-grid">',
+    '<article class="mf-exec-card compact"><span>Мой рабочий день</span><h3>' + escapeHtml(attention.length ? 'Есть задачи, которые требуют внимания.' : 'Срочных сигналов по вашим задачам нет.') + '</h3><p>Здесь показываются только задачи, где вы указаны ответственным, участником или автором.</p></article>',
+    '<section><div class="mf-section-title"><h3>Требуют внимания</h3><span>' + attention.length + '</span></div>' + (attention.length ? '<div class="task-group-list">' + attention.slice(0, 5).map(taskCardHtml).join('') + '</div>' : '<article class="empty-state"><strong>Всё спокойно</strong><span>Просрочка, блокеры и ожидания не найдены.</span></article>') + '</section>',
+    '<section><div class="mf-section-title"><h3>Следующие задачи</h3><span>' + nextTasks.length + '</span></div>' + (nextTasks.length ? '<div class="task-group-list">' + nextTasks.map(taskCardHtml).join('') + '</div>' : '<article class="empty-state"><strong>Очередь пуста</strong><span>Попросите назначить вас ответственным или участником задачи.</span></article>') + '</section>',
+    '</section>',
+  ].join('');
 }
 
 function renderMfMyTasks() {
-  const tasks = mfTasksForEmployee(mfCurrentUserId);
-  const owned = tasks.filter(function (task) { return task.ownerId === mfCurrentUserId && isMfOpenTask(task); });
-  const reportable = tasks.filter(function (task) { return task.reportable; });
+  const profile = identityDisplayProfile();
+  const tasks = personalLiveTasks(profile);
+  const open = tasks.filter(function (task) { return !isFinalTask(task); });
+  const owned = open.filter(function (task) { return taskRelationshipToProfile(task, profile).owner; });
+  const shared = open.filter(function (task) { return !taskRelationshipToProfile(task, profile).owner; });
+  const attention = uniqueTasks([]
+    .concat(overdueTasks(open))
+    .concat(blockedTasks(open))
+    .concat(waitingTasks(open)))
+    .sort(compareTaskUrgency);
   elements.taskList.innerHTML = [
     '<section class="mf-page-grid">',
     '<div class="mf-mini-grid">',
-    mfMiniStat('Мои открытые', owned.length, 'cyan'),
-    mfMiniStat('Контроль сегодня', owned.filter(function (task) { return task.controlDate === todayIsoBangkok(); }).length, 'green'),
-    mfMiniStat('Для отчёта', reportable.length, 'green'),
-    mfMiniStat('Совместные', tasks.filter(function (task) { return task.ownerId !== mfCurrentUserId; }).length, 'cyan'),
+    mfMiniStat('Мои активные', owned.length, 'cyan'),
+    mfMiniStat('Требуют внимания', attention.length, attention.length ? 'critical' : 'green'),
+    mfMiniStat('Совместные', shared.length, 'cyan'),
+    mfMiniStat('В фокусе', open.filter(isManualFocusTask).length, 'green'),
     '</div>',
-    '<section><div class="mf-section-title"><h3>Задачи Lisa</h3><span>' + owned.length + '</span></div>' + mfTaskList(owned, 'Нет задач Lisa', 'Очередь ответственного в демо-данных пуста.') + '</section>',
-    '<section><div class="mf-section-title"><h3>Мои задачи для отчёта</h3><span>' + reportable.length + '</span></div>' + mfTaskList(reportable, 'Нет задач для отчёта', 'Список источников для отчёта пуст.') + '</section>',
+    '<section><div class="mf-section-title"><h3>Требуют внимания</h3><span>' + attention.length + '</span></div>' + (attention.length ? '<div class="task-group-list">' + attention.map(taskCardHtml).join('') + '</div>' : '<article class="empty-state"><strong>Срочных задач нет</strong><span>Просрочка, блокеры и ожидания не найдены.</span></article>') + '</section>',
+    '<section><div class="mf-section-title"><h3>Моя очередь</h3><span>' + owned.length + '</span></div>' + (owned.length ? '<div class="task-group-list">' + owned.map(taskCardHtml).join('') + '</div>' : '<article class="empty-state"><strong>Задачи не назначены</strong><span>Проверьте поле «Ответственный» или данные профиля.</span></article>') + '</section>',
+    '<section><div class="mf-section-title"><h3>Совместная работа</h3><span>' + shared.length + '</span></div>' + (shared.length ? '<div class="task-group-list">' + shared.map(taskCardHtml).join('') + '</div>' : '<article class="empty-state"><strong>Совместных задач нет</strong><span>Задачи появятся после добавления вас как участника или автора.</span></article>') + '</section>',
     '</section>',
   ].join('');
 }
@@ -3721,6 +3826,67 @@ function renderMfSettings() {
   ].join('');
 }
 
+function renderMfProfile() {
+  const profile = identityDisplayProfile();
+  const roleLabel = accessRoleLabels[profile.accessRole] || profile.accessRole;
+  elements.taskList.innerHTML = [
+    '<section class="mf-page-grid profile-page">',
+    '<article class="mf-settings-card mf-profile-card">',
+    '<div class="mf-section-title"><h3>Мой профиль</h3><span>Google подтверждён</span></div>',
+    '<div class="mf-profile-head"><div class="mf-avatar" aria-hidden="true">' + escapeHtml(mfInitials(profile.displayName)) + '</div><div><strong>' + escapeHtml(profile.displayName) + '</strong><span>' + escapeHtml(profile.email) + '</span></div></div>',
+    '<div class="mf-readonly-grid">',
+    '<span>Роль <strong>' + escapeHtml(roleLabel) + '</strong></span>',
+    '<span>Должность <strong>' + escapeHtml(profile.title || 'Не указана') + '</strong></span>',
+    '<span>Направление <strong>' + escapeHtml(profile.department || 'Не указано') + '</strong></span>',
+    '<span>Ответственный в задачах <strong>' + escapeHtml(profile.defaultOwnerLabel || 'Не настроен') + '</strong></span>',
+    '</div>',
+    '<div class="mf-action-row"><button class="secondary-button" type="button" data-identity-action="signout">Выйти</button></div>',
+    '</article>',
+    '<article class="mf-settings-card">',
+    '<div class="mf-section-title"><h3>Оформление</h3><span>Для этого браузера</span></div>',
+    '<label class="mf-form-control" for="personalizationThemeSelect"><span>Тема</span><select id="personalizationThemeSelect" data-personalization-setting="theme">' + mfSelectOptions(mfThemePresets, personalizationState.theme) + '</select></label>',
+    '<label class="mf-form-control" for="personalizationAccentSelect"><span>Акцентный цвет</span><select id="personalizationAccentSelect" data-personalization-setting="accent">' + mfSelectOptions(mfAccentColors, personalizationState.accent) + '</select></label>',
+    '</article>',
+    '</section>',
+  ].join('');
+}
+
+function renderMfAdminDashboard() {
+  const profile = identityDisplayProfile();
+  if (!(profile.permissions && profile.permissions.canManageUsers)) {
+    elements.taskList.innerHTML = '<article class="empty-state"><strong>Нет доступа</strong><span>Раздел доступен только администратору.</span></article>';
+    return;
+  }
+  const dashboardIdentity = dashboardData().identity || {};
+  const taskSchema = taskIdentitySchemaData();
+  const activeUsers = activeUsersData();
+  const userRows = activeUsers.map(function (user) {
+    return '<article class="mf-settings-row"><strong>' + escapeHtml(user.displayName || user.email || 'Пользователь') + '</strong><span>' + escapeHtml((user.accessRole || 'member') + ' · ' + (user.department || 'без направления') + ' · ' + (user.email || '')) + '</span></article>';
+  }).join('');
+  elements.taskList.innerHTML = [
+    '<section class="mf-page-grid admin-page">',
+    '<div class="mf-mini-grid">',
+    mfMiniStat('Активные пользователи', activeUsers.length, 'cyan'),
+    mfMiniStat('Задачи', allLoadedTasks().length, 'cyan'),
+    mfMiniStat('Поля видимости', taskSchema && taskSchema.status === 'ready' ? 'Готовы' : 'Проверить', taskSchema && taskSchema.status === 'ready' ? 'green' : 'critical'),
+    mfMiniStat('Фильтрация', dashboardIdentity.filteredByUser ? 'Включена' : 'Выключена', dashboardIdentity.filteredByUser ? 'green' : 'critical'),
+    '</div>',
+    '<article class="mf-settings-card">',
+    '<div class="mf-section-title"><h3>Безопасность доступа</h3><span>' + escapeHtml(dashboardIdentity.visibilityMode || 'profile_only') + '</span></div>',
+    '<div class="mf-readonly-grid">',
+    '<span>Google-профиль <strong>подтверждён</strong></span>',
+    '<span>Запись <strong>' + escapeHtml(safeWritesEnabled() ? 'разрешена' : 'выключена') + '</strong></span>',
+    '<span>Персональная фильтрация <strong>' + escapeHtml(dashboardIdentity.filteredByUser ? 'включена' : 'ещё не включена') + '</strong></span>',
+    '<span>Схема задач <strong>' + escapeHtml(taskSchema ? taskSchema.status : 'не проверена') + '</strong></span>',
+    '</div>',
+    '<div class="mf-action-row"><button class="secondary-button" type="button" data-task-identity-action="check">Проверить поля задач</button></div>',
+    '</article>',
+    '<section><div class="mf-section-title"><h3>Участники</h3><span>' + activeUsers.length + '</span></div><div class="mf-settings-list">' + (userRows || '<article class="empty-state"><strong>Список не загружен</strong><span>Обновите профиль администратора.</span></article>') + '</div></section>',
+    '<article class="mf-settings-card"><div class="mf-section-title"><h3>Производительность</h3><span>Диагностика</span></div>' + performanceSummaryHtml() + '</article>',
+    '</section>',
+  ].join('');
+}
+
 function renderMfSection() {
   elements.workspaceControls.innerHTML = '';
   if (activeTab === 'dashboard') {
@@ -3752,13 +3918,47 @@ function renderMfSection() {
     return true;
   }
   if (activeTab === 'settings') {
-    renderMfSettings();
+    renderMfProfile();
+    return true;
+  }
+  if (activeTab === 'admin') {
+    renderMfAdminDashboard();
     return true;
   }
   return false;
 }
 
 function renderPanel() {
+  const profile = identityDisplayProfile();
+  if (profileState.status === 'loading') {
+    elements.panelEyebrow.textContent = 'Доступ';
+    elements.panelTitle.textContent = 'Проверяем рабочий профиль';
+    elements.panelBadge.textContent = 'ПРОВЕРКА ВХОДА';
+    elements.statusMessage.textContent = 'Проверяем сохранённый Google-вход...';
+    elements.workspaceControls.innerHTML = '';
+    elements.taskList.innerHTML = '<article class="loading-state">Проверяю доступ к дашборду...</article>';
+    return;
+  }
+  if (!profile.isVerifiedByGoogle || !(profile.permissions && profile.permissions.canUseDashboard)) {
+    elements.panelEyebrow.textContent = 'Безопасный доступ';
+    elements.panelTitle.textContent = 'Войдите рабочим Google-аккаунтом';
+    elements.panelBadge.textContent = 'ДАННЫЕ ЗАКРЫТЫ';
+    elements.statusMessage.textContent = profileState.status === 'error'
+      ? 'Вход пока не подтверждён. Нажмите «Войти через Google» и выберите рабочий аккаунт.'
+      : 'До подтверждения профиля рабочие задачи и данные сотрудников не загружаются.';
+    elements.statusMessage.classList.toggle('error', false);
+    elements.workspaceControls.innerHTML = '';
+    elements.taskList.innerHTML = [
+      '<section class="signed-out-gate">',
+      '<div class="signed-out-icon" aria-hidden="true">🔐</div>',
+      '<h3>Доступ только для участников MF Group</h3>',
+      '<p>Используйте рабочий Google-аккаунт @mfstream.io, который добавлен в список тестировщиков.</p>',
+      '<button class="primary-button" type="button" data-identity-action="signin">Войти через Google</button>',
+      '<span>GitHub, токены и установка программ не нужны.</span>',
+      '</section>',
+    ].join('');
+    return;
+  }
   const label = viewLabels[activeTab];
   elements.panelEyebrow.textContent = label[0];
   elements.panelTitle.textContent = label[1];
@@ -3789,6 +3989,17 @@ function renderPanel() {
 
 function render() {
   localizeStaticLabels();
+  const profile = identityDisplayProfile();
+  const dashboardAllowed = profile.isVerifiedByGoogle
+    && Boolean(profile.permissions && profile.permissions.canUseDashboard);
+  elements.sidebarShell.hidden = !dashboardAllowed;
+  elements.sidebarToggle.hidden = !dashboardAllowed;
+  elements.liveDataStatus.hidden = !dashboardAllowed;
+  elements.summaryCards.hidden = !dashboardAllowed;
+  elements.modeBanner.hidden = !dashboardAllowed;
+  if (!dashboardAllowed && sidebarOpen) {
+    sidebarOpen = false;
+  }
   renderSidebarState();
   renderModeBanner();
   renderCreateTaskButton();
@@ -3813,9 +4024,13 @@ function setSidebarOpen(open) {
 }
 
 function localizeStaticLabels() {
+  const profile = identityDisplayProfile();
   elements.tabs.forEach(function (tab) {
+    const allowedRoles = String(tab.dataset.roles || '').split(/\s+/).filter(Boolean);
+    const allowed = !allowedRoles.length || allowedRoles.includes(profile.accessRole);
+    tab.hidden = !allowed;
     const label = viewLabels[tab.dataset.tab];
-    if (label) {
+    if (label && allowed) {
       const count = navCountForTab(tab.dataset.tab);
       tab.innerHTML = '<span>' + escapeHtml(label[0]) + '</span>' + (count === '' || count == null ? '' : '<strong>' + escapeHtml(count) + '</strong>');
     }
@@ -3964,6 +4179,19 @@ async function handleIdentityAction(action) {
     }
     identityState = loadIdentityState();
     await loadProfile();
+    dashboardState = BAFoxUiState.error('dashboard', new Error('Google-вход не выполнен.'), {
+      message: 'Войдите через Google рабочим аккаунтом, чтобы открыть данные.',
+    });
+    scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
+    scaffoldState.status = 'idle';
+    liveRefreshState = {
+      status: 'idle',
+      message: 'Данные закрыты до входа',
+      source: 'Закрыто',
+      lastUpdatedAt: null,
+      isForced: false,
+    };
+    activeTab = 'dashboard';
     personalizationState = loadPersonalizationState();
     applyPersonalizationState();
     flashMessage = 'Выход выполнен. Google-профиль очищен в этом браузере.';
@@ -3984,6 +4212,10 @@ async function handleIdentityAction(action) {
       setStoredIdentityToken(credential);
       await loadProfile();
       const profile = identityDisplayProfile();
+      if (profile.isVerifiedByGoogle && profile.permissions && profile.permissions.canUseDashboard) {
+        activeTab = 'dashboard';
+        await loadDashboard({ forceRefresh: true });
+      }
       flashMessage = profile.isVerifiedByGoogle
         ? 'Профиль подтверждён через Google.'
         : 'Google credential получен, но backend профиль не подтверждён.';
@@ -4295,15 +4527,16 @@ async function loadDashboard(options) {
 
 async function loadProfile() {
   profileState = BAFoxClient.createLoadingState('profile');
-  taskIdentitySchemaState = BAFoxClient.createLoadingState('taskIdentitySchema');
+  taskIdentitySchemaState.status = 'idle';
+  activeUsersState.status = 'idle';
   if (activeTab === 'settings') {
     renderPanel();
   }
   profileState = await BAFoxClient.getProfile(identityRequestParams());
-  taskIdentitySchemaState = await BAFoxClient.getTaskIdentitySchema(identityRequestParams());
   const profileData = profileState.data || {};
   const permissions = profileData.permissions || {};
   if (permissions.canManageUsers) {
+    taskIdentitySchemaState = await BAFoxClient.getTaskIdentitySchema(identityRequestParams());
     activeUsersState = await BAFoxClient.getActiveUsers(identityRequestParams());
   }
   render();
@@ -4311,6 +4544,10 @@ async function loadProfile() {
 
 async function handleManualRefresh() {
   if (liveRefreshState.status === 'loading' || dashboardState.status === 'loading') {
+    return;
+  }
+  const profile = identityDisplayProfile();
+  if (!profile.isVerifiedByGoogle || !(profile.permissions && profile.permissions.canUseDashboard)) {
     return;
   }
   await loadDashboard({ forceRefresh: true });
@@ -4788,10 +5025,25 @@ async function initializeDashboard() {
   setInterval(formatBangkokTime, 30000);
   render();
   await loadOptionalLocalConfig();
-  await Promise.all([
-    loadDashboard(),
-    loadProfile(),
-  ]);
+  await loadProfile();
+  const profile = identityDisplayProfile();
+  if (profile.isVerifiedByGoogle && profile.permissions && profile.permissions.canUseDashboard) {
+    await loadDashboard();
+  } else {
+    dashboardState = BAFoxUiState.error('dashboard', new Error('Google-вход не выполнен.'), {
+      message: 'Войдите через Google рабочим аккаунтом, чтобы открыть данные.',
+    });
+    scaffoldState = BAFoxClient.createLoadingState('scaffoldInfo');
+    scaffoldState.status = 'idle';
+    liveRefreshState = {
+      status: 'idle',
+      message: 'Данные закрыты до входа',
+      source: 'Закрыто',
+      lastUpdatedAt: null,
+      isForced: false,
+    };
+    render();
+  }
 }
 
 initializeDashboard();

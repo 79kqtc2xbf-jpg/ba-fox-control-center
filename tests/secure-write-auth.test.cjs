@@ -78,7 +78,7 @@ test('backend keeps the server-side action token as a legacy integration fallbac
   assert.equal(result.authorizationMode, 'legacy_action_token');
 });
 
-function loadWebClient(configOverrides) {
+function loadWebClient(configOverrides, endpointResponse) {
   const requests = [];
   const head = {
     appendChild(script) {
@@ -87,13 +87,15 @@ function loadWebClient(configOverrides) {
       requests.push(url);
       const callback = url.searchParams.get('callback');
       queueMicrotask(function () {
-        context[callback]({
-          ok: true,
-          data: {
-            taskId: 'TEST-1',
-          },
-          error: null,
-        });
+        context[callback](typeof endpointResponse === 'function'
+          ? endpointResponse(url)
+          : {
+            ok: true,
+            data: {
+              taskId: 'TEST-1',
+            },
+            error: null,
+          });
       });
     },
     removeChild(script) {
@@ -123,9 +125,31 @@ function loadWebClient(configOverrides) {
     },
   };
   context.BAFoxUiState = {
-    loading() {},
+    loading(route) {
+      return { status: 'loading', route, data: null, error: null, isMock: false };
+    },
+    success(route, data) {
+      return { status: 'success', route, data, error: null, isMock: false };
+    },
+    empty(route, data, options) {
+      return { status: 'empty', route, data, error: null, isMock: Boolean(options && options.isMock) };
+    },
+    error(route, error, options) {
+      return {
+        status: 'error',
+        route,
+        data: options && options.fallbackData || null,
+        error,
+        message: options && options.message || '',
+        isMock: Boolean(options && options.isMock),
+      };
+    },
   };
-  context.BAFoxMockData = {};
+  context.BAFoxMockData = {
+    getResponse() {
+      throw new Error('Mock fallback must not be used in live mode.');
+    },
+  };
   vm.runInContext(fs.readFileSync(path.join(root, 'web/api/baFoxClient.js'), 'utf8'), context);
   return { client: context.BAFoxClient, requests };
 }
@@ -155,6 +179,63 @@ test('web client sends Google identity for writes and does not add a token param
   assert.equal(requests[0].searchParams.get('route'), 'createTask');
   assert.equal(requests[0].searchParams.get('idToken'), 'google-id-token');
   assert.equal(requests[0].searchParams.has('token'), false);
+});
+
+test('web client does not expose mock dashboard data when Google sign-in is missing', async function () {
+  const { client, requests } = loadWebClient({}, function () {
+    return {
+      ok: false,
+      data: null,
+      error: {
+        code: 'GOOGLE_TOKEN_REQUIRED',
+        message: 'Verified Google identity token is required.',
+      },
+    };
+  });
+
+  const state = await client.getDashboard({});
+
+  assert.equal(state.status, 'error');
+  assert.equal(state.data, null);
+  assert.equal(state.isMock, false);
+  assert.equal(state.error.code, 'GOOGLE_TOKEN_REQUIRED');
+  assert.equal(requests.length, 1);
+});
+
+test('backend protects task reads and admin diagnostics independently of visibility mode', function () {
+  const context = loadAppsScriptAuthorization();
+  vm.runInContext(fs.readFileSync(path.join(root, 'apps-script/WebApp.gs'), 'utf8'), context);
+
+  context.requireVerifiedProfile_ = function () {
+    return {
+      ok: false,
+      error: context.baFoxError('GOOGLE_TOKEN_REQUIRED', 'Sign-in required.', {}),
+    };
+  };
+  const anonymousDashboard = context.baFoxAuthorizeReadRoute_('dashboard', {});
+  assert.equal(anonymousDashboard.error.code, 'GOOGLE_TOKEN_REQUIRED');
+
+  context.requireVerifiedProfile_ = function () {
+    return {
+      ok: true,
+      profile: {
+        accessRole: 'member',
+        status: 'active',
+        isRegistered: true,
+      },
+    };
+  };
+  context.profileCanManageUsers_ = function () {
+    return false;
+  };
+  const memberAdminRoute = context.baFoxAuthorizeReadRoute_('activeUsers', {});
+  assert.equal(memberAdminRoute.error.code, 'ADMIN_REQUIRED');
+
+  context.profileCanManageUsers_ = function () {
+    return true;
+  };
+  assert.equal(context.baFoxAuthorizeReadRoute_('activeUsers', {}), null);
+  assert.equal(context.baFoxAuthorizeReadRoute_('scaffoldInfo', {}), null);
 });
 
 test('Pages workflows cannot serialize BA_FOX_ACTION_TOKEN into the public bundle', function () {

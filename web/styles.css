@@ -4201,3 +4201,102 @@ body[data-mf-theme="light"] .home-action:hover strong {
     display: grid;
   }
 }
+
+[hidden] {
+  display: none !important;
+}
+
+.dashboard-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.signed-out-gate {
+  display: grid;
+  justify-items: center;
+  gap: 14px;
+  max-width: 620px;
+  margin: 32px auto;
+  padding: 40px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: linear-gradient(145deg, rgba(88, 242, 194, 0.08), rgba(255, 79, 216, 0.05));
+  text-align: center;
+}
+
+.signed-out-gate h3,
+.signed-out-gate p {
+  margin: 0;
+}
+
+.signed-out-gate p,
+.signed-out-gate > span {
+  color: var(--muted-strong);
+}
+
+.signed-out-icon {
+  font-size: 38px;
+}
+
+.profile-page,
+.admin-page {
+  max-width: 980px;
+}
+
+@media (max-width: 780px) {
+  .app-shell {
+    padding: 8px;
+  }
+
+  .hero-card {
+    gap: 10px;
+    padding: 14px;
+  }
+
+  .hero-card h1 {
+    font-size: 26px;
+    line-height: 1.05;
+  }
+
+  .hero-copy {
+    display: none;
+  }
+
+  .hero-status {
+    grid-column: 1 / -1;
+    align-items: stretch;
+  }
+
+  .dashboard-grid,
+  .mf-mini-grid,
+  .stage30-dashboard .mf-mini-grid,
+  .risks-dashboard .mf-mini-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .summary-card {
+    min-height: 88px;
+    padding: 14px;
+  }
+
+  .summary-card strong {
+    font-size: 30px;
+  }
+
+  .content-panel {
+    padding: 14px;
+  }
+
+  .panel-header h2 {
+    font-size: 24px;
+  }
+
+  .signed-out-gate {
+    margin: 12px auto;
+    padding: 24px 16px;
+  }
+
+  .workspace-layout .tab {
+    min-height: 54px;
+    padding: 12px;
+  }
+}
