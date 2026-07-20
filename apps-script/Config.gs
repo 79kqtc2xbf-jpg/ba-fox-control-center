@@ -1,14 +1,14 @@
 var BA_FOX_CONFIG = {
-  VERSION: 'v2.8.0-stage-14-performance-schema',
+  VERSION: 'v2.9.0-team-projects-enforced',
   DRY_RUN: true,
   READ_LIVE_SHEETS: true,
   SAFE_WRITE_MODE: true,
   ACTION_TOKEN: '',
   ALLOWED_WORKSPACE_DOMAIN: 'mfstream.io',
   GOOGLE_CLIENT_ID: '',
-  IDENTITY_ENFORCEMENT_MODE: 'profile_only',
-  PROFILE_ROUTE_MODE: 'profile_only',
-  VISIBILITY_ENFORCEMENT: false,
+  IDENTITY_ENFORCEMENT_MODE: 'enforced',
+  PROFILE_ROUTE_MODE: 'enforced',
+  VISIBILITY_ENFORCEMENT: true,
   TIMEZONE: 'Asia/Bangkok',
   SHEETS: {
     TASKS: 'Tasks',
@@ -17,7 +17,8 @@ var BA_FOX_CONFIG = {
     REPORTS: 'Reports',
     NOTIFICATION_QUEUE: 'NotificationQueue',
     CONTACTS: 'Contacts',
-    USERS: 'Users'
+    USERS: 'Users',
+    PROJECTS: 'Projects'
   },
   USERS_COLUMNS: {
     USER_ID: 1,
@@ -33,6 +34,19 @@ var BA_FOX_CONFIG = {
     CREATED_AT: 11,
     UPDATED_AT: 12
   },
+  PROJECT_COLUMNS: {
+    ID: 1,
+    NAME: 2,
+    DEPARTMENT: 3,
+    OWNER_EMAIL: 4,
+    OWNER_USER_ID: 5,
+    STATUS: 6,
+    DESCRIPTION: 7,
+    CREATED_AT: 8,
+    CREATED_BY_EMAIL: 9,
+    UPDATED_AT: 10
+  },
+  PROJECT_STATUSES: ['Active', 'Paused', 'Completed', 'Archived'],
   TASK_COLUMNS: {
     ID: 1,
     DATE: 2,

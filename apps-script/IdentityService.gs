@@ -84,6 +84,25 @@ function requestIdentityToken_(request) {
   );
 }
 
+function identityTokenCacheKey_(token) {
+  if (typeof Utilities === 'undefined' || !Utilities.computeDigest) {
+    return '';
+  }
+  var digest = Utilities.computeDigest(
+    Utilities.DigestAlgorithm.SHA_256,
+    token,
+    Utilities.Charset.UTF_8
+  );
+  return 'baFoxIdentity:' + Utilities.base64EncodeWebSafe(digest).slice(0, 40);
+}
+
+function identityTokenCache_() {
+  if (typeof CacheService === 'undefined') {
+    return null;
+  }
+  return CacheService.getScriptCache();
+}
+
 function usersSheetStatus_() {
   var sheet = getUsersSheet_();
   if (!sheet) {
@@ -125,18 +144,32 @@ function normalizeUserRecord_(row, rowNumber) {
   };
 }
 
+var baFoxUsersMemo_ = {
+  expiresAt: 0,
+  users: null
+};
+
 function getUsers_() {
+  var now = new Date().getTime();
+  if (baFoxUsersMemo_.users && baFoxUsersMemo_.expiresAt > now) {
+    return baFoxUsersMemo_.users;
+  }
   var sheet = getUsersSheet_();
   if (!sheet || sheet.getLastRow() < 2) {
     return [];
   }
 
   var values = sheet.getDataRange().getValues();
-  return values.slice(1).map(function(row, index) {
+  var users = values.slice(1).map(function(row, index) {
     return normalizeUserRecord_(row, index + 2);
   }).filter(function(user) {
     return Boolean(user.email || user.userId || user.displayName);
   });
+  baFoxUsersMemo_ = {
+    expiresAt: now + 15000,
+    users: users
+  };
+  return users;
 }
 
 function findUserByEmail_(email) {
@@ -221,6 +254,18 @@ function verifyGoogleIdentityToken_(idToken) {
       clientIdConfigured: clientIdConfigured
     };
   }
+  var cache = identityTokenCache_();
+  var cacheKey = identityTokenCacheKey_(token);
+  if (cache && cacheKey) {
+    try {
+      var cached = cache.get(cacheKey);
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch (cacheReadError) {
+      // Token verification continues normally when the short-lived cache is unavailable.
+    }
+  }
   if (typeof UrlFetchApp === 'undefined') {
     return {
       ok: false,
@@ -283,13 +328,21 @@ function verifyGoogleIdentityToken_(idToken) {
         clientIdConfigured: clientIdConfigured
       };
     }
-    return {
+    var verifiedResult = {
       ok: true,
       mode: 'google_token_verified',
       claims: claims,
       email: normalizeWorkspaceEmail_(claims.email),
       clientIdConfigured: clientIdConfigured
     };
+    if (cache && cacheKey) {
+      try {
+        cache.put(cacheKey, JSON.stringify(verifiedResult), 300);
+      } catch (cacheWriteError) {
+        // A cache miss only affects latency; it must never block sign-in.
+      }
+    }
+    return verifiedResult;
   } catch (err) {
     return {
       ok: false,
@@ -413,6 +466,12 @@ function profileCanManageUsers_(profile) {
   return profile && profile.isRegistered === true && profile.status === 'active' && normalizeProfileRole_(profile) === 'admin';
 }
 
+function profileCanManageProjects_(profile) {
+  var role = normalizeProfileRole_(profile);
+  return profile && profile.isRegistered === true && profile.status === 'active'
+    && ['admin', 'executive'].indexOf(role) !== -1;
+}
+
 function profileCanUseDashboard_(profile) {
   var role = normalizeProfileRole_(profile);
   return profile && profile.isRegistered === true && profile.status === 'active'
@@ -451,13 +510,14 @@ function profilePermissions_(profile) {
     canCreateTasks: profileCanWrite_(profile),
     canUseDashboard: profileCanUseDashboard_(profile),
     canManageUsers: profileCanManageUsers_(profile),
+    canManageProjects: profileCanManageProjects_(profile),
     canWrite: profileCanWrite_(profile)
   };
 }
 
 function identityResponseLimitations_(tokenResult) {
   var limitations = [
-    'Dashboard visibility is identity-aware but not filtered by user unless enforcement mode is enforced.',
+    'Dashboard visibility is enforced: admin/executive users see all tasks, other users see only related tasks.',
     'Browser writes require a verified Google profile. A server-side action token remains a legacy integration fallback only.',
     'Legacy tasks only have Owner label; robust member visibility needs ownerEmail/userId, collaborator, createdBy, and visibility columns.',
     'Token verification uses Google tokeninfo from Apps Script. This is real Google validation, but future hard enforcement should be QA-tested against deployed OAuth settings.'
@@ -481,6 +541,9 @@ function applyRegisteredProfileFlags_(user, identitySource) {
 
 function getCurrentUserProfile_(request, context) {
   var settings = context || {};
+  if (request && request.__verifiedIdentityResult) {
+    return request.__verifiedIdentityResult;
+  }
   var identity = getIdentityFromRequest_(request || {});
   if (settings.requireGoogleToken === true && identity.identityMode !== 'google_token_verified') {
     identity = {
@@ -643,6 +706,9 @@ function getVerifiedUserProfile_(request) {
 
 function requireVerifiedProfile_(request, options) {
   var settings = options || {};
+  if (request && request.__verifiedAuthorization && request.__verifiedAuthorization.ok) {
+    return request.__verifiedAuthorization;
+  }
   var result = getCurrentUserProfile_(request || {}, {
     requireGoogleToken: settings.requireGoogleToken === true
   });
@@ -777,6 +843,9 @@ function isUserAllowedForRoute_(profile, routeName, action) {
   }
   if (routeName === 'users' || action === 'manageUsers') {
     return profileCanManageUsers_(profile);
+  }
+  if (routeName === 'createProject' || action === 'manageProjects') {
+    return profileCanManageProjects_(profile);
   }
   return true;
 }
@@ -924,9 +993,9 @@ function buildVisibilityPreview_(profile, tasks, options) {
   });
 
   return {
-    mode: 'dry_run',
-    filteredByUser: false,
-    wouldFilterInEnforcedMode: !profileCanSeeAll_(profile),
+    mode: 'enforced',
+    filteredByUser: !profileCanSeeAll_(profile),
+    wouldFilterInEnforcedMode: false,
     effectiveUser: profile && (profile.email || profile.displayName || profile.userId) || '',
     effectiveUserId: profile && profile.userId || '',
     effectiveRole: profile && profile.accessRole || 'viewer',
@@ -994,7 +1063,7 @@ function identityDashboardMetadata_(request, routeName) {
     identityMode: identity.identityMode,
     enforcementMode: identity.enforcementMode,
     visibilityMode: visibilityMode,
-    filteredByUser: false,
+    filteredByUser: visibilityMode === 'enforced' && !profileCanSeeAll_(identity.profile),
     taskIdentitySchema: taskIdentitySchema,
     optionalIdentityColumnsPresent: taskIdentitySchema.anyPresent,
     identityWarnings: identityWarnings,

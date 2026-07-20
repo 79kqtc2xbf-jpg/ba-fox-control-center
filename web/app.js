@@ -331,7 +331,7 @@ const usersRegistry = Object.freeze([
   },
   {
     userId: 'user_asya_sundareva',
-    email: 'TODO_ASYA@mfstream.io',
+    email: 'operations.jr@mfstream.io',
     displayName: 'Asya Sundareva',
     title: 'Junior Operations · High Risk',
     accessRole: 'member',
@@ -724,7 +724,7 @@ let flashMessage = '';
 let liveRefreshState = {
   status: 'loading',
   message: 'Обновляем данные…',
-  source: 'Demo fallback',
+  source: 'Закрыто',
   lastUpdatedAt: null,
   isForced: false,
 };
@@ -738,6 +738,32 @@ function stateFromFullDashboard(fullState, route, data) {
     error: fullState.error,
     isMock: fullState.isMock,
   };
+}
+
+function dashboardUsers() {
+  const users = dashboardData().users;
+  return Array.isArray(users) ? users.filter(function (user) { return user.status === 'active'; }) : [];
+}
+
+function dashboardProjects() {
+  const projects = dashboardData().projects;
+  return Array.isArray(projects) ? projects : [];
+}
+
+function dashboardDepartments() {
+  const seen = {};
+  return dashboardUsers().map(function (user) {
+    return String(user.department || '').trim();
+  }).concat(dashboardProjects().map(function (project) {
+    return String(project.department || '').trim();
+  })).filter(function (department) {
+    const key = normalizeText(department);
+    if (!key || seen[key]) return false;
+    seen[key] = true;
+    return true;
+  }).sort(function (left, right) {
+    return left.localeCompare(right, 'ru');
+  });
 }
 
 function escapeHtml(value) {
@@ -923,14 +949,19 @@ function taskDirectionKey(task) {
       return raw.includes(alias);
     });
   });
-  return matched ? matched.id : 'admin_ea';
+  return matched ? matched.id : raw;
 }
 
 function directionLabelByKey(key) {
   const direction = directionFilters.find(function (filter) {
     return filter.id === key;
   });
-  return direction && key !== 'all' ? direction.label : 'Не назначено';
+  const dynamicDepartment = dashboardDepartments().find(function (department) {
+    return normalizeText(department) === key;
+  });
+  return direction && key !== 'all'
+    ? direction.label
+    : dynamicDepartment || (key === 'unassigned' ? 'Не назначено' : key);
 }
 
 function taskDirectionLabel(task) {
@@ -1361,6 +1392,14 @@ function ownerWorkloadRows(tasks) {
 function ownerFilterOptions(tasks) {
   const seen = {};
   const options = [{ id: 'all', label: 'Все ответственные' }];
+  dashboardUsers().forEach(function (user) {
+    const label = user.defaultOwnerLabel || user.displayName || user.email;
+    const id = ownerKey(label);
+    if (!seen[id]) {
+      seen[id] = true;
+      options.push({ id: id, label: label });
+    }
+  });
   (tasks || []).forEach(function (task) {
     const label = taskOwnerLabel(task);
     const id = ownerKey(task && task.owner);
@@ -1417,11 +1456,17 @@ function personalLiveTasks(profile) {
 }
 
 function directionWorkloadRows(tasks) {
-  return directionFilters.filter(function (direction) {
-    return direction.id !== 'all';
-  }).map(function (direction) {
+  const directions = dashboardDepartments().map(function (department) {
+    return { id: normalizeText(department), label: department };
+  });
+  if ((tasks || []).some(function (task) { return !taskDirectionRawValue(task); })) {
+    directions.push({ id: 'unassigned', label: 'Не назначено' });
+  }
+  return directions.map(function (direction) {
     const directionTasks = tasks.filter(function (task) {
-      return taskDirectionKey(task) === direction.id;
+      return direction.id === 'unassigned'
+        ? !taskDirectionRawValue(task)
+        : normalizeText(taskDirectionRawValue(task)) === direction.id;
     });
     return {
       id: direction.id,
@@ -1534,19 +1579,31 @@ async function requestGoogleIdentityCredential() {
   }
   return new Promise(function (resolve, reject) {
     let resolved = false;
-    window.google.accounts.id.initialize({
+    requestGoogleIdentityCredential.resolve = function (credential) {
+      resolved = true;
+      resolve(credential);
+    };
+    requestGoogleIdentityCredential.reject = reject;
+    if (!requestGoogleIdentityCredential.initialized) {
+      window.google.accounts.id.initialize({
       client_id: config.googleClientId,
       auto_select: false,
+      use_fedcm_for_prompt: true,
       callback: function (response) {
         const credential = response && response.credential ? response.credential : '';
         if (!credential) {
-          reject(new Error('Google не вернул identity credential.'));
+          if (requestGoogleIdentityCredential.reject) {
+            requestGoogleIdentityCredential.reject(new Error('Google не вернул identity credential.'));
+          }
           return;
         }
-        resolved = true;
-        resolve(credential);
+        if (requestGoogleIdentityCredential.resolve) {
+          requestGoogleIdentityCredential.resolve(credential);
+        }
       },
-    });
+      });
+      requestGoogleIdentityCredential.initialized = true;
+    }
     window.google.accounts.id.prompt(function (notification) {
       if (resolved) {
         return;
@@ -2094,7 +2151,7 @@ function renderModeBanner() {
   }
   elements.modeBanner.className = 'mode-banner ' + (failed ? 'warning' : isMock ? 'mock' : 'live');
   elements.modeBanner.innerHTML = failed
-    ? '<strong>Демо-данные MF Group</strong><span>' + escapeHtml(dashboardState.message || cleanupAuditState.message || 'Живой источник недоступен. Показываю временные данные MF.') + '</span>'
+    ? '<strong>Данные недоступны</strong><span>' + escapeHtml(dashboardState.message || cleanupAuditState.message || 'Живой источник временно недоступен.') + '</span>'
     : isMock
       ? '<strong>Демо-режим MF Group</strong><span>Макет только для просмотра. Без миграции таблиц, записей, Telegram, Gmail и изменений Apps Script.</span>'
       : safeWritesEnabled()
@@ -2199,7 +2256,7 @@ function statusText() {
     return 'Команда показывает нагрузку по ответственным и три главные задачи каждого.';
   }
   if (activeTab === 'departments') {
-    return 'Отдел / направление временно считается из существующей категории задачи. Это можно переименовать без изменения схемы.';
+    return 'Направления собраны по отделам активных сотрудников; проекты добавляются отдельно.';
   }
   if (activeTab === 'dependencies') {
     return 'Риски и зависшие показывают просрочку, блокеры, ожидания и задачи без владельца, направления, следующего шага или даты.';
@@ -3357,17 +3414,26 @@ function renderMfMyTasks() {
 }
 
 function renderMfMyFocus() {
-  const focus = mfTasksForEmployee(mfCurrentUserId).filter(function (task) {
-    return isMfOpenTask(task) && (task.priority === 'Высокий' || task.controlDate === todayIsoBangkok() || isOverdueStatus(task.status) || taskStatusKey(task) === 'blocked');
-  });
+  const profile = identityDisplayProfile();
+  const focus = personalLiveTasks(profile).filter(function (task) {
+    return !isFinalTask(task) && (
+      isHighPriority(task)
+      || taskControlDate(task) === todayIsoBangkok()
+      || isOverdueTask(task)
+      || isBlockerTask(task)
+      || isManualFocusTask(task)
+    );
+  }).sort(compareTaskUrgency);
   elements.taskList.innerHTML = [
     '<section class="mf-page-grid">',
     '<article class="mf-exec-card compact">',
     '<span>Личный фокус</span>',
-    '<h3>Индивидуальность остаётся: у Lisa есть «Мои задачи», «Мой фокус», «Мои отчёты» и свои контрольные даты.</h3>',
-    '<p>Этот список считается из демо-командных задач и остаётся только для просмотра.</p>',
+    '<h3>Приоритетные задачи, блокеры и контрольные даты текущего пользователя.</h3>',
+    '<p>Список строится только из доступных вам live-задач.</p>',
     '</article>',
-    mfTaskList(focus, 'Фокус пуст', 'У Lisa нет приоритетных задач, блокеров или контрольных дат.'),
+    focus.length
+      ? '<div class="task-group-list">' + focus.map(taskCardHtml).join('') + '</div>'
+      : '<article class="empty-state"><strong>Фокус пуст</strong><span>Нет приоритетных задач, блокеров или контрольных дат.</span></article>',
     '</section>',
   ].join('');
 }
@@ -3389,7 +3455,9 @@ function renderMfTeam() {
       '</article>',
     ].join('');
   }).join('');
-  elements.taskList.innerHTML = '<section class="mf-card-grid">' + rows + '</section>';
+  elements.taskList.innerHTML = rows
+    ? '<section class="mf-card-grid">' + rows + '</section>'
+    : '<article class="empty-state"><strong>Команда не настроена</strong><span>Добавьте активных сотрудников в лист Users.</span></article>';
 }
 
 function renderMfDepartments() {
@@ -3397,8 +3465,8 @@ function renderMfDepartments() {
     const urgentTasks = direction.active.slice().sort(compareTaskUrgency).slice(0, 3);
     return [
       '<article class="mf-department-card">',
-      '<div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(direction.id) + '</span><h3>' + escapeHtml(direction.label) + '</h3></div>' + mfPill('Временная модель', direction.id === 'unassigned' ? 'neutral' : 'green') + '</div>',
-      '<p>Группировка по существующему полю «Категория». Это направление можно переименовать позже без новой колонки.</p>',
+      '<div class="mf-task-head"><div><span class="mf-id">Отдел</span><h3>' + escapeHtml(direction.label) + '</h3></div>' + mfPill('Из Users', direction.id === 'unassigned' ? 'neutral' : 'green') + '</div>',
+      '<p>Направление сформировано по отделам активных членов команды.</p>',
       '<div class="mf-task-meta">',
       '<span>Активные задачи: <strong>' + direction.active.length + '</strong></span>',
       '<span>Блокеры: <strong>' + direction.blockers.length + '</strong></span>',
@@ -3410,7 +3478,22 @@ function renderMfDepartments() {
       '</article>',
     ].join('');
   }).join('');
-  elements.taskList.innerHTML = '<section class="mf-card-grid departments">' + cards + '</section>';
+  const projects = dashboardProjects().map(function (project) {
+    return '<article class="mf-department-card"><div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(project.id) + '</span><h3>' + escapeHtml(project.name) + '</h3></div>' + mfPill(project.status, project.status === 'Active' ? 'green' : 'neutral') + '</div><p>' + escapeHtml(project.description || 'Без описания') + '</p><div class="mf-task-meta"><span>Отдел: <strong>' + escapeHtml(project.department) + '</strong></span><span>Ответственный: <strong>' + escapeHtml(project.ownerEmail || 'Не назначен') + '</strong></span></div></article>';
+  }).join('');
+  const profile = identityDisplayProfile();
+  const addButton = profile.permissions && profile.permissions.canManageProjects
+    ? '<div class="mf-action-row"><button class="primary-button" type="button" data-project-action="create">Добавить проект</button></div>'
+    : '';
+  elements.taskList.innerHTML = [
+    addButton,
+    '<section><div class="mf-section-title"><h3>Проекты</h3><span>' + dashboardProjects().length + '</span></div>',
+    projects ? '<div class="mf-card-grid departments">' + projects + '</div>' : '<article class="empty-state"><strong>Проектов пока нет</strong><span>Начните с первого рабочего проекта.</span></article>',
+    '</section>',
+    '<section><div class="mf-section-title"><h3>Отделы</h3><span>' + dashboardDepartments().length + '</span></div>',
+    cards ? '<div class="mf-card-grid departments">' + cards + '</div>' : '<article class="empty-state"><strong>Отделы не настроены</strong><span>Укажите отделы в листе Users.</span></article>',
+    '</section>',
+  ].join('');
 }
 
 function renderMfDependencies() {
@@ -3443,26 +3526,20 @@ function renderMfDependencies() {
 }
 
 function renderMfReports() {
-  const rows = mfReportRows.map(function (report) {
-    const statusKey = reportStatusKey(report);
-    return [
-      '<article class="mf-report-card">',
-      '<div class="mf-task-head"><div><span class="mf-id">' + escapeHtml(report.type) + '</span><h3>' + escapeHtml(report.owner) + '</h3></div>' + mfPill(statusKey === 'unknown' ? report.status : getStatusLabel(statusKey), statusKey === 'waiting' ? 'critical' : 'green') + '</div>',
-      '<p>' + escapeHtml(report.summary) + '</p>',
-      '<div class="mf-task-meta"><span>Период: <strong>' + escapeHtml(report.period) + '</strong></span><span>Источник: <strong>Демо-записи отчётов</strong></span></div>',
-      '</article>',
-    ].join('');
-  }).join('');
+  const completed = reportableCompletedTasks();
   elements.taskList.innerHTML = [
     '<section class="mf-page-grid">',
-    '<article class="mf-exec-card compact"><span>Отчёты</span><h3>Дневные, недельные, отделовые и управленческие сводки пока показаны как демо-заглушки.</h3><p>Отчёт не генерируется, не отправляется, не проверяется, не пишется в Sheets и не отправляется в Telegram.</p></article>',
-    '<div class="mf-card-grid reports">' + rows + '</div>',
+    '<article class="mf-exec-card compact"><span>Отчёты</span><h3>Сводки строятся только по реальным задачам.</h3><p>В тестовом контуре отчёт можно сформировать и скопировать; автоматическая отправка пока выключена.</p></article>',
+    '<div class="mf-action-row"><button class="primary-button" type="button" data-report-action="daySummary">Сформировать дневной</button><button class="secondary-button" type="button" data-report-action="weekSummary">Сформировать недельный</button></div>',
+    completed.length
+      ? '<div class="task-group-list">' + completed.slice(0, 10).map(taskCardHtml).join('') + '</div>'
+      : '<article class="empty-state"><strong>Нет данных для отчёта</strong><span>Завершённые задачи появятся здесь после начала работы.</span></article>',
     '</section>',
   ].join('');
 }
 
 function usersRegistryRowsHtml() {
-  return usersRegistry.map(function (user) {
+  return dashboardUsers().map(function (user) {
     return [
       '<article class="mf-settings-row">',
       '<strong>' + escapeHtml(user.displayName) + '</strong>',
@@ -3526,7 +3603,7 @@ function visibilityPreviewHtml(preview) {
   const reasons = preview.reasonCounts || {};
   return [
     '<div class="mf-readonly-grid">',
-    '<span>Dry-run <strong>' + escapeHtml(preview.mode || 'dry_run') + '</strong></span>',
+    '<span>Режим <strong>' + escapeHtml(preview.mode || 'enforced') + '</strong></span>',
     '<span>Пользователь <strong>' + escapeHtml(preview.effectiveUser || 'не выбран') + '</strong></span>',
     '<span>Роль <strong>' + escapeHtml(preview.effectiveRole || 'viewer') + '</strong></span>',
     '<span>Фильтрация дашборда <strong>' + escapeHtml(preview.filteredByUser ? 'включена' : 'не применена') + '</strong></span>',
@@ -3546,10 +3623,10 @@ function visibilityPreviewHtml(preview) {
 function pilotReadinessGuardrailsHtml() {
   return [
     '<div class="mf-readonly-grid">',
-    '<span>Статус пилота <strong>на паузе / не активен</strong></span>',
-    '<span>Реальная фильтрация <strong>выключена</strong></span>',
-    '<span>Миграция колонок <strong>только вручную, после backup</strong></span>',
-    '<span>Rollback <strong>через backup или скрытие appended колонок</strong></span>',
+    '<span>Статус контура <strong>готов к тестированию</strong></span>',
+    '<span>Реальная фильтрация <strong>включена</strong></span>',
+    '<span>Назначение задач <strong>все активные пользователи</strong></span>',
+    '<span>Проекты <strong>добавление включено для admin/executive</strong></span>',
     '</div>',
   ].join('');
 }
@@ -3689,11 +3766,11 @@ function renderMfSettings() {
       : 'Поля участников пока не заполнены';
   const visibilityFilterLabel = dashboardIdentity.filteredByUser
     ? 'Фильтрация по пользователю включена'
-    : 'Фильтрация по пользователю не включена';
-  const pilotStatusLabel = 'Пилот на паузе / не активен';
+    : 'Полная видимость по роли';
+  const pilotStatusLabel = 'Контур готов';
   const enforcementOffLabel = dashboardIdentity.filteredByUser
-    ? 'проверить: фильтрация включена'
-    : 'выключено, preview only';
+    ? 'включено'
+    : 'полная видимость admin/executive';
   elements.taskList.innerHTML = [
     '<section class="mf-settings-page">',
     '<section class="mf-two-column settings">',
@@ -3759,14 +3836,14 @@ function renderMfSettings() {
     '<div class="mf-readonly-grid">',
     '<span>Название <strong>' + workspaceName + '</strong></span>',
     '<span>Allowed domain <strong>' + escapeHtml(allowedWorkspaceDomain) + '</strong></span>',
-    '<span>Users registry <strong>' + usersRegistry.length + ' пользователей</strong></span>',
+    '<span>Users registry <strong>' + dashboardUsers().length + ' пользователей</strong></span>',
     '<span>Настройки workspace <strong>Роли, Users sheet, Telegram mapping, аудит</strong></span>',
     '</div>',
     '</article>',
     '<article class="mf-settings-card mf-external-card">',
     '<div class="mf-section-title"><h3>Права доступа</h3><span class="mf-external-marker">' + escapeHtml(pilotStatusLabel) + '</span></div>',
-    '<p>Пилот Andrey/Daniil сейчас не активен. Этот экран готовит только controlled readiness и dry-run preview.</p>',
-    '<p>Текущий dashboard не фильтрует live-данные по пользователю в profile_only/soft режиме. Полная фильтрация включается только после отдельного enforced QA.</p>',
+    '<p>Чтение и запись требуют подтверждённый рабочий Google-профиль.</p>',
+    '<p>Участник видит связанные с ним задачи; admin и executive имеют полную видимость.</p>',
     '<div class="mf-readonly-grid">',
     '<span>Поля видимости задач <strong>' + escapeHtml(taskIdentitySchemaLabel) + '</strong></span>',
     '<span>Visibility mode <strong>' + escapeHtml(dashboardIdentity.visibilityMode || enforcementModeLabel || 'profile_only') + '</strong></span>',
@@ -3787,8 +3864,8 @@ function renderMfSettings() {
     '<span>Legacy Tasks <strong>' + escapeHtml(taskSchema && taskSchema.requiredLegacyColumnsOk ? 'ок' : 'нужно проверить') + '</strong></span>',
     '<span>Не хватает <strong>' + escapeHtml(taskIdentityMissingText(taskSchema)) + '</strong></span>',
     '<span>Optional write <strong>' + escapeHtml(taskSchema && taskSchema.optionalIdentityWriteActive ? 'частично активно' : 'не активно') + '</strong></span>',
-    '<span>Миграция <strong>опционально, вручную, после backup</strong></span>',
-    '<span>Фильтрация <strong>выключена; preview only</strong></span>',
+    '<span>Миграция <strong>выполнена; повторно не требуется</strong></span>',
+    '<span>Фильтрация <strong>включена</strong></span>',
     '</div>',
     '<div class="mf-column-list compact">' + taskIdentitySchemaFoundHtml(taskSchema) + '</div>',
     '<div class="mf-action-row">',
@@ -3799,15 +3876,15 @@ function renderMfSettings() {
     '<div class="mf-column-list compact">' + taskIdentityManualColumnsHtml(taskSchema) + '</div>',
     '</article>',
     '<article class="mf-settings-card">',
-    '<div class="mf-section-title"><h3>Предпросмотр видимости</h3><span>Dry-run</span></div>',
-    '<p>Фильтрация не применена к реальному дашборду. Preview нужен для Liza/admin, Andrey и Daniil перед любым pilot go.</p>',
+    '<div class="mf-section-title"><h3>Проверка видимости</h3><span>Enforced</span></div>',
+    '<p>Расчёт показывает, сколько задач увидит выбранный пользователь при действующих правилах.</p>',
     '<label class="mf-form-control" for="visibilityPreviewUserSelect"><span>Пользователь</span><select id="visibilityPreviewUserSelect">' + activeUsersOptionsHtml(activeUsers) + '</select></label>',
     '<div class="mf-action-row"><button class="secondary-button" type="button" data-visibility-preview-action="calculate"' + (canManageTaskIdentity && activeUsers.length ? '' : ' disabled') + '>Посчитать видимость</button></div>',
     visibilityPreviewHtml(visibilityPreview),
     '</article>',
     '</section>',
     '<section class="mf-settings-card">',
-    '<div class="mf-section-title"><h3>Stage 37 readiness</h3><span>pilot paused</span></div>',
+    '<div class="mf-section-title"><h3>Готовность тестового контура</h3><span>ready</span></div>',
     pilotReadinessGuardrailsHtml(),
     '</section>',
     '<section class="mf-settings-card">',
@@ -3816,7 +3893,7 @@ function renderMfSettings() {
     '</section>',
     '<section class="mf-two-column settings">',
     '<section><div class="mf-section-title"><h3>Роли доступа</h3><span>model</span></div><div class="mf-settings-list">' + roleRows + '</div></section>',
-    '<section><div class="mf-section-title"><h3>Users registry</h3><span>Users sheet draft</span></div><div class="mf-settings-list">' + usersRegistryRowsHtml() + '</div></section>',
+    '<section><div class="mf-section-title"><h3>Пользователи</h3><span>Live Users sheet</span></div><div class="mf-settings-list">' + usersRegistryRowsHtml() + '</div></section>',
     '</section>',
     '<section class="mf-settings-card">',
     '<div class="mf-section-title"><h3>Users sheet columns</h3><span>schema draft</span></div>',
@@ -4095,9 +4172,52 @@ function openCreateTaskModal() {
   }
   createTaskState = { status: 'idle', message: '' };
   elements.createTaskForm.reset();
+  const users = dashboardUsers();
+  elements.createTaskForm.elements.owner.innerHTML = users.map(function (user) {
+    const label = user.defaultOwnerLabel || user.displayName || user.email;
+    return '<option value="' + escapeHtml(label) + '">' + escapeHtml(user.displayName || label) + ' · ' + escapeHtml(user.department || 'Без отдела') + '</option>';
+  }).join('') + '<option value="Не назначено">Не назначено</option>';
+  elements.createTaskForm.elements.category.innerHTML = '<option value="">Не назначено</option>' + dashboardDepartments().map(function (department) {
+    return '<option value="' + escapeHtml(department) + '">' + escapeHtml(department) + '</option>';
+  }).join('');
   elements.createTaskModal.hidden = false;
   renderCreateTaskModal();
   elements.createTaskForm.elements.title.focus();
+}
+
+async function handleProjectAction(action) {
+  if (action !== 'create') {
+    return;
+  }
+  const name = window.prompt('Название проекта');
+  if (!name) {
+    return;
+  }
+  const departments = dashboardDepartments();
+  const department = window.prompt(
+    'Отдел проекта' + (departments.length ? '\nДоступны: ' + departments.join(', ') : ''),
+    departments[0] || ''
+  );
+  if (!department) {
+    return;
+  }
+  const description = window.prompt('Краткое описание проекта (необязательно)', '') || '';
+  try {
+    flashMessage = 'Добавляем проект…';
+    render();
+    await BAFoxClient.createProject(Object.assign({
+      name: name.trim(),
+      department: department.trim(),
+      description: description.trim(),
+    }, identityRequestParams()));
+    await loadDashboard({ forceRefresh: true });
+    activeTab = 'departments';
+    flashMessage = 'Проект добавлен.';
+    render();
+  } catch (error) {
+    flashMessage = error && error.message ? error.message : 'Не удалось добавить проект.';
+    render();
+  }
 }
 
 function closeCreateTaskModal() {
@@ -4584,7 +4704,7 @@ async function loadCompletedIfNeeded() {
   if ((data.completed && Array.isArray(data.completed.tasks)) || dashboardState.status === 'loading') {
     return;
   }
-  const completedState = await BAFoxClient.getCompletedTasks({ limit: 100 });
+  const completedState = await BAFoxClient.getCompletedTasks(Object.assign({ limit: 100 }, identityRequestParams()));
   if (completedState.status !== 'success' && completedState.status !== 'empty') {
     return;
   }
@@ -4608,7 +4728,7 @@ async function loadCleanupAuditIfNeeded() {
   }
   cleanupAuditState = BAFoxClient.createLoadingState('cleanupAudit');
   renderPanel();
-  cleanupAuditState = await BAFoxClient.getCleanupAudit();
+  cleanupAuditState = await BAFoxClient.getCleanupAudit(identityRequestParams());
   renderPanel();
 }
 
@@ -4734,6 +4854,11 @@ elements.workspaceControls.addEventListener('click', function (event) {
 });
 
 elements.taskList.addEventListener('click', function (event) {
+  const projectActionButton = event.target.closest('[data-project-action]');
+  if (projectActionButton) {
+    handleProjectAction(projectActionButton.dataset.projectAction);
+    return;
+  }
   const identityActionButton = event.target.closest('[data-identity-action]');
   if (identityActionButton) {
     handleIdentityAction(identityActionButton.dataset.identityAction);
