@@ -40,8 +40,10 @@ https://docs.google.com/spreadsheets/d/1TJjQ0Uc_olOxL8kGW3tmd-e2wCfRoPkxbOEDOBs6
 
 - Dashboard: https://79kqtc2xbf-jpg.github.io/ba-fox-control-center/
 - User guide for colleagues: [`docs/TEST_CONTOUR_USER_GUIDE_RU.md`](docs/TEST_CONTOUR_USER_GUIDE_RU.md)
+- Code contribution guide: [`docs/CONTRIBUTOR_GUIDE_RU.md`](docs/CONTRIBUTOR_GUIDE_RU.md)
 - GitHub tokens are not required for testers.
-- The current test mode shows the shared dashboard; per-user task filtering is not enforced yet.
+- Anonymous visitors cannot load task or user data.
+- Registered pilot users see role-aware navigation; the personal task page is derived from their verified Google profile.
 
 ## MVP scope
 
