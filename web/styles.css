@@ -2718,6 +2718,25 @@ h1 {
   color: #ff9beb;
 }
 
+.task-action.trash-chip,
+.danger-button {
+  border-color: rgba(255, 77, 109, 0.38);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.task-action.restore-chip {
+  border-color: rgba(88, 242, 194, 0.4);
+  background: rgba(88, 242, 194, 0.1);
+  color: var(--success);
+}
+
+.trashed-card,
+.archived-project {
+  border-style: dashed;
+  opacity: 0.86;
+}
+
 .chip-row-label.muted {
   color: var(--muted);
 }

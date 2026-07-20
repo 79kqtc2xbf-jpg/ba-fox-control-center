@@ -181,6 +181,50 @@ test('web client sends Google identity for writes and does not add a token param
   assert.equal(requests[0].searchParams.has('token'), false);
 });
 
+test('web client updates projects through an authenticated write route', async function () {
+  const { client, requests } = loadWebClient();
+
+  await client.updateProject({
+    projectId: 'PRJ-1',
+    name: 'Updated project',
+    idToken: 'google-id-token',
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal(requests[0].searchParams.get('route'), 'updateProject');
+  assert.equal(requests[0].searchParams.get('projectId'), 'PRJ-1');
+  assert.equal(requests[0].searchParams.get('idToken'), 'google-id-token');
+});
+
+test('task trash actions are reversible and members can manage only tasks they created', function () {
+  const context = loadAppsScriptAuthorization();
+  context.BA_FOX_CONFIG.TASK_COLUMNS = {};
+  vm.runInContext(fs.readFileSync(path.join(root, 'apps-script/TaskService.gs'), 'utf8'), context);
+
+  const actionMap = context.baFoxTaskActionMap_();
+  assert.equal(actionMap.moveToTrash.archived, true);
+  assert.equal(actionMap.restoreFromTrash.archived, false);
+
+  const member = {
+    accessRole: 'member',
+    email: 'member@mfstream.io',
+    userId: 'USR-1',
+  };
+  assert.equal(context.baFoxProfileCanManageTrashedTask_(member, {
+    createdByEmail: 'member@mfstream.io',
+  }), true);
+  assert.equal(context.baFoxProfileCanManageTrashedTask_(member, {
+    createdByEmail: 'other@mfstream.io',
+    createdByUserId: 'USR-2',
+  }), false);
+  assert.equal(context.baFoxProfileCanManageTrashedTask_({
+    accessRole: 'admin',
+    email: 'admin@mfstream.io',
+  }, {
+    createdByEmail: 'other@mfstream.io',
+  }), true);
+});
+
 test('web client does not expose mock dashboard data when Google sign-in is missing', async function () {
   const { client, requests } = loadWebClient({}, function () {
     return {

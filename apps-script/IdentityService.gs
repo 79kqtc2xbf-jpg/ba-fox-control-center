@@ -844,7 +844,7 @@ function isUserAllowedForRoute_(profile, routeName, action) {
   if (routeName === 'users' || action === 'manageUsers') {
     return profileCanManageUsers_(profile);
   }
-  if (routeName === 'createProject' || action === 'manageProjects') {
+  if (routeName === 'createProject' || routeName === 'updateProject' || action === 'manageProjects') {
     return profileCanManageProjects_(profile);
   }
   return true;

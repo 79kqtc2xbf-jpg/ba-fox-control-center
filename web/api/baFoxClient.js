@@ -23,6 +23,7 @@
     'createTask',
     'editTask',
     'createProject',
+    'updateProject',
     'prepareTaskIdentityColumns',
   ]);
   const TASK_ACTION_MESSAGES = Object.freeze({
@@ -59,6 +60,17 @@
     WRITE_FORBIDDEN: 'У этого профиля нет прав на обновление задач.',
     UNAUTHORIZED: 'Нет доступа для обновления задачи.',
     VALIDATION_ERROR: 'Проверьте поля обновления этапа.',
+  });
+  const PROJECT_MESSAGES = Object.freeze({
+    FIELDS_NOT_ALLOWED: 'Можно изменять только разрешённые поля проекта.',
+    PROJECT_NOT_FOUND: 'Проект не найден.',
+    DUPLICATE_PROJECT_ID: 'Найдено несколько проектов с одинаковым ID. Изменение остановлено.',
+    PROJECTS_SHEET_MISSING: 'Лист Projects недоступен.',
+    SAFE_WRITES_DISABLED: 'Безопасная запись выключена. Проект не изменён.',
+    GOOGLE_TOKEN_REQUIRED: 'Нужен подтверждённый Google-вход.',
+    IDENTITY_REQUIRED: 'Нужен подтверждённый рабочий профиль.',
+    WRITE_FORBIDDEN: 'Редактировать проекты могут только руководитель или администратор.',
+    VALIDATION_ERROR: 'Проверьте название, отдел, ответственного и статус проекта.',
   });
   const JSONP_TIMEOUT_MS = 25000;
   const RATE_LIMIT_MESSAGE = 'Google Sheets временно ограничил чтение. EA FOX повторит попытку позже.';
@@ -543,7 +555,29 @@
         throw new Error('Создание проектов недоступно без live-источника.');
       }
       requireWriteCredential(options, config);
-      return getJsonp('createProject', writeRequestParams(options, config));
+      try {
+        return await getJsonp('createProject', writeRequestParams(options, config));
+      } catch (error) {
+        if (error && error.code && PROJECT_MESSAGES[error.code]) {
+          error.message = PROJECT_MESSAGES[error.code];
+        }
+        throw error;
+      }
+    },
+    updateProject: async function (options) {
+      const config = global.BAFoxConfig.getConfig();
+      if (config.useMockData) {
+        throw new Error('Редактирование проектов недоступно без live-источника.');
+      }
+      requireWriteCredential(options, config);
+      try {
+        return await getJsonp('updateProject', writeRequestParams(options, config));
+      } catch (error) {
+        if (error && error.code && PROJECT_MESSAGES[error.code]) {
+          error.message = PROJECT_MESSAGES[error.code];
+        }
+        throw error;
+      }
     },
     prepareTaskIdentityColumns: async function (options) {
       const config = global.BAFoxConfig.getConfig();
