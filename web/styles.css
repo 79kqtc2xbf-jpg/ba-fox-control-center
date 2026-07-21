@@ -1453,6 +1453,52 @@ h1 {
   display: none;
 }
 
+.task-more {
+  margin-top: 10px;
+}
+
+.task-more > summary {
+  width: fit-content;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--muted-strong);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 30px;
+  list-style: none;
+}
+
+.task-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.task-more > summary::after {
+  margin-left: 7px;
+  content: "⌄";
+}
+
+.task-more[open] > summary::after {
+  content: "⌃";
+}
+
+.task-more[open] .task-details {
+  display: grid;
+  gap: 4px;
+  margin: 10px 0 0;
+}
+
+.task-more[open] .task-details span:nth-child(n+3) {
+  display: block;
+}
+
+.task-more[open] .task-actions {
+  margin-top: 10px;
+}
+
 .task-details span:nth-child(n+3) {
   display: none;
 }
