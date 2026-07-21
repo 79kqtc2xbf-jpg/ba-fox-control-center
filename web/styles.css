@@ -3353,6 +3353,13 @@ body[data-mf-accent="magenta"] {
   align-items: start;
 }
 
+/* When the sidebar is hidden before Google sign-in, do not reserve its desktop
+   column. The access screen must use the whole workspace instead of a narrow
+   left strip with an empty area beside it. */
+.workspace-layout.signed-out-workspace {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .sidebar-toggle {
   display: none;
 }
