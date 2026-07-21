@@ -2,6 +2,10 @@
 
 Personal Executive Assistant task-control system for Lisa.
 
+## Быстрый вход для нового разработчика или ИИ-агента
+
+Начните с [`docs/REPOSITORY_HANDOFF_RU.md`](docs/REPOSITORY_HANDOFF_RU.md): там актуальная архитектура, границы безопасности, карта кода и минимальный набор проверок. Новая обратная связь коллег собрана отдельно в [`docs/INCOMING_FEEDBACK_2026-07-21.md`](docs/INCOMING_FEEDBACK_2026-07-21.md); это backlog, а не уже реализованные изменения.
+
 ## Product ownership
 
 - Product owner: Liza Kiseleva
@@ -38,7 +42,7 @@ https://docs.google.com/spreadsheets/d/1TJjQ0Uc_olOxL8kGW3tmd-e2wCfRoPkxbOEDOBs6
 
 ## Test contour
 
-- Dashboard: https://79kqtc2xbf-jpg.github.io/ba-fox-control-center/
+- Dashboard: актуальная ссылка на тестовый контур выдаётся отдельно; не добавляйте URL тестового окружения в репозиторий.
 - User guide for colleagues: [`docs/TEST_CONTOUR_USER_GUIDE_RU.md`](docs/TEST_CONTOUR_USER_GUIDE_RU.md)
 - Code contribution guide: [`docs/CONTRIBUTOR_GUIDE_RU.md`](docs/CONTRIBUTOR_GUIDE_RU.md)
 - GitHub tokens are not required for testers.

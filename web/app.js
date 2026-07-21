@@ -2351,13 +2351,18 @@ function renderEmpty() {
 }
 
 function taskMeta(task) {
-  return [
+  const meta = [
     'Ответственный: ' + taskOwnerLabel(task),
     'Отдел / направление: ' + taskDirectionLabel(task),
-    'Контакт: ' + (task.organization || 'Без контакта'),
     taskDueDate(task) ? 'Срок: ' + humanDate(taskDueDate(task)) : 'Без срока',
     taskControlDate(task) ? 'Контроль: ' + humanDate(taskControlDate(task)) : '',
-  ].filter(Boolean);
+  ];
+
+  if (task.organization) {
+    meta.splice(2, 0, 'Контакт: ' + task.organization);
+  }
+
+  return meta.filter(Boolean);
 }
 
 function taskMatchesFilter(task, filterId) {
@@ -2548,11 +2553,14 @@ function taskCardHtml(task) {
     '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title)) + '</div>',
     '<div class="task-meta">' + meta.map(function (item) { return '<span>' + escapeHtml(item) + '</span>'; }).join('') + '</div>',
     '<div class="next-action"><strong>Следующее действие</strong><span>' + escapeHtml(nextActionText(task)) + '</span></div>',
+    '<details class="task-more">',
+    '<summary>Ещё</summary>',
     '<div class="task-details">',
     taskDetailHtml('Источник', task.source || task.appSource || task.channel),
     taskDetailHtml('ID задачи', task.id),
     '</div>',
     actionButtonsHtml(task),
+    '</details>',
     '</div>',
     '<aside class="task-primary">',
     '<button class="complete-task-button" type="button" data-task-id="' + escapeHtml(task.id) + '" data-task-action="markDone"' + (!safeWritesEnabled() || (taskActionState[task.id] || {}).status === 'loading' ? ' disabled' : '') + '>' + escapeHtml(((taskActionState[task.id] || {}).status === 'loading' && (taskActionState[task.id] || {}).action === 'markDone') ? '...' : '✓ Выполнено') + '</button>',
