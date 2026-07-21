@@ -31,6 +31,7 @@ const elements = {
   sidebarToggle: document.querySelector('#sidebarToggle'),
   sidebarShell: document.querySelector('#sidebarShell'),
   sidebarBackdrop: document.querySelector('#sidebarBackdrop'),
+  workspaceLayout: document.querySelector('.workspace-layout'),
   tabBar: document.querySelector('.tabs'),
   tabs: document.querySelectorAll('.tab'),
   summaryCards: document.querySelector('#summaryCards'),
@@ -353,6 +354,7 @@ const mfCurrentUserId = 'emp_lisa';
 const identityStorageKey = 'mfGroupTracker.identityPrepared';
 const identityTokenStorageKey = 'mfGroupTracker.googleIdentityToken';
 const personalizationStoragePrefix = 'mfGroupTracker.personalizationPreview';
+let googleAutoSignInInFlight = false;
 
 const mfThemePresets = Object.freeze([
   { id: 'neon_dark', label: 'Neon dark', description: 'Тёмная операционная тема с неоновыми акцентами.' },
@@ -1567,6 +1569,46 @@ function googleIdentityScriptLoaded() {
   return Boolean(window.google && window.google.accounts && window.google.accounts.id);
 }
 
+function handleGoogleIdentityCredential(response) {
+  const credential = response && response.credential ? response.credential : '';
+  if (!credential) {
+    if (requestGoogleIdentityCredential.reject) {
+      requestGoogleIdentityCredential.reject(new Error('Google не вернул identity credential.'));
+    }
+    return;
+  }
+
+  if (requestGoogleIdentityCredential.resolve) {
+    const resolve = requestGoogleIdentityCredential.resolve;
+    requestGoogleIdentityCredential.resolve = null;
+    requestGoogleIdentityCredential.reject = null;
+    resolve(credential);
+    return;
+  }
+
+  if (!googleAutoSignInInFlight) {
+    return;
+  }
+
+  googleAutoSignInInFlight = false;
+  restoreGoogleSessionFromCredential(credential).catch(function () {
+    // The signed-out screen remains available if Google or the backend declines
+    // the restored credential. A manual sign-in remains possible.
+  });
+}
+
+function initializeGoogleIdentityClient(config) {
+  if (requestGoogleIdentityCredential.initialized) {
+    return;
+  }
+  window.google.accounts.id.initialize({
+    client_id: config.googleClientId,
+    auto_select: true,
+    callback: handleGoogleIdentityCredential,
+  });
+  requestGoogleIdentityCredential.initialized = true;
+}
+
 function loadGoogleIdentityScript() {
   if (googleIdentityScriptLoaded()) {
     return Promise.resolve();
@@ -1605,37 +1647,61 @@ async function requestGoogleIdentityCredential() {
       resolve(credential);
     };
     requestGoogleIdentityCredential.reject = reject;
-    if (!requestGoogleIdentityCredential.initialized) {
-      window.google.accounts.id.initialize({
-      client_id: config.googleClientId,
-      auto_select: false,
-      use_fedcm_for_prompt: true,
-      callback: function (response) {
-        const credential = response && response.credential ? response.credential : '';
-        if (!credential) {
-          if (requestGoogleIdentityCredential.reject) {
-            requestGoogleIdentityCredential.reject(new Error('Google не вернул identity credential.'));
-          }
-          return;
-        }
-        if (requestGoogleIdentityCredential.resolve) {
-          requestGoogleIdentityCredential.resolve(credential);
-        }
-      },
-      });
-      requestGoogleIdentityCredential.initialized = true;
-    }
+    initializeGoogleIdentityClient(config);
     window.google.accounts.id.prompt(function (notification) {
       if (resolved) {
         return;
       }
       if (notification && notification.isNotDisplayed && notification.isNotDisplayed()) {
+        requestGoogleIdentityCredential.resolve = null;
+        requestGoogleIdentityCredential.reject = null;
         reject(new Error('Google-вход не показан. Проверьте OAuth Client ID и домен приложения.'));
       } else if (notification && notification.isSkippedMoment && notification.isSkippedMoment()) {
+        requestGoogleIdentityCredential.resolve = null;
+        requestGoogleIdentityCredential.reject = null;
         reject(new Error('Google-вход отменён или пропущен.'));
       }
     });
   });
+}
+
+async function restoreGoogleSessionFromCredential(credential) {
+  setStoredIdentityToken(credential);
+  await loadProfile();
+  const profile = identityDisplayProfile();
+  if (!profile.isVerifiedByGoogle || !(profile.permissions && profile.permissions.canUseDashboard)) {
+    return;
+  }
+  activeTab = 'dashboard';
+  await loadDashboard();
+  flashMessage = 'Рабочий профиль восстановлен через Google.';
+  render();
+}
+
+async function tryRestoreGoogleSession() {
+  const config = BAFoxConfig.getConfig();
+  if (!config.hasGoogleClientId) {
+    return;
+  }
+  try {
+    await loadGoogleIdentityScript();
+    if (!googleIdentityScriptLoaded()) {
+      return;
+    }
+    initializeGoogleIdentityClient(config);
+    googleAutoSignInInFlight = true;
+    window.google.accounts.id.prompt(function (notification) {
+      if (!notification) {
+        return;
+      }
+      if ((notification.isNotDisplayed && notification.isNotDisplayed())
+        || (notification.isSkippedMoment && notification.isSkippedMoment())) {
+        googleAutoSignInInFlight = false;
+      }
+    });
+  } catch (error) {
+    googleAutoSignInInFlight = false;
+  }
 }
 
 function findRegistryUserByEmail(email) {
@@ -4175,6 +4241,7 @@ function render() {
     && Boolean(profile.permissions && profile.permissions.canUseDashboard);
   elements.sidebarShell.hidden = !dashboardAllowed;
   elements.sidebarToggle.hidden = !dashboardAllowed;
+  elements.workspaceLayout.classList.toggle('signed-out-workspace', !dashboardAllowed);
   elements.liveDataStatus.hidden = !dashboardAllowed;
   elements.summaryCards.hidden = !dashboardAllowed;
   elements.modeBanner.hidden = !dashboardAllowed;
@@ -4452,6 +4519,10 @@ function closeEditTaskModal() {
 async function handleIdentityAction(action) {
   if (action === 'signout') {
     setStoredIdentityToken('');
+    googleAutoSignInInFlight = false;
+    if (googleIdentityScriptLoaded() && window.google.accounts.id.disableAutoSelect) {
+      window.google.accounts.id.disableAutoSelect();
+    }
     try {
       window.localStorage.removeItem(identityStorageKey);
     } catch (error) {
@@ -5363,6 +5434,7 @@ async function initializeDashboard() {
     loadGoogleIdentityScript().catch(function () {
       // Sign-in will show the actionable error if Google remains unavailable.
     });
+    tryRestoreGoogleSession();
   }
   await loadProfile();
   const profile = identityDisplayProfile();
