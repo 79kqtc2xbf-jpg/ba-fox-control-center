@@ -17,7 +17,6 @@
     'taskIdentitySchema',
     'activeUsers',
     'visibilityPreview',
-    'contacts',
   ]);
   const WRITE_ROUTES = Object.freeze([
     'taskAction',
@@ -531,9 +530,6 @@
     },
     getFullDashboard: function (options) {
       return readRoute('fullDashboard', options || {});
-    },
-    getContacts: function (options) {
-      return readRoute('contacts', options || {});
     },
     getCleanupAudit: function (options) {
       return readRoute('cleanupAudit', options || {});

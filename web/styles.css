@@ -4400,10 +4400,25 @@ body[data-mf-theme="light"] .home-action:hover strong {
   line-height: 1.35;
 }
 
-.collaborator-picker {
+.collaborator-dropdown {
+  border: 1px solid #d7dee8;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.collaborator-dropdown summary {
+  padding: 11px 12px;
+  color: #172033;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.collaborator-options {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  padding: 0 10px 10px;
 }
 
 .collaborator-option {
@@ -4435,7 +4450,7 @@ body[data-mf-theme="light"] .home-action:hover strong {
 }
 
 @media (max-width: 560px) {
-  .collaborator-picker {
+  .collaborator-options {
     grid-template-columns: 1fr;
   }
 }
