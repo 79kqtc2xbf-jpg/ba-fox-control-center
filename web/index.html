@@ -119,7 +119,8 @@
           </fieldset>
           <label class="form-field">
             <span>Контакт <em>(необязательно)</em></span>
-            <input type="text" name="organization" autocomplete="organization" placeholder="Можно оставить пустым" />
+            <input type="text" name="organization" list="taskContactSuggestions" autocomplete="organization" placeholder="Начните вводить контакт или организацию" />
+            <datalist id="taskContactSuggestions"></datalist>
           </label>
           <label class="form-field form-field-wide">
             <span>Следующее действие</span>

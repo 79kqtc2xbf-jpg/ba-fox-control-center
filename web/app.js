@@ -53,6 +53,7 @@ const elements = {
   createTaskModal: document.querySelector('#createTaskModal'),
   createTaskForm: document.querySelector('#createTaskForm'),
   taskCollaboratorsSelect: document.querySelector('#taskCollaboratorsSelect'),
+  taskContactSuggestions: document.querySelector('#taskContactSuggestions'),
   createTaskMessage: document.querySelector('#createTaskMessage'),
   submitCreateTask: document.querySelector('#submitCreateTask'),
   cancelCreateTask: document.querySelector('#cancelCreateTask'),
@@ -723,6 +724,7 @@ let visibilityPreviewState = BAFoxClient.createLoadingState('visibilityPreview')
 visibilityPreviewState.status = 'idle';
 let taskActionState = {};
 let createTaskState = { status: 'idle', message: '' };
+const createTaskDraftStorageKey = 'mfGroupTracker.createTaskDraft';
 let editTaskState = { status: 'idle', message: '', taskId: '' };
 let performanceState = {
   signInMs: null,
@@ -4394,7 +4396,27 @@ function openCreateTaskModal() {
   elements.createTaskForm.elements.category.innerHTML = '<option value="">Не назначено</option>' + dashboardDepartments().map(function (department) {
     return '<option value="' + escapeHtml(department) + '">' + escapeHtml(department) + '</option>';
   }).join('');
+  try {
+    const draft = JSON.parse(window.sessionStorage.getItem(createTaskDraftStorageKey) || '{}');
+    Object.keys(draft).forEach(function (field) {
+      if (elements.createTaskForm.elements[field] && typeof draft[field] === 'string') {
+        elements.createTaskForm.elements[field].value = draft[field];
+      }
+    });
+  } catch (error) {
+    // A missing temporary draft must never block task creation.
+  }
   elements.createTaskModal.hidden = false;
+  BAFoxClient.getContacts(identityRequestParams()).then(function(response) {
+    const contacts = response && response.contacts ? response.contacts : [];
+    elements.taskContactSuggestions.innerHTML = contacts.map(function(contact) {
+      const value = contact.organization || contact.displayName;
+      const label = [contact.displayName, contact.organization, contact.role].filter(Boolean).join(' · ');
+      return '<option value="' + escapeHtml(value) + '" label="' + escapeHtml(label) + '"></option>';
+    }).join('');
+  }).catch(function () {
+    elements.taskContactSuggestions.innerHTML = '';
+  });
   renderCreateTaskModal();
   elements.createTaskForm.elements.title.focus();
 }
@@ -4497,6 +4519,21 @@ function closeCreateTaskModal() {
   elements.createTaskModal.hidden = true;
   createTaskState = { status: 'idle', message: '' };
   renderCreateTaskModal();
+}
+
+function saveCreateTaskDraft() {
+  if (elements.createTaskModal.hidden || createTaskState.status === 'loading') return;
+  try {
+    const data = new FormData(elements.createTaskForm);
+    const draft = {};
+    ['title', 'owner', 'organization', 'category', 'status', 'priority', 'nextAction', 'controlDate', 'reminder', 'comment'].forEach(function (field) {
+      const value = String(data.get(field) || '').trim();
+      if (value) draft[field] = value;
+    });
+    window.sessionStorage.setItem(createTaskDraftStorageKey, JSON.stringify(draft));
+  } catch (error) {
+    // Drafts are optional and remain in the current browser session only.
+  }
 }
 
 function openCreateTaskSuccessModal() {
@@ -4870,6 +4907,7 @@ async function handleCreateTaskSubmit(event) {
     performanceState.createTaskMs = Math.round(performance.now() - createStartedAt);
     performanceState.createTaskBackend = createResponse && createResponse.performance ? createResponse.performance : null;
     elements.createTaskForm.reset();
+    window.sessionStorage.removeItem(createTaskDraftStorageKey);
     createTaskState = { status: 'success', message: 'Задача добавлена · ' + formatDurationMs(performanceState.createTaskMs) };
     elements.createTaskModal.hidden = true;
     activeTab = 'all';
@@ -5072,6 +5110,16 @@ elements.sidebarBackdrop.addEventListener('click', function () {
 });
 
 document.addEventListener('keydown', function (event) {
+  if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === 'n' && elements.createTaskModal.hidden && safeWritesEnabled()) {
+    event.preventDefault();
+    openCreateTaskModal();
+    return;
+  }
+  if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !elements.createTaskModal.hidden) {
+    event.preventDefault();
+    if (elements.createTaskForm.requestSubmit) elements.createTaskForm.requestSubmit();
+    return;
+  }
   if (event.key === 'Escape' && !elements.createTaskSuccessModal.hidden) {
     closeCreateTaskSuccessModal();
     return;
@@ -5113,6 +5161,7 @@ elements.closeCreateTaskSuccess.addEventListener('click', closeCreateTaskSuccess
 elements.closeEditTask.addEventListener('click', closeEditTaskModal);
 elements.closeEditTaskTop.addEventListener('click', closeEditTaskModal);
 elements.createTaskForm.addEventListener('submit', handleCreateTaskSubmit);
+elements.createTaskForm.addEventListener('input', saveCreateTaskDraft);
 elements.editTaskForm.addEventListener('submit', handleEditTaskSubmit);
 elements.createTaskModal.addEventListener('click', function (event) {
   if (event.target === elements.createTaskModal) {
