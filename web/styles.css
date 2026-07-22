@@ -2244,6 +2244,7 @@ h1 {
 
 .task-chip,
 .priority-label,
+.decision-label,
 .audit-group-chip,
 .severity-pill {
   padding: 6px 9px;
@@ -2276,6 +2277,30 @@ h1 {
   border: 1px solid rgba(139, 92, 255, 0.25);
   background: var(--accent-secondary-soft);
   color: #cdbdff;
+}
+
+.decision-label {
+  border: 1px solid rgba(0, 229, 255, 0.26);
+  background: rgba(0, 229, 255, 0.1);
+  color: var(--accent);
+}
+
+.decision-label.now {
+  border-color: rgba(67, 255, 154, 0.34);
+  background: rgba(67, 255, 154, 0.1);
+  color: var(--success);
+}
+
+.decision-label.today {
+  border-color: rgba(255, 179, 71, 0.36);
+  background: rgba(255, 179, 71, 0.1);
+  color: var(--warning);
+}
+
+.decision-label.overdue {
+  border-color: rgba(255, 79, 200, 0.42);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .task-title {

@@ -1237,6 +1237,23 @@ function isUrgentTask(task) {
   return !isFinalTask(task) && (isHighPriority(task) || isBlockerTask(task));
 }
 
+function taskPriorityDecision(task) {
+  if (isFinalTask(task)) return null;
+  if (isOverdueTask(task)) {
+    return { label: 'Эскалация: просрочено', tone: 'overdue' };
+  }
+  if (isTodayRelevantTask(task) && isHighPriority(task)) {
+    return { label: 'Сделать сейчас', tone: 'now' };
+  }
+  if (isTodayRelevantTask(task)) {
+    return { label: 'Контроль сегодня', tone: 'today' };
+  }
+  if (isHighPriority(task) || isBlockerTask(task)) {
+    return { label: 'Запланировать', tone: 'plan' };
+  }
+  return { label: 'Рабочая очередь', tone: 'queue' };
+}
+
 function isManualFocusTask(task) {
   const text = taskSearchText(task);
   return task.focus === true || manualFocusTaskIds[task.id] === true || text.includes('focus') || text.includes('фокус') || text.includes('главное');
@@ -2164,14 +2181,14 @@ function groupedTasks(tasks) {
   };
 
   tasks.forEach(function (task) {
-    if (isUrgentTask(task)) {
+    if (isOverdueTask(task)) {
+      groups.overdue.push(task);
+    } else if (isUrgentTask(task)) {
       groups.urgent.push(task);
     } else if (isWaitingTask(task)) {
       groups.waiting.push(task);
     } else if (isPushTask(task)) {
       groups.pushes.push(task);
-    } else if (isOverdueTask(task)) {
-      groups.overdue.push(task);
     } else {
       groups.remaining.push(task);
     }
@@ -2628,12 +2645,14 @@ function actionButtonsHtml(task) {
 
 function taskCardHtml(task) {
   const meta = taskMeta(task);
+  const decision = taskPriorityDecision(task);
   return [
     '<article class="task-card" data-tone="' + escapeHtml(taskTone(task)) + '">',
     '<div class="task-main">',
     '<div class="task-topline">',
     '<span class="task-chip">' + escapeHtml(getTaskStatusLabel(task)) + '</span>',
     task.priority ? '<span class="priority-label">' + escapeHtml(task.priority) + '</span>' : '',
+    decision ? '<span class="decision-label ' + escapeHtml(decision.tone) + '">' + escapeHtml(decision.label) + '</span>' : '',
     '</div>',
     '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title)) + '</div>',
     '<div class="task-meta">' + meta.map(function (item) { return '<span>' + escapeHtml(item) + '</span>'; }).join('') + '</div>',
