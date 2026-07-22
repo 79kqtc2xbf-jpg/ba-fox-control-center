@@ -106,41 +106,42 @@
             <span>Название задачи</span>
             <input type="text" name="title" autocomplete="off" required />
           </label>
-          <label class="form-field">
+          <button class="create-task-details-toggle" type="button" id="createTaskDetailsToggle" aria-expanded="false">Добавить детали</button>
+          <label class="form-field create-task-detail">
             <span>Ответственный</span>
             <select name="owner" id="taskOwnerSelect">
               <option value="Не назначено">Не назначено</option>
             </select>
           </label>
-          <fieldset class="form-field form-field-wide collaborator-field">
+          <fieldset class="form-field form-field-wide collaborator-field create-task-detail">
             <legend>Дополнительные ответственные <em>(необязательно)</em></legend>
             <div class="collaborator-picker" id="taskCollaboratorsSelect"></div>
             <small>Можно выбрать нескольких соисполнителей. Основной ответственный указывается отдельно.</small>
           </fieldset>
-          <label class="form-field">
+          <label class="form-field create-task-detail">
             <span>Контакт <em>(необязательно)</em></span>
             <input type="text" name="organization" list="taskContactSuggestions" autocomplete="organization" placeholder="Начните вводить контакт или организацию" />
             <datalist id="taskContactSuggestions"></datalist>
           </label>
-          <label class="form-field form-field-wide">
+          <label class="form-field form-field-wide create-task-detail">
             <span>Следующее действие</span>
             <textarea name="nextAction" rows="3"></textarea>
           </label>
-          <label class="form-field">
+          <label class="form-field create-task-detail">
             <span>Контрольная дата</span>
             <div class="date-control" data-date-picker-for="controlDate">
               <input type="date" name="controlDate" />
               <button class="date-picker-button" type="button" data-date-picker-for="controlDate" aria-label="Выбрать контрольную дату">Выбрать дату</button>
             </div>
           </label>
-          <label class="form-field">
+          <label class="form-field create-task-detail">
             <span>Напоминание</span>
             <div class="date-control" data-date-picker-for="reminder">
               <input type="date" name="reminder" />
               <button class="date-picker-button" type="button" data-date-picker-for="reminder" aria-label="Выбрать дату напоминания">Выбрать дату</button>
             </div>
           </label>
-          <label class="form-field">
+          <label class="form-field create-task-detail">
             <span>Приоритет</span>
             <select name="priority">
               <option value="Medium">Средний</option>
@@ -148,7 +149,7 @@
               <option value="Low">Низкий</option>
             </select>
           </label>
-          <label class="form-field">
+          <label class="form-field create-task-detail">
             <span>Статус</span>
             <select name="status">
               <option value="Not Started">Не начато</option>
@@ -158,13 +159,13 @@
               <option value="Done">Готово</option>
             </select>
           </label>
-          <label class="form-field">
+          <label class="form-field create-task-detail">
             <span>Отдел / направление</span>
             <select name="category" id="taskDepartmentSelect">
               <option value="">Не назначено</option>
             </select>
           </label>
-          <label class="form-field form-field-wide">
+          <label class="form-field form-field-wide create-task-detail">
             <span>Комментарий</span>
             <textarea name="comment" rows="3" placeholder="Контекст, решение, источник или важная деталь"></textarea>
           </label>

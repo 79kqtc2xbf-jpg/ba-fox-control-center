@@ -3056,6 +3056,21 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.create-task-details-toggle {
+  grid-column: 1 / -1;
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-weight: 800;
+  text-decoration: underline;
+}
+
+#createTaskForm:not(.create-task-details-open) .create-task-detail {
+  display: none;
+}
+
 .home-focus {
   margin-bottom: 14px;
   padding: 22px;

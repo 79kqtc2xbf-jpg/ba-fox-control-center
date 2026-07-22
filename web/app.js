@@ -52,6 +52,7 @@ const elements = {
   createTaskButton: document.querySelector('#createTaskButton'),
   createTaskModal: document.querySelector('#createTaskModal'),
   createTaskForm: document.querySelector('#createTaskForm'),
+  createTaskDetailsToggle: document.querySelector('#createTaskDetailsToggle'),
   taskCollaboratorsSelect: document.querySelector('#taskCollaboratorsSelect'),
   taskContactSuggestions: document.querySelector('#taskContactSuggestions'),
   createTaskMessage: document.querySelector('#createTaskMessage'),
@@ -724,6 +725,7 @@ let visibilityPreviewState = BAFoxClient.createLoadingState('visibilityPreview')
 visibilityPreviewState.status = 'idle';
 let taskActionState = {};
 let createTaskState = { status: 'idle', message: '' };
+let createTaskDetailsOpen = false;
 const createTaskDraftStorageKey = 'mfGroupTracker.createTaskDraft';
 let editTaskState = { status: 'idle', message: '', taskId: '' };
 let performanceState = {
@@ -4358,6 +4360,14 @@ function renderCreateTaskModal() {
   elements.createTaskMessage.textContent = createTaskState.message || '';
   elements.createTaskMessage.classList.toggle('error', createTaskState.status === 'error');
   elements.createTaskMessage.classList.toggle('success', createTaskState.status === 'success');
+  elements.createTaskForm.classList.toggle('create-task-details-open', createTaskDetailsOpen);
+  elements.createTaskDetailsToggle.setAttribute('aria-expanded', createTaskDetailsOpen ? 'true' : 'false');
+  elements.createTaskDetailsToggle.textContent = createTaskDetailsOpen ? 'Скрыть детали' : 'Добавить детали';
+}
+
+function setCreateTaskDetailsOpen(open) {
+  createTaskDetailsOpen = Boolean(open);
+  renderCreateTaskModal();
 }
 
 function openCreateTaskDatePicker(fieldName) {
@@ -4382,6 +4392,7 @@ function openCreateTaskModal() {
     return;
   }
   createTaskState = { status: 'idle', message: '' };
+  createTaskDetailsOpen = false;
   elements.createTaskForm.reset();
   const users = dashboardUsers();
   elements.createTaskForm.elements.owner.innerHTML = users.map(function (user) {
@@ -4403,6 +4414,7 @@ function openCreateTaskModal() {
         elements.createTaskForm.elements[field].value = draft[field];
       }
     });
+    createTaskDetailsOpen = Object.keys(draft).some(function(field) { return field !== 'title'; });
   } catch (error) {
     // A missing temporary draft must never block task creation.
   }
@@ -4876,6 +4888,7 @@ async function handleCreateTaskSubmit(event) {
   const payload = createTaskPayloadFromForm();
   const missing = validateCreateTaskPayload(payload);
   if (missing.length) {
+    setCreateTaskDetailsOpen(true);
     createTaskState = {
       status: 'error',
       message: missing.includes('Введите название задачи')
@@ -5162,6 +5175,7 @@ elements.closeEditTask.addEventListener('click', closeEditTaskModal);
 elements.closeEditTaskTop.addEventListener('click', closeEditTaskModal);
 elements.createTaskForm.addEventListener('submit', handleCreateTaskSubmit);
 elements.createTaskForm.addEventListener('input', saveCreateTaskDraft);
+elements.createTaskDetailsToggle.addEventListener('click', function () { setCreateTaskDetailsOpen(!createTaskDetailsOpen); });
 elements.editTaskForm.addEventListener('submit', handleEditTaskSubmit);
 elements.createTaskModal.addEventListener('click', function (event) {
   if (event.target === elements.createTaskModal) {
