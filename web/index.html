@@ -115,14 +115,12 @@
           </label>
           <fieldset class="form-field form-field-wide collaborator-field create-task-detail">
             <legend>Дополнительные ответственные <em>(необязательно)</em></legend>
-            <div class="collaborator-picker" id="taskCollaboratorsSelect"></div>
+            <details class="collaborator-dropdown">
+              <summary id="taskCollaboratorsSummary">Выбрать дополнительных ответственных</summary>
+              <div class="collaborator-options" id="taskCollaboratorsSelect"></div>
+            </details>
             <small>Можно выбрать нескольких соисполнителей. Основной ответственный указывается отдельно.</small>
           </fieldset>
-          <label class="form-field create-task-detail">
-            <span>Контакт <em>(необязательно)</em></span>
-            <input type="text" name="organization" list="taskContactSuggestions" autocomplete="organization" placeholder="Начните вводить контакт или организацию" />
-            <datalist id="taskContactSuggestions"></datalist>
-          </label>
           <label class="form-field form-field-wide create-task-detail">
             <span>Следующее действие</span>
             <textarea name="nextAction" rows="3"></textarea>

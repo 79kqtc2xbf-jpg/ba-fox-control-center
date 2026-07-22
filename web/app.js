@@ -54,7 +54,7 @@ const elements = {
   createTaskForm: document.querySelector('#createTaskForm'),
   createTaskDetailsToggle: document.querySelector('#createTaskDetailsToggle'),
   taskCollaboratorsSelect: document.querySelector('#taskCollaboratorsSelect'),
-  taskContactSuggestions: document.querySelector('#taskContactSuggestions'),
+  taskCollaboratorsSummary: document.querySelector('#taskCollaboratorsSummary'),
   createTaskMessage: document.querySelector('#createTaskMessage'),
   submitCreateTask: document.querySelector('#submitCreateTask'),
   cancelCreateTask: document.querySelector('#cancelCreateTask'),
@@ -2464,10 +2464,6 @@ function taskMeta(task) {
     taskControlDate(task) ? 'Контроль: ' + humanDate(taskControlDate(task)) : '',
   ];
 
-  if (task.organization) {
-    meta.splice(2, 0, 'Контакт: ' + task.organization);
-  }
-
   return meta.filter(Boolean);
 }
 
@@ -2691,7 +2687,6 @@ function completedTaskCardHtml(task) {
     '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title)) + '</div>',
     '<div class="task-meta">' + [
       'Ответственные: ' + taskAssigneesLabel(task),
-      task.organization || 'Без компании',
       task.source || task.appSource || task.channel || '',
       task.id ? 'ID: ' + task.id : '',
     ].filter(Boolean).map(function (item) { return '<span>' + escapeHtml(item) + '</span>'; }).join('') + '</div>',
@@ -3464,7 +3459,6 @@ function managementTaskCardHtml(task) {
     '<div class="mf-task-meta">',
     '<span>Ответственные: <strong>' + escapeHtml(taskAssigneesLabel(task)) + '</strong></span>',
     '<span>Отдел / направление: <strong>' + escapeHtml(taskDirectionLabel(task)) + '</strong></span>',
-    '<span>Контакт: <strong>' + escapeHtml(task.organization || 'Без контакта') + '</strong></span>',
     '<span>Контроль: <strong>' + escapeHtml(taskControlDate(task) ? humanDate(taskControlDate(task)) : '-') + '</strong></span>',
     '<span>Срок: <strong>' + escapeHtml(taskDueDate(task) ? humanDate(taskDueDate(task)) : '-') + '</strong></span>',
     '</div>',
@@ -4414,21 +4408,17 @@ function openCreateTaskModal() {
         elements.createTaskForm.elements[field].value = draft[field];
       }
     });
+    if (Array.isArray(draft.collaboratorEmails)) {
+      Array.prototype.forEach.call(elements.createTaskForm.querySelectorAll('input[name="collaboratorEmails"]'), function(input) {
+        input.checked = draft.collaboratorEmails.indexOf(input.value) !== -1;
+      });
+    }
     createTaskDetailsOpen = Object.keys(draft).some(function(field) { return field !== 'title'; });
   } catch (error) {
     // A missing temporary draft must never block task creation.
   }
   elements.createTaskModal.hidden = false;
-  BAFoxClient.getContacts(identityRequestParams()).then(function(response) {
-    const contacts = response && response.contacts ? response.contacts : [];
-    elements.taskContactSuggestions.innerHTML = contacts.map(function(contact) {
-      const value = contact.organization || contact.displayName;
-      const label = [contact.displayName, contact.organization, contact.role].filter(Boolean).join(' · ');
-      return '<option value="' + escapeHtml(value) + '" label="' + escapeHtml(label) + '"></option>';
-    }).join('');
-  }).catch(function () {
-    elements.taskContactSuggestions.innerHTML = '';
-  });
+  updateCollaboratorSummary();
   renderCreateTaskModal();
   elements.createTaskForm.elements.title.focus();
 }
@@ -4538,14 +4528,25 @@ function saveCreateTaskDraft() {
   try {
     const data = new FormData(elements.createTaskForm);
     const draft = {};
-    ['title', 'owner', 'organization', 'category', 'status', 'priority', 'nextAction', 'controlDate', 'reminder', 'comment'].forEach(function (field) {
+    ['title', 'owner', 'category', 'status', 'priority', 'nextAction', 'controlDate', 'reminder', 'comment'].forEach(function (field) {
       const value = String(data.get(field) || '').trim();
       if (value) draft[field] = value;
     });
+    const collaboratorEmails = data.getAll('collaboratorEmails').map(function(email) { return String(email || '').trim(); }).filter(Boolean);
+    if (collaboratorEmails.length) draft.collaboratorEmails = collaboratorEmails;
     window.sessionStorage.setItem(createTaskDraftStorageKey, JSON.stringify(draft));
   } catch (error) {
     // Drafts are optional and remain in the current browser session only.
   }
+}
+
+function updateCollaboratorSummary() {
+  const selected = elements.createTaskForm
+    ? Array.prototype.filter.call(elements.createTaskForm.querySelectorAll('input[name="collaboratorEmails"]'), function(input) { return input.checked; })
+    : [];
+  elements.taskCollaboratorsSummary.textContent = selected.length
+    ? 'Дополнительные ответственные: ' + selected.length
+    : 'Выбрать дополнительных ответственных';
 }
 
 function openCreateTaskSuccessModal() {
@@ -4590,7 +4591,7 @@ function openEditTaskModal(taskId) {
   elements.editTaskBody.innerHTML = [
     '<div class="edit-task-summary">',
     '<strong>' + escapeHtml(removeIsoDateNoise(task.title)) + '</strong>',
-    '<span>' + escapeHtml(task.organization || 'Без компании') + ' · ID: ' + escapeHtml(task.id) + '</span>',
+    '<span>ID: ' + escapeHtml(task.id) + '</span>',
     '</div>',
   ].join('');
   elements.editTaskModal.hidden = false;
@@ -4848,7 +4849,6 @@ function createTaskPayloadFromForm() {
     title: String(formData.get('title') || '').trim(),
     owner: String(formData.get('owner') || '').trim(),
     collaboratorEmails: formData.getAll('collaboratorEmails').map(function (email) { return String(email || '').trim(); }).filter(Boolean).join(','),
-    organization: String(formData.get('organization') || '').trim(),
     category: String(formData.get('category') || '').trim(),
     status: String(formData.get('status') || '').trim(),
     priority: String(formData.get('priority') || '').trim(),
@@ -5123,11 +5123,6 @@ elements.sidebarBackdrop.addEventListener('click', function () {
 });
 
 document.addEventListener('keydown', function (event) {
-  if (!event.metaKey && !event.ctrlKey && !event.altKey && event.key.toLowerCase() === 'n' && elements.createTaskModal.hidden && safeWritesEnabled()) {
-    event.preventDefault();
-    openCreateTaskModal();
-    return;
-  }
   if ((event.metaKey || event.ctrlKey) && event.key === 'Enter' && !elements.createTaskModal.hidden) {
     event.preventDefault();
     if (elements.createTaskForm.requestSubmit) elements.createTaskForm.requestSubmit();
@@ -5175,6 +5170,12 @@ elements.closeEditTask.addEventListener('click', closeEditTaskModal);
 elements.closeEditTaskTop.addEventListener('click', closeEditTaskModal);
 elements.createTaskForm.addEventListener('submit', handleCreateTaskSubmit);
 elements.createTaskForm.addEventListener('input', saveCreateTaskDraft);
+elements.createTaskForm.addEventListener('change', function(event) {
+  if (event.target && event.target.name === 'collaboratorEmails') {
+    updateCollaboratorSummary();
+    saveCreateTaskDraft();
+  }
+});
 elements.createTaskDetailsToggle.addEventListener('click', function () { setCreateTaskDetailsOpen(!createTaskDetailsOpen); });
 elements.editTaskForm.addEventListener('submit', handleEditTaskSubmit);
 elements.createTaskModal.addEventListener('click', function (event) {
