@@ -373,6 +373,7 @@ function baFoxCreateTaskAllowedKeys_() {
     'googleCredential',
     'title',
     'owner',
+    'collaboratorEmails',
     'organization',
     'nextAction',
     'deadline',
@@ -491,9 +492,15 @@ function baFoxCreateTaskIdentityMetadata_(normalized, profile) {
   if (!ownerUser && ownerMatch.warning) {
     warnings.push(ownerMatch.warning);
   }
+  var collaboratorResolution = baFoxResolveCreateTaskCollaborators_(normalized.collaboratorEmails, ownerUser);
+  if (collaboratorResolution.invalidEmails.length) {
+    warnings.push('COLLABORATOR_NOT_ACTIVE');
+  }
   return {
     ownerEmail: ownerUser ? ownerUser.email : '',
     ownerUserId: ownerUser ? ownerUser.userId : '',
+    collaboratorEmails: collaboratorResolution.emails.join(','),
+    collaboratorUserIds: collaboratorResolution.userIds.join(','),
     createdByEmail: profile && profile.isAuthenticated ? normalizeWorkspaceEmail_(profile.email) : '',
     createdByUserId: profile && profile.isAuthenticated ? baFoxSafeString(profile.userId) : '',
     visibility: baFoxSafeString(normalized.visibility || 'team'),
@@ -504,7 +511,33 @@ function baFoxCreateTaskIdentityMetadata_(normalized, profile) {
       matchedCount: ownerMatch.matches ? ownerMatch.matches.length : 0,
       warning: ownerMatch.warning || ''
     },
+    collaboratorResolution: collaboratorResolution,
     warnings: warnings
+  };
+}
+
+function baFoxResolveCreateTaskCollaborators_(value, ownerUser) {
+  var emails = baFoxSplitIdentityList_(value, true);
+  var uniqueEmails = [];
+  var seen = {};
+  var userIds = [];
+  var invalidEmails = [];
+  emails.forEach(function(email) {
+    if (seen[email]) return;
+    seen[email] = true;
+    var user = findUserByEmail_(email);
+    if (!user || user.status !== 'active') {
+      invalidEmails.push(email);
+      return;
+    }
+    if (ownerUser && user.email === ownerUser.email) return;
+    uniqueEmails.push(user.email);
+    if (user.userId) userIds.push(user.userId);
+  });
+  return {
+    emails: uniqueEmails,
+    userIds: userIds,
+    invalidEmails: invalidEmails
   };
 }
 
@@ -518,7 +551,7 @@ function baFoxSafeCreateTask(request) {
     });
   }
 
-  var createFields = ['title', 'owner', 'organization', 'nextAction', 'deadline', 'controlDate', 'reminder', 'status', 'priority', 'category', 'comment'];
+  var createFields = ['title', 'owner', 'collaboratorEmails', 'organization', 'nextAction', 'deadline', 'controlDate', 'reminder', 'status', 'priority', 'category', 'comment'];
   var objectFields = baFoxValidateCreateTaskScalar_(normalized, createFields);
   if (objectFields.length) {
     return baFoxError('VALIDATION_ERROR', 'Create task fields must be simple text values.', {
@@ -588,6 +621,11 @@ function baFoxSafeCreateTask(request) {
   var actorProfile = identityCheck.profile || {};
   var actorLabel = actorProfile.email || actorProfile.displayName || 'BA Fox Web';
   var identityMetadata = baFoxCreateTaskIdentityMetadata_(normalized, actorProfile);
+  if (identityMetadata.collaboratorResolution.invalidEmails.length) {
+    return baFoxError('VALIDATION_ERROR', 'Collaborators must be active workspace users.', {
+      collaboratorEmails: identityMetadata.collaboratorResolution.invalidEmails
+    });
+  }
   var appendResponse = baFoxAppendSafeCreateTaskRow(baFoxSafeCreateTaskRow_(taskId, normalized, now), identityMetadata);
   if (!appendResponse.ok) {
     baFoxAuditTaskAction({
@@ -615,6 +653,7 @@ function baFoxSafeCreateTask(request) {
     newValues: baFoxSafeJson_({
       title: normalized.title || '',
       owner: normalized.owner || 'Лиза',
+      collaboratorEmails: identityMetadata.collaboratorEmails,
       organization: normalized.organization || '',
       category: normalized.category || '',
       status: normalized.status || 'Не начато',

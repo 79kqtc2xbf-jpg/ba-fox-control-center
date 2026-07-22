@@ -2687,6 +2687,18 @@ h1 {
   font-size: 12px;
 }
 
+.sidebar-utility {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.workspace-layout .utility-tab {
+  color: var(--muted-strong);
+}
+
 .dashboard-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -4325,6 +4337,67 @@ body[data-mf-theme="light"] .home-action:hover strong {
   border-color: rgba(255, 79, 216, 0.78);
   background: #ffffff;
   box-shadow: 0 0 0 3px rgba(255, 79, 216, 0.14);
+}
+
+.modal-panel .collaborator-field {
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.modal-panel .collaborator-field legend {
+  padding: 0;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.modal-panel .collaborator-field small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.collaborator-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.collaborator-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #d7dee8;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #172033;
+  cursor: pointer;
+}
+
+.collaborator-option input {
+  width: auto;
+  margin: 0;
+  accent-color: #ec4899;
+}
+
+.collaborator-option span {
+  overflow: hidden;
+  color: #172033 !important;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 560px) {
+  .collaborator-picker {
+    grid-template-columns: 1fr;
+  }
 }
 
 .modal-panel .date-control {
