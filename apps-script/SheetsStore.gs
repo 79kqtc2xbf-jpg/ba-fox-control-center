@@ -43,13 +43,52 @@ function baFoxReadTasksRows() {
   };
 }
 
+var baFoxSheetHeadersMemo_ = {};
+
+function baFoxSheetHeadersCacheKey_(sheet) {
+  if (!sheet || !sheet.getName) {
+    return '';
+  }
+  return 'baFox:sheetHeaders:v1:' + baFoxSafeString(sheet.getName());
+}
+
 function baFoxReadSheetHeaders_(sheet) {
   if (!sheet || sheet.getLastRow() < 1) {
     return [];
   }
-  return sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(header) {
+  var cacheKey = baFoxSheetHeadersCacheKey_(sheet);
+  if (cacheKey && baFoxSheetHeadersMemo_[cacheKey]) {
+    return baFoxSheetHeadersMemo_[cacheKey].slice();
+  }
+  var cache = typeof CacheService !== 'undefined' && CacheService.getScriptCache ? CacheService.getScriptCache() : null;
+  if (cache && cacheKey) {
+    try {
+      var cached = cache.get(cacheKey);
+      if (cached) {
+        var parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          baFoxSheetHeadersMemo_[cacheKey] = parsed;
+          return parsed.slice();
+        }
+      }
+    } catch (cacheReadError) {
+      // Reading headers from the sheet remains the safe fallback.
+    }
+  }
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(header) {
     return baFoxSafeString(header);
   });
+  if (cacheKey) {
+    baFoxSheetHeadersMemo_[cacheKey] = headers;
+    if (cache) {
+      try {
+        cache.put(cacheKey, JSON.stringify(headers), 60);
+      } catch (cacheWriteError) {
+        // A cache miss only affects latency; it must not prevent task saving.
+      }
+    }
+  }
+  return headers.slice();
 }
 
 function baFoxFindHeaderColumn_(headers, names) {
@@ -478,15 +517,22 @@ function baFoxAppendSafeCreateTaskRow(rowValues, identityMetadata) {
     var headerMap = getTaskHeaderMap_(sheet);
     var schema = baFoxTaskIdentitySchemaStatus_(headerMap.headers);
     var finalRowValues = rowValues.slice();
-    while (finalRowValues.length < sheet.getLastColumn()) {
+    while (finalRowValues.length < headerMap.columnCount) {
       finalRowValues.push('');
     }
     if (identityMetadata) {
       writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('OWNER_EMAIL'), identityMetadata.ownerEmail || '');
       writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('OWNER_USER_ID'), identityMetadata.ownerUserId || '');
+      writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('COLLABORATOR_EMAILS'), identityMetadata.collaboratorEmails || '');
+      writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('COLLABORATOR_USER_IDS'), identityMetadata.collaboratorUserIds || '');
       writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('CREATED_BY_EMAIL'), identityMetadata.createdByEmail || '');
       writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('CREATED_BY_USER_ID'), identityMetadata.createdByUserId || '');
       writeOptionalCell_(finalRowValues, headerMap, baFoxOptionalTaskFieldNames_('VISIBILITY'), identityMetadata.visibility || 'team');
+      if (identityMetadata.collaboratorEmails && (!getOptionalColumnIndex_(headerMap, baFoxOptionalTaskFieldNames_('COLLABORATOR_EMAILS')) || !getOptionalColumnIndex_(headerMap, baFoxOptionalTaskFieldNames_('COLLABORATOR_USER_IDS')))) {
+        return baFoxError('TASK_IDENTITY_SCHEMA_INCOMPLETE', 'Collaborator columns are not available in Tasks.', {
+          missingColumns: ['Collaborator Emails', 'Collaborator User IDs']
+        });
+      }
     }
     sheet.appendRow(finalRowValues);
     return baFoxOk({

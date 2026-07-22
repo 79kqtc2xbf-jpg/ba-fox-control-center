@@ -52,6 +52,7 @@ const elements = {
   createTaskButton: document.querySelector('#createTaskButton'),
   createTaskModal: document.querySelector('#createTaskModal'),
   createTaskForm: document.querySelector('#createTaskForm'),
+  taskCollaboratorsSelect: document.querySelector('#taskCollaboratorsSelect'),
   createTaskMessage: document.querySelector('#createTaskMessage'),
   submitCreateTask: document.querySelector('#submitCreateTask'),
   cancelCreateTask: document.querySelector('#cancelCreateTask'),
@@ -941,6 +942,24 @@ function ownerLabel(value) {
 
 function taskOwnerLabel(task) {
   return ownerLabel(task && task.owner);
+}
+
+function taskCollaboratorLabels(task) {
+  const usersByEmail = dashboardUsers().reduce(function (result, user) {
+    const email = normalizeEmail(user && user.email);
+    if (email) result[email] = user;
+    return result;
+  }, {});
+  const collaboratorEmails = identityList(task && task.collaboratorEmailList, task && task.collaboratorEmails);
+  return collaboratorEmails.map(function (email) {
+    const user = usersByEmail[normalizeEmail(email)];
+    return user ? (user.displayName || user.defaultOwnerLabel || user.email) : email;
+  });
+}
+
+function taskAssigneesLabel(task) {
+  const collaborators = taskCollaboratorLabels(task);
+  return taskOwnerLabel(task) + (collaborators.length ? ' + ' + collaborators.join(', ') : '');
 }
 
 function taskDirectionRawValue(task) {
@@ -2418,7 +2437,7 @@ function renderEmpty() {
 
 function taskMeta(task) {
   const meta = [
-    'Ответственный: ' + taskOwnerLabel(task),
+    'Ответственные: ' + taskAssigneesLabel(task),
     'Отдел / направление: ' + taskDirectionLabel(task),
     taskDueDate(task) ? 'Срок: ' + humanDate(taskDueDate(task)) : 'Без срока',
     taskControlDate(task) ? 'Контроль: ' + humanDate(taskControlDate(task)) : '',
@@ -2648,7 +2667,7 @@ function completedTaskCardHtml(task) {
     '</div>',
     '<div class="task-title">' + escapeHtml(removeIsoDateNoise(task.title)) + '</div>',
     '<div class="task-meta">' + [
-      'Ответственный: ' + taskOwnerLabel(task),
+      'Ответственные: ' + taskAssigneesLabel(task),
       task.organization || 'Без компании',
       task.source || task.appSource || task.channel || '',
       task.id ? 'ID: ' + task.id : '',
@@ -3420,7 +3439,7 @@ function managementTaskCardHtml(task) {
     '</div>',
     '<p>' + escapeHtml(nextActionText(task)) + '</p>',
     '<div class="mf-task-meta">',
-    '<span>Ответственный: <strong>' + escapeHtml(taskOwnerLabel(task)) + '</strong></span>',
+    '<span>Ответственные: <strong>' + escapeHtml(taskAssigneesLabel(task)) + '</strong></span>',
     '<span>Отдел / направление: <strong>' + escapeHtml(taskDirectionLabel(task)) + '</strong></span>',
     '<span>Контакт: <strong>' + escapeHtml(task.organization || 'Без контакта') + '</strong></span>',
     '<span>Контроль: <strong>' + escapeHtml(taskControlDate(task) ? humanDate(taskControlDate(task)) : '-') + '</strong></span>',
@@ -4348,6 +4367,11 @@ function openCreateTaskModal() {
     const label = user.defaultOwnerLabel || user.displayName || user.email;
     return '<option value="' + escapeHtml(label) + '">' + escapeHtml(user.displayName || label) + ' · ' + escapeHtml(user.department || 'Без отдела') + '</option>';
   }).join('') + '<option value="Не назначено">Не назначено</option>';
+  elements.taskCollaboratorsSelect.innerHTML = users.map(function (user) {
+    const name = user.displayName || user.defaultOwnerLabel || user.email;
+    const detail = user.department ? ' · ' + user.department : '';
+    return '<label class="collaborator-option"><input type="checkbox" name="collaboratorEmails" value="' + escapeHtml(user.email) + '"><span>' + escapeHtml(name + detail) + '</span></label>';
+  }).join('');
   elements.createTaskForm.elements.category.innerHTML = '<option value="">Не назначено</option>' + dashboardDepartments().map(function (department) {
     return '<option value="' + escapeHtml(department) + '">' + escapeHtml(department) + '</option>';
   }).join('');
@@ -4755,6 +4779,7 @@ function createTaskPayloadFromForm() {
   return {
     title: String(formData.get('title') || '').trim(),
     owner: String(formData.get('owner') || '').trim(),
+    collaboratorEmails: formData.getAll('collaboratorEmails').map(function (email) { return String(email || '').trim(); }).filter(Boolean).join(','),
     organization: String(formData.get('organization') || '').trim(),
     category: String(formData.get('category') || '').trim(),
     status: String(formData.get('status') || '').trim(),

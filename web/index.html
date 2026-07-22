@@ -43,13 +43,15 @@
           <button class="tab active" type="button" data-tab="dashboard" aria-selected="true">Главная</button>
           <button class="tab" type="button" data-tab="myTasks" aria-selected="false">Мои задачи</button>
           <button class="tab" type="button" data-tab="all" aria-selected="false">Задачи команды</button>
-          <button class="tab" type="button" data-tab="trash" aria-selected="false">Корзина</button>
           <button class="tab" type="button" data-tab="team" aria-selected="false">Команда</button>
           <button class="tab" type="button" data-tab="departments" data-roles="admin executive" aria-selected="false">Направления</button>
           <button class="tab" type="button" data-tab="dependencies" data-roles="admin executive" aria-selected="false">Риски</button>
           <button class="tab" type="button" data-tab="settings" aria-selected="false">Профиль</button>
           <button class="tab" type="button" data-tab="admin" data-roles="admin" aria-selected="false">Администрирование</button>
         </nav>
+        <div class="sidebar-utility" aria-label="Служебные разделы">
+          <button class="tab utility-tab" type="button" data-tab="trash" aria-selected="false">Корзина</button>
+        </div>
       </aside>
 
       <section class="workspace-main">
@@ -110,6 +112,11 @@
               <option value="Не назначено">Не назначено</option>
             </select>
           </label>
+          <fieldset class="form-field form-field-wide collaborator-field">
+            <legend>Дополнительные ответственные <em>(необязательно)</em></legend>
+            <div class="collaborator-picker" id="taskCollaboratorsSelect"></div>
+            <small>Можно выбрать нескольких соисполнителей. Основной ответственный указывается отдельно.</small>
+          </fieldset>
           <label class="form-field">
             <span>Контакт <em>(необязательно)</em></span>
             <input type="text" name="organization" autocomplete="organization" placeholder="Можно оставить пустым" />
