@@ -607,7 +607,9 @@ function baFoxSafeCreateTask(request) {
     });
   }
 
+  var identityStartedAt = new Date().getTime();
   var identityCheck = requireAuthorizedSafeWrite_(normalized);
+  var identityMs = new Date().getTime() - identityStartedAt;
   if (!identityCheck.ok) {
     return identityCheck.error;
   }
@@ -641,6 +643,7 @@ function baFoxSafeCreateTask(request) {
     return appendResponse;
   }
 
+  var auditStartedAt = new Date().getTime();
   var auditResult = baFoxAuditTaskAction({
     timestamp: now,
     actor: actorLabel,
@@ -686,7 +689,9 @@ function baFoxSafeCreateTask(request) {
     performance: {
       operation: 'createTask',
       durationMs: new Date().getTime() - operationStartedAt,
+      identityMs: identityMs,
       sheetWriteMs: appendResponse.data && appendResponse.data.performance ? appendResponse.data.performance.sheetWriteMs : null,
+      auditMs: new Date().getTime() - auditStartedAt,
       timestamp: baFoxIsoNow()
     }
   });

@@ -311,7 +311,8 @@ function baFoxProtectedTaskReadRoute_(route) {
     'completed',
     'dashboard',
     'workspaceDashboard',
-    'fullDashboard'
+    'fullDashboard',
+    'contacts'
   ].indexOf(route) !== -1;
 }
 
@@ -415,6 +416,9 @@ function baFoxBuildRouteResponse_(route, parameters) {
       break;
     case 'visibilityPreview':
       response = getVisibilityPreview(parameters);
+      break;
+    case 'contacts':
+      response = baFoxOk({ contacts: baFoxListContacts_(parameters.limit || 100) });
       break;
     case 'taskAction':
       response = taskAction(parameters);
